@@ -1,0 +1,25 @@
+# ResolveMeQ Web App (Vite) - Netlify
+# Deploy from repo root. Do NOT set "Base directory" in Netlify (leave blank).
+
+[build]
+  command = "npm run build"
+  publish = "build"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+# Ensure JS is served with correct MIME type (fixes blank page / module script error)
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+
+[[headers]]
+  for = "/*.mjs"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+
+[[headers]]
+  for = "/assets/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
