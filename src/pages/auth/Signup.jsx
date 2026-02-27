@@ -13,6 +13,7 @@ import {
   X
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import { api } from '../../services/api';
 
 /**
  * Signup page component with modern design and form validation
@@ -96,16 +97,29 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
     }
     
     setLoading(true);
+    setErrors({});
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Prepare user data for API
+      const userData = {
+        email: formData.email,
+        password: formData.password,
+        username: formData.email.split('@')[0],
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        name: `${formData.firstName} ${formData.lastName}`,
+        department: formData.company,
+      };
       
-      // For now, accept any signup data
-      onSignup(formData);
+      // Call real API
+      await api.auth.register(userData);
+      
+      // Show success message and redirect to login
+      alert('Registration successful! Please check your email to verify your account.');
+      onNavigateToLogin();
     } catch (error) {
       console.error('Signup error:', error);
-      setErrors({ general: 'Signup failed. Please try again.' });
+      setErrors({ general: error.message || 'Signup failed. Please try again.' });
     } finally {
       setLoading(false);
     }

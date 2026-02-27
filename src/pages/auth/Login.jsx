@@ -13,6 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import { api, TokenService } from '../../services/api';
 
 /**
  * Login page component with modern design and glassmorphism effects
@@ -67,16 +68,21 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
     }
     
     setLoading(true);
+    setErrors({});
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Call real API
+      const response = await api.auth.login(formData.email, formData.password);
       
-      // For now, accept any credentials
-      onLogin(formData);
+      // Get user profile
+      const user = await api.auth.getCurrentUser();
+      TokenService.setUser(user);
+      
+      // Call parent login handler
+      onLogin({ ...formData, user });
     } catch (error) {
       console.error('Login error:', error);
-      setErrors({ general: 'Login failed. Please try again.' });
+      setErrors({ general: error.message || 'Login failed. Please check your credentials.' });
     } finally {
       setLoading(false);
     }

@@ -1,20 +1,24 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import GlobalSearchPanel from '../GlobalSearchPanel';
 import { cn } from '../../utils/cn';
+
+const PATH_TO_PAGE_ID = {
+  '/': 'dashboard',
+  '/tickets': 'tickets',
+  '/analytics': 'analytics',
+  '/teams': 'teams',
+  '/users': 'users',
+  '/knowledge-base': 'knowledge-base',
+  '/billing': 'billing',
+  '/settings': 'settings',
+};
 
 /**
  * Main layout component that wraps the entire application
- * @param {Object} props - Component props
- * @param {React.ReactNode} props.children - Page content
- * @param {Object} props.user - Current user object
- * @param {Function} props.onNavigate - Function to handle navigation
- * @param {Function} props.onSearch - Function to handle search
- * @param {Function} props.onThemeChange - Function to handle theme change
- * @param {Function} props.onLogout - Function to handle logout
- * @param {string} props.theme - Current theme mode
- * @param {string} props.className - Additional CSS classes
  */
 const Layout = ({
   children,
@@ -24,15 +28,20 @@ const Layout = ({
   onThemeChange,
   onLogout,
   theme,
-  className
+  className,
+  activeTeamId,
+  activeTeamName,
+  userTeams = [],
+  onActiveTeamChange,
+  planName,
+  searchQuery,
+  searchResults,
+  searchLoading,
+  searchError,
 }) => {
+  const location = useLocation();
+  const activeItem = PATH_TO_PAGE_ID[location.pathname] ?? 'dashboard';
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activeItem, setActiveItem] = useState('dashboard');
-
-  const handleNavigate = (itemId) => {
-    setActiveItem(itemId);
-    onNavigate?.(itemId);
-  };
 
   const handleToggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
@@ -45,25 +54,41 @@ const Layout = ({
         collapsed={sidebarCollapsed}
         onToggle={handleToggleSidebar}
         activeItem={activeItem}
-        onNavigate={handleNavigate}
+        onNavigate={onNavigate}
         theme={theme}
         onThemeChange={onThemeChange}
         className="fixed left-0 top-0 h-full z-40"
+        activeTeamId={activeTeamId}
+        activeTeamName={activeTeamName}
+        userTeams={userTeams}
+        onActiveTeamChange={onActiveTeamChange}
       />
 
-      {/* Main Content Area */}
-      <div className={cn(
-        'transition-all duration-300 ease-out',
-        sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-70',
-        'min-h-screen'
-      )}>
+      {/* Main Content Area - margin matches sidebar width so header/search push when sidebar expands */}
+      <div
+        className={cn(
+          'min-h-screen transition-[margin] duration-300 ease-out',
+          sidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[280px]'
+        )}
+      >
         {/* Header */}
         <Header
           user={user}
+          planName={planName}
           onSearch={onSearch}
           onThemeChange={onThemeChange}
           onLogout={onLogout}
+          onNavigate={onNavigate}
           theme={theme}
+        />
+
+        {/* Global Search Results (below header) */}
+        <GlobalSearchPanel
+          query={searchQuery}
+          results={searchResults}
+          loading={searchLoading}
+          error={searchError}
+          onNavigate={onNavigate}
         />
 
         {/* Page Content */}

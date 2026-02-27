@@ -20,10 +20,10 @@ const Card = React.forwardRef(({
   const baseClasses = 'rounded-lg transition-all duration-300';
   
   const variants = {
-    default: 'bg-white border border-neutral-200 shadow-sm',
+    default: 'bg-white dark:bg-gray-900/80 border border-neutral-200 dark:border-gray-700 shadow-sm',
     glass: 'glass-card',
-    elevated: 'bg-white border border-neutral-200 shadow-lg hover:shadow-xl',
-    interactive: 'bg-white border border-neutral-200 shadow-sm hover:shadow-lg hover:scale-[1.02] cursor-pointer',
+    elevated: 'bg-white dark:bg-gray-900/80 border border-neutral-200 dark:border-gray-700 shadow-lg hover:shadow-xl',
+    interactive: 'bg-white dark:bg-gray-900/80 border border-neutral-200 dark:border-gray-700 shadow-sm hover:shadow-lg hover:scale-[1.02] cursor-pointer',
   };
   
   const hoverClasses = hover ? 'hover:shadow-lg hover:scale-[1.02]' : '';

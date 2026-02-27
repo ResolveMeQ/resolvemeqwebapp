@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Home, 
@@ -6,10 +6,12 @@ import {
   BarChart3, 
   Users, 
   User,
+  BookOpen,
   Settings,
   CreditCard,
   ChevronLeft, 
   ChevronRight,
+  ChevronDown,
   Menu,
   X,
   Sun,
@@ -37,9 +39,23 @@ const Sidebar = ({
   onNavigate,
   className,
   theme = THEME_MODES.LIGHT,
-  onThemeChange
+  onThemeChange,
+  activeTeamId,
+  activeTeamName,
+  userTeams = [],
+  onActiveTeamChange,
 }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
+  const teamDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (teamDropdownRef.current && !teamDropdownRef.current.contains(e.target)) setTeamDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const iconMap = {
     Home,
@@ -47,6 +63,7 @@ const Sidebar = ({
     BarChart3,
     Users,
     User,
+    BookOpen,
     Settings,
     CreditCard,
   };
@@ -57,8 +74,8 @@ const Sidebar = ({
     [THEME_MODES.AUTO]: Monitor,
   };
 
-  const handleNavigate = (itemId) => {
-    onNavigate?.(itemId);
+  const handleNavigate = (path) => {
+    onNavigate?.(path);
     setIsMobileOpen(false);
   };
 
@@ -130,7 +147,7 @@ const Sidebar = ({
           return (
             <motion.button
               key={item.id}
-              onClick={() => handleNavigate(item.id)}
+              onClick={() => handleNavigate(item.href)}
               className={cn(
                 'w-full flex items-center space-x-3 px-3 py-3 rounded-lg transition-all duration-200 text-left group',
                 isActive
@@ -164,9 +181,77 @@ const Sidebar = ({
         })}
       </nav>
 
+      {/* Active team switcher (one team context for usage/billing) - when collapsed, dropdown opens to the right */}
+      {(userTeams.length > 0 || activeTeamId) && (
+        <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-800" ref={teamDropdownRef}>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setTeamDropdownOpen(!teamDropdownOpen)}
+              className={cn(
+                'w-full flex items-center justify-between gap-2 px-3 py-3 rounded-lg transition-all duration-200 text-left',
+                'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+              )}
+              title={collapsed ? (activeTeamName || 'Select team') : undefined}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                  <Users size={20} />
+                </div>
+                {!collapsed && (
+                  <span className="font-medium truncate text-sm">
+                    {activeTeamName || 'Select team'}
+                  </span>
+                )}
+              </div>
+              {!collapsed && <ChevronDown size={16} className="text-gray-500 dark:text-gray-400 shrink-0" />}
+            </button>
+            <AnimatePresence>
+              {teamDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, ...(collapsed ? { x: -8 } : { y: -4 }) }}
+                  animate={{ opacity: 1, x: 0, y: 0 }}
+                  exit={{ opacity: 0, ...(collapsed ? { x: -8 } : { y: -4 }) }}
+                  className={cn(
+                    'absolute py-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-48 overflow-y-auto',
+                    collapsed
+                      ? 'left-full ml-1 top-0 min-w-[180px]'
+                      : 'left-0 right-0 bottom-full mb-1'
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => { onActiveTeamChange?.(null); setTeamDropdownOpen(false); }}
+                    className={cn(
+                      'w-full px-3 py-2 text-left text-sm',
+                      !activeTeamId ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    )}
+                  >
+                    No team selected
+                  </button>
+                  {userTeams.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => { onActiveTeamChange?.(t.id); setTeamDropdownOpen(false); }}
+                      className={cn(
+                        'w-full px-3 py-2 text-left text-sm truncate',
+                        activeTeamId === t.id ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      )}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
+
       {/* Theme Toggle */}
       <div className="px-4 py-2">
-        <button
+        <motion.button
           onClick={handleThemeChange}
           className="w-full flex items-center space-x-3 px-3 py-3 rounded-lg transition-all duration-200 text-left group hover:bg-gray-100 dark:hover:bg-gray-800"
           whileHover={{ scale: 1.02 }}
@@ -185,10 +270,10 @@ const Sidebar = ({
                 className="font-medium text-gray-600 dark:text-gray-300"
               >
                 {theme.charAt(0).toUpperCase() + theme.slice(1)} Mode
-              </motion.span>
-            )}
+            </motion.span>
+          )}
           </AnimatePresence>
-        </button>
+        </motion.button>
       </div>
 
       {/* Footer */}

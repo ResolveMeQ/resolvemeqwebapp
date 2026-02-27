@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import Tickets from './pages/Tickets';
 import Analytics from './pages/Analytics';
 import Teams from './pages/Teams';
 import Users from './pages/Users';
+import KnowledgeBase from './pages/KnowledgeBase';
 import Billing from './pages/Billing';
 import Settings from './pages/Settings';
 import Login from './pages/auth/Login';
@@ -13,20 +15,89 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
 import './index.css';
 import { THEME_MODES } from './constants';
+import { TokenService, api } from './services/api';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const [searchResults, setSearchResults] = useState({
+    tickets: [],
+    knowledgeBase: [],
+    users: [],
+  });
   const [theme, setTheme] = useState(THEME_MODES.LIGHT);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authPage, setAuthPage] = useState('login');
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [preferences, setPreferences] = useState(null);
+  const [userTeams, setUserTeams] = useState([]);
+  const [planName, setPlanName] = useState(null);
 
-  // Mock user data
-  const user = {
-    name: 'Nyuydine Bill',
-    email: 'nyuydine.bill@resolvemeq.com',
-    avatar: null,
-    role: 'admin'
+  // Check for existing authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = TokenService.getAccessToken();
+      const savedUser = TokenService.getUser();
+      
+      if (token && savedUser) {
+        setUser(savedUser);
+        setIsAuthenticated(true);
+      } else if (token) {
+        try {
+          const userData = await api.auth.getCurrentUser();
+          TokenService.setUser(userData);
+          setUser(userData);
+          setIsAuthenticated(true);
+        } catch (error) {
+          console.error('Auth check failed:', error);
+          TokenService.clearTokens();
+        }
+      }
+      setLoading(false);
+    };
+    
+    checkAuth();
+  }, []);
+
+  // Load preferences, user's teams, and subscription (for header plan badge) when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setPreferences(null);
+      setUserTeams([]);
+      setPlanName(null);
+      return;
+    }
+    const load = async () => {
+      try {
+        const [prefs, teams, sub] = await Promise.all([
+          api.settings.getPreferences(),
+          api.teams.list().catch(() => []),
+          api.billing.getSubscription().catch(() => null),
+        ]);
+        setPreferences(prefs || null);
+        setUserTeams(Array.isArray(teams) ? teams : []);
+        const name = sub?.plan_detail?.name ?? sub?.plan?.name ?? null;
+        setPlanName(name || null);
+      } catch {
+        setPreferences(null);
+        setUserTeams([]);
+        setPlanName(null);
+      }
+    };
+    load();
+  }, [isAuthenticated]);
+
+  const handleActiveTeamChange = async (teamId) => {
+    try {
+      await api.settings.updatePreferences({ active_team: teamId || null });
+      const prefs = await api.settings.getPreferences();
+      setPreferences(prefs || null);
+    } catch (e) {
+      console.error('Failed to set active team:', e);
+    }
   };
 
   // Theme management
@@ -87,118 +158,148 @@ function App() {
     applyTheme(newTheme);
   };
 
-  const handleNavigate = (page) => {
-    setCurrentPage(page);
+  const handleNavigate = (to) => {
+    const path = typeof to === 'string' && to.startsWith('/') ? to : `/${to}`;
+    navigate(path);
   };
 
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-    console.log('Searching for:', query);
+  const handleSearch = async (query) => {
+    const trimmed = (query || '').trim();
+    setSearchQuery(trimmed);
+
+    if (!trimmed) {
+      setSearchResults({ tickets: [], knowledgeBase: [], users: [] });
+      setSearchError(null);
+      setSearchLoading(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    setSearchError(null);
+
+    try {
+      const [tickets, kbArticles, teamMembers] = await Promise.all([
+        api.tickets.search({ q: trimmed }).catch(() => []),
+        api.knowledgeBase.search(trimmed).catch(() => []),
+        api.users.listTeamMembers().catch(() => []),
+      ]);
+
+      const lower = trimmed.toLowerCase();
+      const usersFiltered = (Array.isArray(teamMembers) ? teamMembers : []).filter((u) => {
+        const fullName = u.full_name || `${u.first_name || ''} ${u.last_name || ''}`.trim();
+        return (
+          (fullName && fullName.toLowerCase().includes(lower)) ||
+          (u.email && u.email.toLowerCase().includes(lower)) ||
+          (u.username && u.username.toLowerCase().includes(lower))
+        );
+      });
+
+      setSearchResults({
+        tickets: Array.isArray(tickets) ? tickets : [],
+        knowledgeBase: Array.isArray(kbArticles) ? kbArticles : [],
+        users: usersFiltered,
+      });
+    } catch (err) {
+      console.error('Global search failed:', err);
+      setSearchError(err?.message || 'Search failed. Please try again.');
+      setSearchResults({ tickets: [], knowledgeBase: [], users: [] });
+    } finally {
+      setSearchLoading(false);
+    }
   };
 
   const handleLogout = () => {
+    api.auth.logout();
     setIsAuthenticated(false);
-    setAuthPage('login');
-    console.log('Logging out...');
+    setUser(null);
+    navigate('/login');
   };
 
   // Authentication handlers
-  const handleLogin = (credentials) => {
-    // For now, accept any credentials
-    console.log('Login attempt:', credentials);
+  const handleLogin = (loginData) => {
+    setUser(loginData.user);
     setIsAuthenticated(true);
-    setCurrentPage('dashboard');
+    navigate('/');
   };
 
   const handleSignup = (userData) => {
-    // For now, accept any signup data
-    console.log('Signup attempt:', userData);
-    setIsAuthenticated(true);
-    setCurrentPage('dashboard');
+    setAuthPage('login');
+    navigate('/login');
   };
 
   const handleForgotPassword = (email) => {
-    // For now, just log the email
-    console.log('Forgot password for:', email);
-    setAuthPage('reset-password');
+    navigate('/reset-password');
   };
 
   const handleResetPassword = (passwordData) => {
-    // For now, just log the password reset
-    console.log('Password reset:', passwordData);
     setAuthPage('login');
+    navigate('/login');
   };
 
-  const renderAuthPage = () => {
-    switch (authPage) {
-      case 'login':
-        return <Login onLogin={handleLogin} onNavigateToSignup={() => setAuthPage('signup')} onNavigateToForgotPassword={() => setAuthPage('forgot-password')} />;
-      case 'signup':
-        return <Signup onSignup={handleSignup} onNavigateToLogin={() => setAuthPage('login')} />;
-      case 'forgot-password':
-        return <ForgotPassword onSubmit={handleForgotPassword} onNavigateToLogin={() => setAuthPage('login')} />;
-      case 'reset-password':
-        return <ResetPassword onSubmit={handleResetPassword} onNavigateToLogin={() => setAuthPage('login')} />;
-      default:
-        return <Login onLogin={handleLogin} onNavigateToSignup={() => setAuthPage('signup')} onNavigateToForgotPassword={() => setAuthPage('forgot-password')} />;
-    }
+  const renderAuthRoutes = () => (
+    <Routes>
+      <Route path="/login" element={<Login onLogin={handleLogin} onNavigateToSignup={() => navigate('/signup')} onNavigateToForgotPassword={() => navigate('/forgot-password')} />} />
+      <Route path="/signup" element={<Signup onSignup={handleSignup} onNavigateToLogin={() => navigate('/login')} />} />
+      <Route path="/forgot-password" element={<ForgotPassword onSubmit={handleForgotPassword} onNavigateToLogin={() => navigate('/login')} />} />
+      <Route path="/reset-password" element={<ResetPassword onSubmit={handleResetPassword} onNavigateToLogin={() => navigate('/login')} />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
+  );
+
+  const layoutProps = {
+    user,
+    planName,
+    onNavigate: handleNavigate,
+    onSearch: handleSearch,
+    onThemeChange: handleThemeChange,
+    onLogout: handleLogout,
+    theme,
+    searchQuery,
+    searchResults,
+    searchLoading,
+    searchError,
+    activeTeamId: preferences?.active_team,
+    activeTeamName: preferences?.active_team_name,
+    userTeams,
+    onActiveTeamChange: handleActiveTeamChange,
   };
 
-  const renderPage = () => {
-    try {
-      switch (currentPage) {
-        case 'dashboard':
-          return <Dashboard />;
-        case 'tickets':
-          return <Tickets />;
-        case 'analytics':
-          return <Analytics />;
-        case 'teams':
-          return <Teams />;
-        case 'users':
-          return <Users />;
-        case 'billing':
-          return <Billing />;
-        case 'settings':
-          return <Settings />;
-        default:
-          return <Dashboard />;
-      }
-    } catch (error) {
-      console.error('Error rendering page:', error);
-      return (
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">Error Loading Page</h2>
-          <p className="text-gray-600 mb-4">Something went wrong. Please try refreshing the page.</p>
-          <p className="text-sm text-gray-500 mb-4">Error: {error.message}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Refresh Page
-          </button>
+  const renderMainRoutes = () => (
+    <Routes>
+      <Route path="/" element={<Layout {...layoutProps}><Dashboard /></Layout>} />
+      <Route path="/tickets" element={<Layout {...layoutProps}><Tickets /></Layout>} />
+      <Route path="/analytics" element={<Layout {...layoutProps}><Analytics /></Layout>} />
+      <Route path="/teams" element={<Layout {...layoutProps}><Teams /></Layout>} />
+      <Route path="/users" element={<Layout {...layoutProps}><Users /></Layout>} />
+      <Route path="/knowledge-base" element={<Layout {...layoutProps}><KnowledgeBase /></Layout>} />
+      <Route path="/billing" element={<Layout {...layoutProps}><Billing /></Layout>} />
+      <Route path="/settings" element={<Layout {...layoutProps}><Settings /></Layout>} />
+      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/signup" element={<Navigate to="/" replace />} />
+      <Route path="/forgot-password" element={<Navigate to="/" replace />} />
+      <Route path="/reset-password" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+
+  // Show loading spinner while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-purple-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-300">Loading...</p>
         </div>
-      );
-    }
-  };
-
-  // Show authentication pages if not authenticated
-  if (!isAuthenticated) {
-    return renderAuthPage();
+      </div>
+    );
   }
 
-  return (
-    <Layout
-      user={user}
-      onNavigate={handleNavigate}
-      onSearch={handleSearch}
-      onThemeChange={handleThemeChange}
-      onLogout={handleLogout}
-      theme={theme}
-    >
-      {renderPage()}
-    </Layout>
-  );
+  // Show authentication routes if not authenticated
+  if (!isAuthenticated) {
+    return renderAuthRoutes();
+  }
+
+  return renderMainRoutes();
 }
 
 export default App;

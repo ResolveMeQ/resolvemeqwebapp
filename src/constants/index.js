@@ -161,6 +161,12 @@ export const NAVIGATION_ITEMS = [
     icon: 'User',
   },
   {
+    id: 'knowledge-base',
+    label: 'Knowledge Base',
+    href: '/knowledge-base',
+    icon: 'BookOpen',
+  },
+  {
     id: 'billing',
     label: 'Billing',
     href: '/billing',

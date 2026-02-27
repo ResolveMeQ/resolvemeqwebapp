@@ -13,30 +13,24 @@ import {
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { THEME_MODES } from '../../constants';
+import { api } from '../../services/api';
 
 /**
- * Header component with search, notifications, and user menu
- * @param {Object} props - Component props
- * @param {Object} props.user - Current user object
- * @param {Function} props.onSearch - Function to handle search
- * @param {Function} props.onThemeChange - Function to handle theme change
- * @param {Function} props.onLogout - Function to handle logout
- * @param {string} props.theme - Current theme mode
- * @param {string} props.className - Additional CSS classes
+ * Header component with search, notifications, and user menu.
+ * User and plan are from props (no static defaults).
  */
 const Header = ({
-  user = {
-    name: 'Nyuydine BIll',
-    email: 'nyuydine.bill@resolvemeq.com',
-    avatar: null,
-    role: 'admin'
-  },
+  user,
+  planName,
   onSearch,
   onThemeChange,
   onLogout,
+  onNavigate,
   theme = THEME_MODES.LIGHT,
   className
 }) => {
+  const displayName = user?.full_name || (user?.first_name || user?.last_name ? [user.first_name, user.last_name].filter(Boolean).join(' ') : null) || user?.email || user?.username || 'Account';
+  const displayRole = user?.is_staff ? 'Agent' : 'Member';
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
@@ -74,29 +68,55 @@ const Header = ({
     { value: THEME_MODES.AUTO, icon: Monitor, label: 'Auto' },
   ];
 
-  const notifications = [
-    {
-      id: 1,
-      title: 'New ticket assigned',
-      message: 'You have been assigned ticket #1234',
-      time: '2 minutes ago',
-      type: 'info'
-    },
-    {
-      id: 2,
-      title: 'System update',
-      message: 'Scheduled maintenance completed',
-      time: '1 hour ago',
-      type: 'success'
-    },
-    {
-      id: 3,
-      title: 'Critical alert',
-      message: 'High priority ticket requires attention',
-      time: '3 hours ago',
-      type: 'warning'
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState(null);
+
+  const fetchNotifications = async () => {
+    setNotificationsLoading(true);
+    setNotificationsError(null);
+    try {
+      const data = await api.notifications.list();
+      setNotifications(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setNotificationsError(err?.message || 'Failed to load notifications');
+      setNotifications([]);
+    } finally {
+      setNotificationsLoading(false);
     }
-  ];
+  };
+
+  useEffect(() => {
+    if (user) fetchNotifications();
+  }, [user]);
+
+  useEffect(() => {
+    if (isNotificationsOpen && user) fetchNotifications();
+  }, [isNotificationsOpen]);
+
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification.is_read) {
+      try {
+        await api.notifications.markRead(notification.id);
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n))
+        );
+      } catch (_) {}
+    }
+    if (notification.link && onNavigate) {
+      setIsNotificationsOpen(false);
+      onNavigate(notification.link);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await api.notifications.markAllRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    } catch (_) {}
+  };
 
   return (
     <header className={cn(
@@ -139,11 +159,13 @@ const Header = ({
 
         {/* Right Side Actions */}
         <div className="flex items-center space-x-4">
-          {/* Billing Status */}
-          <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border border-blue-200/30 dark:border-blue-700/30 rounded-lg">
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Pro Plan</span>
-          </div>
+          {/* Billing Status - dynamic from subscription when available */}
+          {planName && (
+            <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border border-blue-200/30 dark:border-blue-700/30 rounded-lg">
+              <div className="w-2 h-2 bg-green-500 rounded-full" />
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{planName}</span>
+            </div>
+          )}
 
           {/* Theme Toggle */}
           <div className="relative" ref={themeMenuRef}>
@@ -208,9 +230,9 @@ const Header = ({
               aria-label="Notifications"
             >
               <Bell size={20} className="text-gray-600 dark:text-gray-300" />
-              {notifications.length > 0 && (
+              {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                  {notifications.length}
+                  {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </button>
@@ -223,37 +245,67 @@ const Header = ({
                   exit={{ opacity: 0, y: -10, scale: 0.95 }}
                   className="absolute right-0 mt-2 w-80 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-gray-200/20 dark:border-gray-700/20 rounded-lg shadow-lg z-50"
                 >
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                  <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                     <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
+                    {unreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleMarkAllRead}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        Mark all read
+                      </button>
+                    )}
                   </div>
                   <div className="max-h-96 overflow-y-auto">
-                    {notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className="p-4 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-start space-x-3">
-                          <div className={cn(
-                            'w-2 h-2 rounded-full mt-2 flex-shrink-0',
-                            notification.type === 'info' && 'bg-blue-500',
-                            notification.type === 'success' && 'bg-green-500',
-                            notification.type === 'warning' && 'bg-yellow-500',
-                            notification.type === 'error' && 'bg-red-500'
-                          )} />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                              {notification.title}
-                            </p>
-                            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                              {notification.message}
-                            </p>
-                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                              {notification.time}
-                            </p>
-                          </div>
-                        </div>
+                    {notificationsLoading ? (
+                      <div className="p-6 text-center text-gray-500 dark:text-gray-400 text-sm">
+                        Loading…
                       </div>
-                    ))}
+                    ) : notificationsError ? (
+                      <div className="p-6 text-center text-red-500 dark:text-red-400 text-sm">
+                        {notificationsError}
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <div className="p-6 text-center text-gray-500 dark:text-gray-400 text-sm">
+                        No notifications
+                      </div>
+                    ) : (
+                      notifications.map((notification) => (
+                        <button
+                          type="button"
+                          key={notification.id}
+                          onClick={() => handleNotificationClick(notification)}
+                          className={cn(
+                            'w-full text-left p-4 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer',
+                            !notification.is_read && 'bg-blue-50/50 dark:bg-blue-900/10'
+                          )}
+                        >
+                          <div className="flex items-start space-x-3">
+                            <div className={cn(
+                              'w-2 h-2 rounded-full mt-2 flex-shrink-0',
+                              notification.type === 'info' && 'bg-blue-500',
+                              notification.type === 'success' && 'bg-green-500',
+                              notification.type === 'warning' && 'bg-yellow-500',
+                              notification.type === 'error' && 'bg-red-500'
+                            )} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                {notification.title}
+                              </p>
+                              {notification.message && (
+                                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                                  {notification.message}
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                                {notification.time}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -271,17 +323,17 @@ const Header = ({
               aria-label="User menu"
             >
               <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-full flex items-center justify-center">
-                {user.avatar ? (
-                  <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                {user?.avatar || user?.profile_image_url ? (
+                  <img src={user.avatar || user.profile_image_url} alt={displayName} className="w-full h-full rounded-full object-cover" />
                 ) : (
                   <span className="text-white font-medium text-sm">
-                    {user.name.charAt(0).toUpperCase()}
+                    {String(displayName).charAt(0).toUpperCase()}
                   </span>
                 )}
               </div>
               <div className="hidden md:block text-left">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{user.role}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[140px]">{displayName}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{displayRole}</p>
               </div>
               <ChevronDown size={16} className="text-gray-500 dark:text-gray-400" />
             </button>
@@ -295,14 +347,14 @@ const Header = ({
                   className="absolute right-0 mt-2 w-56 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-gray-200/20 dark:border-gray-700/20 rounded-lg shadow-lg z-50"
                 >
                   <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{displayName}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{user?.email ?? '—'}</p>
                   </div>
                   <div className="p-2">
                     <button
                       onClick={() => {
                         setIsUserMenuOpen(false);
-                        // Navigate to settings
+                        onNavigate?.('settings');
                       }}
                       className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                     >

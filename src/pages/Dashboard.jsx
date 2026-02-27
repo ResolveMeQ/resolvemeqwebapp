@@ -1,104 +1,101 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { 
-  Users, 
-  Clock, 
-  CheckCircle, 
-  AlertTriangle,
-  MessageSquare,
-  Phone,
-  Mail,
-  Calendar,
-  Star,
-  Zap,
-  Target,
-  Award,
-  Shield,
-  Headphones,
-  Settings,
-  FileText,
-  Eye,
-  TrendingUp,
-  TrendingDown,
-  MoreHorizontal
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Ticket, FolderOpen, CheckCircle, Clock, ListTodo, Plus } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import AIRecommendationsPanel from '../components/AIRecommendationsPanel';
+import { api } from '../services/api';
 
 /**
- * Dashboard page component - Static display of ResolveMeQ IT Helpdesk information
+ * Dashboard page component - Real-time analytics and ticket overview
  */
 const Dashboard = () => {
-  // Mock recent tickets data
-  const recentTickets = [
-    {
-      id: 1,
-      title: 'WiFi Connection Issues',
-      description: 'Unable to connect to office WiFi network',
-      status: 'open',
-      priority: 'high',
-      assignee: 'Sarah Johnson',
-      createdAt: '2 hours ago',
-      category: 'Network'
-    },
-    {
-      id: 2,
-      title: 'Software Installation Failed',
-      description: 'Adobe Creative Suite installation keeps failing',
-      status: 'in-progress',
-      priority: 'medium',
-      assignee: 'Mike Chen',
-      createdAt: '4 hours ago',
-      category: 'Software'
-    },
-    {
-      id: 3,
-      title: 'Laptop Won\'t Start',
-      description: 'Computer shows black screen on startup',
-      status: 'resolved',
-      priority: 'high',
-      assignee: 'Emma Davis',
-      createdAt: '1 day ago',
-      category: 'Hardware'
-    },
-    {
-      id: 4,
-      title: 'Email Sync Problems',
-      description: 'Outlook not syncing with Exchange server',
-      status: 'open',
-      priority: 'low',
-      assignee: 'Unassigned',
-      createdAt: '2 days ago',
-      category: 'Email'
-    },
-    {
-      id: 5,
-      title: 'Printer Configuration',
-      description: 'Need help setting up new office printer',
-      status: 'in-progress',
-      priority: 'medium',
-      assignee: 'John Smith',
-      createdAt: '3 days ago',
-      category: 'Hardware'
+  const navigate = useNavigate();
+  const [analytics, setAnalytics] = useState(null);
+  const [recentTickets, setRecentTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const [analyticsData, ticketsData] = await Promise.all([
+        api.analytics.getTicketAnalytics(),
+        api.tickets.list({ limit: 5 })
+      ]);
+      
+      setAnalytics(analyticsData);
+      setRecentTickets(Array.isArray(ticketsData) ? ticketsData.slice(0, 5) : []);
+    } catch (err) {
+      console.error('Error loading dashboard:', err);
+      setError(err.message);
+      setAnalytics({
+        open_tickets: 0,
+        closed_tickets: 0,
+        avg_resolution_time_seconds: null,
+        tickets_per_week: []
+      });
+      setRecentTickets([]);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const formatTime = (seconds) => {
+    if (!seconds) return 'N/A';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+
+  const formatTicketTime = (timestamp) => {
+    if (!timestamp) return 'Unknown';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now - date;
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    
+    if (hours < 1) return 'Just now';
+    if (hours < 24) return `${hours} hours ago`;
+    const days = Math.floor(hours / 24);
+    if (days === 1) return '1 day ago';
+    return `${days} days ago`;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   const getStatusBadge = (status) => {
     switch (status) {
       case 'open':
+      case 'new':
         return <Badge variant="warning">Open</Badge>;
       case 'in-progress':
+      case 'in_progress':
         return <Badge variant="info">In Progress</Badge>;
       case 'resolved':
         return <Badge variant="success">Resolved</Badge>;
       default:
-        return <Badge variant="default">Unknown</Badge>;
+        return <Badge variant="default">{status}</Badge>;
     }
   };
 
   const getPriorityBadge = (priority) => {
-    switch (priority) {
+    switch (priority?.toLowerCase()) {
       case 'high':
         return <Badge variant="error" className="bg-red-100 text-red-700">High</Badge>;
       case 'medium':
@@ -111,260 +108,109 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-8 p-6">
-      {/* Header */}
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="text-center"
-      >
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent mb-2">
-          ResolveMeQ
-        </h1>
-        <p className="text-xl text-gray-600">AI-Powered IT Helpdesk System</p>
-        <p className="text-gray-500 mt-2">Streamlining IT support with intelligent automation</p>
-      </motion.div>
+    <div className="space-y-8 p-6 relative pb-20">
+      <header>
+        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">Dashboard</h1>
+        <p className="text-gray-500 dark:text-gray-400 mt-1">Ticket overview and activity</p>
+      </header>
 
-      {/* Key Features Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-      >
-        <Card className="group hover:scale-105 transition-all duration-300 bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200/50">
-          <div className="text-center p-6">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg group-hover:shadow-xl transition-shadow">
-              <Zap className="w-8 h-8 text-white" />
+      {/* Overview stats */}
+      <Card className="p-6">
+        <h2 className="text-base font-medium text-gray-900 dark:text-white mb-5">Overview</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+              <Ticket className="w-5 h-5" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">AI-Powered Resolution</h3>
-            <p className="text-gray-600">Intelligent ticket routing and automated problem resolution</p>
-          </div>
-        </Card>
-
-        <Card className="group hover:scale-105 transition-all duration-300 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200/50">
-          <div className="text-center p-6">
-            <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg group-hover:shadow-xl transition-shadow">
-              <Headphones className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">24/7 Support</h3>
-            <p className="text-gray-600">Round-the-clock IT support with instant response times</p>
-          </div>
-        </Card>
-
-        <Card className="group hover:scale-105 transition-all duration-300 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200/50">
-          <div className="text-center p-6">
-            <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-violet-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg group-hover:shadow-xl transition-shadow">
-              <Shield className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">Secure & Reliable</h3>
-            <p className="text-gray-600">Enterprise-grade security with data protection</p>
-          </div>
-        </Card>
-      </motion.div>
-
-      {/* System Overview */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-      >
-        <Card className="p-6 bg-gradient-to-br from-gray-50 to-blue-50/30 border-blue-200/30">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-lg flex items-center justify-center mr-3">
-              <Target className="w-4 h-4 text-white" />
-            </div>
-            System Overview
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="text-center group">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg group-hover:shadow-xl transition-shadow">
-                <MessageSquare className="w-6 h-6 text-white" />
+            <div>
+              <div className="text-2xl font-semibold text-gray-900 dark:text-white tabular-nums">
+                {analytics ? (analytics.open_tickets + analytics.closed_tickets) : 0}
               </div>
-              <div className="text-2xl font-bold text-gray-800">1,247</div>
-              <div className="text-sm text-gray-600">Total Tickets</div>
-              <div className="flex items-center justify-center text-green-600 text-sm mt-1">
-                <TrendingUp className="w-3 h-3 mr-1" />
-                +12%
-              </div>
-            </div>
-            
-            <div className="text-center group">
-              <div className="w-12 h-12 bg-gradient-to-br from-yellow-600 to-amber-500 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg group-hover:shadow-xl transition-shadow">
-                <AlertTriangle className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-2xl font-bold text-gray-800">89</div>
-              <div className="text-sm text-gray-600">Open Tickets</div>
-              <div className="flex items-center justify-center text-red-600 text-sm mt-1">
-                <TrendingDown className="w-3 h-3 mr-1" />
-                -5%
-              </div>
-            </div>
-            
-            <div className="text-center group">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-emerald-500 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg group-hover:shadow-xl transition-shadow">
-                <CheckCircle className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-2xl font-bold text-gray-800">23</div>
-              <div className="text-sm text-gray-600">Resolved Today</div>
-              <div className="flex items-center justify-center text-green-600 text-sm mt-1">
-                <TrendingUp className="w-3 h-3 mr-1" />
-                +8%
-              </div>
-            </div>
-            
-            <div className="text-center group">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-violet-500 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg group-hover:shadow-xl transition-shadow">
-                <Users className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-2xl font-bold text-gray-800">12</div>
-              <div className="text-sm text-gray-600">Active Agents</div>
-              <div className="flex items-center justify-center text-blue-600 text-sm mt-1">
-                <TrendingUp className="w-3 h-3 mr-1" />
-                +2
-              </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Total tickets</div>
             </div>
           </div>
-        </Card>
-      </motion.div>
-
-      {/* Recent Tickets */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.6 }}
-      >
-        <Card className="p-6 bg-white/80 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-lg flex items-center justify-center mr-3">
-                <FileText className="w-4 h-4 text-white" />
+          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+              <FolderOpen className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-2xl font-semibold text-gray-900 dark:text-white tabular-nums">
+                {analytics?.open_tickets ?? 0}
               </div>
-              Recent Tickets
-            </h2>
-            <Button variant="outline" size="sm">
-              View All
-            </Button>
-          </div>
-          <div className="space-y-4">
-            {recentTickets.map((ticket) => (
-              <motion.div
-                key={ticket.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
-                className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors group"
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-lg flex items-center justify-center">
-                    <MessageSquare className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-                      {ticket.title}
-                    </h3>
-                    <p className="text-sm text-gray-600">{ticket.description}</p>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <span className="text-xs text-gray-500">{ticket.category}</span>
-                      <span className="text-xs text-gray-500">•</span>
-                      <span className="text-xs text-gray-500">{ticket.createdAt}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  {getStatusBadge(ticket.status)}
-                  {getPriorityBadge(ticket.priority)}
-                  <div className="text-sm text-gray-600">
-                    {ticket.assignee === 'Unassigned' ? (
-                      <span className="text-gray-400">Unassigned</span>
-                    ) : (
-                      <span>{ticket.assignee}</span>
-                    )}
-                  </div>
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </Card>
-      </motion.div>
-
-      {/* Contact Information */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.8 }}
-        className="grid grid-cols-1 lg:grid-cols-2 gap-6"
-      >
-        <Card className="p-6 bg-gradient-to-br from-blue-50 to-cyan-50/30 border-blue-200/30">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-lg flex items-center justify-center mr-3">
-              <Phone className="w-4 h-4 text-white" />
-            </div>
-            Get Support
-          </h2>
-          <div className="space-y-4">
-            <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-white/50 transition-colors">
-              <Phone className="w-5 h-5 text-blue-600" />
-              <span className="text-gray-700 font-medium">1-800-RESOLVE</span>
-            </div>
-            <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-white/50 transition-colors">
-              <Mail className="w-5 h-5 text-blue-600" />
-              <span className="text-gray-700 font-medium">support@resolvemeq.com</span>
-            </div>
-            <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-white/50 transition-colors">
-              <Calendar className="w-5 h-5 text-blue-600" />
-              <span className="text-gray-700 font-medium">24/7 Availability</span>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Open</div>
             </div>
           </div>
-        </Card>
-
-        <Card className="p-6 bg-gradient-to-br from-green-50 to-emerald-50/30 border-green-200/30">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-            <div className="w-8 h-8 bg-gradient-to-br from-green-600 to-emerald-500 rounded-lg flex items-center justify-center mr-3">
-              <Shield className="w-4 h-4 text-white" />
+          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
+              <CheckCircle className="w-5 h-5" />
             </div>
-            System Status
-          </h2>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-lg hover:bg-white/50 transition-colors">
-              <span className="text-gray-700 font-medium">Core Services</span>
-              <Badge variant="success">Operational</Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg hover:bg-white/50 transition-colors">
-              <span className="text-gray-700 font-medium">AI Engine</span>
-              <Badge variant="success">Operational</Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg hover:bg-white/50 transition-colors">
-              <span className="text-gray-700 font-medium">Database</span>
-              <Badge variant="success">Operational</Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg hover:bg-white/50 transition-colors">
-              <span className="text-gray-700 font-medium">API Services</span>
-              <Badge variant="success">Operational</Badge>
+            <div>
+              <div className="text-2xl font-semibold text-gray-900 dark:text-white tabular-nums">
+                {analytics?.closed_tickets ?? 0}
+              </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Resolved</div>
             </div>
           </div>
-        </Card>
-      </motion.div>
-
-      {/* Footer */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 1.0 }}
-        className="text-center text-gray-500 text-sm p-6"
-      >
-        <div className="flex items-center justify-center space-x-2 mb-2">
-          <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
-          <span className="font-medium text-gray-600">ResolveMeQ Dashboard</span>
-          <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-2xl font-semibold text-gray-900 dark:text-white tabular-nums">
+                {formatTime(analytics?.avg_resolution_time_seconds)}
+              </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Avg. resolution</div>
+            </div>
+          </div>
         </div>
-        <p className="text-gray-500">Empowering IT teams with intelligent automation</p>
-        <p className="mt-1 text-gray-400">© 2025 ResolveMeQ. All rights reserved.</p>
-      </motion.div>
+      </Card>
+
+      <AIRecommendationsPanel />
+
+      {/* Recent tickets */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-medium text-gray-900 dark:text-white flex items-center gap-2">
+            <ListTodo className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            Recent tickets
+          </h2>
+          <Button variant="outline" size="sm" onClick={() => navigate('/tickets')}>
+            View all
+          </Button>
+        </div>
+        {recentTickets.length === 0 ? (
+          <div className="py-12 text-center text-gray-500 dark:text-gray-400 text-sm">
+            No recent tickets
+          </div>
+        ) : (
+          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            {recentTickets.map((ticket) => (
+              <li key={ticket.ticket_id} className="py-4 first:pt-0 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="font-medium text-gray-900 dark:text-white truncate">
+                    {ticket.issue_type || 'No title'}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                    {ticket.category || 'Uncategorized'} · {formatTicketTime(ticket.created_at)}
+                  </div>
+                </div>
+                {getStatusBadge(ticket.status)}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      {/* Floating action button: create ticket */}
+      <button
+        type="button"
+        onClick={() => navigate('/tickets', { state: { openCreateForm: true } })}
+        className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+        aria-label="Create ticket"
+        title="Create ticket"
+      >
+        <Plus className="w-7 h-7" />
+      </button>
     </div>
   );
 };

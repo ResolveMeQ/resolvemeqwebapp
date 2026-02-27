@@ -1,176 +1,110 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Edit, 
-  Trash2, 
-  Eye,
-  Users,
-  UserPlus,
-  Settings,
-  MessageSquare,
-  Phone,
-  Mail,
-  Calendar,
-  Activity,
-  Award,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  Star,
-  Building,
-  MapPin,
-  Shield,
-  Zap,
-  Target
-} from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, Users, X, Mail, MapPin, UserPlus } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import { api } from '../services/api';
 
-/**
- * Teams page component with comprehensive team management functionality
- */
+const defaultForm = {
+  name: '',
+  description: '',
+  department: '',
+  location: '',
+  lead: '',
+  members: [],
+};
+
 const Teams = () => {
   const [teams, setTeams] = useState([]);
   const [filteredTeams, setFilteredTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    department: '',
-    location: '',
-    lead: '',
-    members: []
-  });
+  const [panelMode, setPanelMode] = useState('view'); // 'view' | 'edit'
+  const [teamLimits, setTeamLimits] = useState(null);
+  const [invitations, setInvitations] = useState([]);
+  const [inviteEmail, setInviteEmail] = useState({});
+  const [invitingTeamId, setInvitingTeamId] = useState(null);
+  const [acceptLoadingId, setAcceptLoadingId] = useState(null);
+  const [declineLoadingId, setDeclineLoadingId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [formData, setFormData] = useState({ ...defaultForm });
 
-  // Mock teams data
-  const mockTeams = [
-    {
-      id: 1,
-      name: 'IT Support Team',
-      description: 'Primary IT support team handling hardware and software issues',
-      department: 'Information Technology',
-      location: 'New York',
-      lead: 'Sarah Johnson',
-      members: [
-        { id: 1, name: 'Sarah Johnson', role: 'Team Lead', avatar: null, status: 'online' },
-        { id: 2, name: 'Mike Chen', role: 'Senior Support', avatar: null, status: 'online' },
-        { id: 3, name: 'Emma Davis', role: 'Support Specialist', avatar: null, status: 'away' },
-        { id: 4, name: 'John Smith', role: 'Support Specialist', avatar: null, status: 'offline' }
-      ],
-      totalMembers: 4,
-      activeMembers: 2,
-      ticketsHandled: 156,
-      avgResolutionTime: 3.2,
-      satisfactionScore: 4.8,
-      status: 'active',
-      createdAt: '2023-01-15',
-      recentActivity: [
-        { action: 'Resolved 5 tickets', timestamp: '2024-01-15T14:30:00Z' },
-        { action: 'Team meeting completed', timestamp: '2024-01-15T12:15:00Z' },
-        { action: 'New member onboarded', timestamp: '2024-01-15T10:45:00Z' }
-      ]
-    },
-    {
-      id: 2,
-      name: 'Network Support',
-      description: 'Specialized team for network infrastructure and connectivity issues',
-      department: 'Information Technology',
-      location: 'San Francisco',
-      lead: 'Emma Davis',
-      members: [
-        { id: 3, name: 'Emma Davis', role: 'Team Lead', avatar: null, status: 'online' },
-        { id: 5, name: 'David Rodriguez', role: 'Network Engineer', avatar: null, status: 'online' },
-        { id: 6, name: 'Lisa Wang', role: 'Network Specialist', avatar: null, status: 'offline' }
-      ],
-      totalMembers: 3,
-      activeMembers: 2,
-      ticketsHandled: 89,
-      avgResolutionTime: 4.1,
-      satisfactionScore: 4.9,
-      status: 'active',
-      createdAt: '2023-03-20',
-      recentActivity: [
-        { action: 'Network maintenance completed', timestamp: '2024-01-15T16:20:00Z' },
-        { action: 'Critical issue resolved', timestamp: '2024-01-15T14:10:00Z' },
-        { action: 'Infrastructure updated', timestamp: '2024-01-15T12:00:00Z' }
-      ]
-    },
-    {
-      id: 3,
-      name: 'Software Support',
-      description: 'Team focused on software installation, configuration, and troubleshooting',
-      department: 'Information Technology',
-      location: 'Chicago',
-      lead: 'Mike Chen',
-      members: [
-        { id: 2, name: 'Mike Chen', role: 'Team Lead', avatar: null, status: 'online' },
-        { id: 7, name: 'Alex Thompson', role: 'Software Engineer', avatar: null, status: 'online' },
-        { id: 8, name: 'Maria Garcia', role: 'Software Specialist', avatar: null, status: 'away' }
-      ],
-      totalMembers: 3,
-      activeMembers: 2,
-      ticketsHandled: 123,
-      avgResolutionTime: 2.8,
-      satisfactionScore: 4.7,
-      status: 'active',
-      createdAt: '2023-06-10',
-      recentActivity: [
-        { action: 'Software deployment successful', timestamp: '2024-01-15T15:45:00Z' },
-        { action: 'Configuration updated', timestamp: '2024-01-15T13:30:00Z' },
-        { action: 'Training session completed', timestamp: '2024-01-15T11:20:00Z' }
-      ]
-    },
-    {
-      id: 4,
-      name: 'Security Team',
-      description: 'Cybersecurity and access management team',
-      department: 'Information Security',
-      location: 'Austin',
-      lead: 'John Smith',
-      members: [
-        { id: 4, name: 'John Smith', role: 'Team Lead', avatar: null, status: 'online' },
-        { id: 9, name: 'Chris Wilson', role: 'Security Analyst', avatar: null, status: 'online' },
-        { id: 10, name: 'Rachel Brown', role: 'Access Manager', avatar: null, status: 'offline' }
-      ],
-      totalMembers: 3,
-      activeMembers: 2,
-      ticketsHandled: 67,
-      avgResolutionTime: 5.2,
-      satisfactionScore: 4.6,
-      status: 'active',
-      createdAt: '2023-09-05',
-      recentActivity: [
-        { action: 'Security audit completed', timestamp: '2024-01-15T17:00:00Z' },
-        { action: 'Access permissions updated', timestamp: '2024-01-15T15:30:00Z' },
-        { action: 'Threat assessment completed', timestamp: '2024-01-15T13:45:00Z' }
-      ]
-    }
-  ];
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  const [activeTeamContext, setActiveTeamContext] = useState(null);
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setTeams(mockTeams);
-      setFilteredTeams(mockTeams);
-      setLoading(false);
-    }, 1000);
+    loadTeams();
+    loadLimits();
+    loadInvitations();
   }, []);
 
   useEffect(() => {
+    api.settings.getPreferences().then((p) => {
+      if (p?.active_team) setActiveTeamContext({ id: p.active_team, name: p.active_team_name || 'Team' });
+      else setActiveTeamContext(null);
+    }).catch(() => setActiveTeamContext(null));
+  }, []);
+
+  const loadInvitations = async () => {
+    try {
+      const data = await api.teams.invitations();
+      setInvitations(Array.isArray(data) ? data : []);
+    } catch {
+      setInvitations([]);
+    }
+  };
+
+  const loadLimits = async () => {
+    try {
+      const data = await api.teams.limits();
+      setTeamLimits(data);
+    } catch {
+      setTeamLimits(null);
+    }
+  };
+
+  const loadTeams = async () => {
+    try {
+      setLoading(true);
+      const teamsData = await api.teams.list();
+      // Map backend data to frontend format
+      const mappedTeams = Array.isArray(teamsData) ? teamsData.map(team => ({
+        ...team,
+        totalMembers: team.member_count || 0,
+        activeMembers: team.active_member_count || 0,
+        status: team.is_active ? 'active' : 'inactive',
+        members: team.members_details || [],
+        members_details: team.members_details || [],
+        lead_name: team.lead_name || 'No lead assigned',
+        lead_id: team.lead,
+        is_owner: team.is_owner === true
+      })) : [];
+      setTeams(mappedTeams);
+      setFilteredTeams(mappedTeams);
+      await loadLimits();
+    } catch (error) {
+      console.error('Error loading teams:', error);
+      setTeams([]);
+      setFilteredTeams([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const q = (searchQuery || '').toLowerCase();
     const filtered = teams.filter(team =>
-      team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      team.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      team.department.toLowerCase().includes(searchQuery.toLowerCase())
+      (team.name || '').toLowerCase().includes(q) ||
+      (team.description || '').toLowerCase().includes(q) ||
+      (team.department || '').toLowerCase().includes(q)
     );
     setFilteredTeams(filtered);
   }, [searchQuery, teams]);
@@ -199,41 +133,181 @@ const Teams = () => {
     }
   };
 
-  const handleViewDetails = (team) => {
+  const openTeamPanel = (team, mode = 'view') => {
     setSelectedTeam(team);
-    setShowDetailsModal(true);
+    setPanelMode(mode);
+    if (mode === 'edit') {
+      setFormData({
+        name: team.name,
+        description: team.description || '',
+        department: team.department || '',
+        location: team.location || '',
+        lead: team.lead_id || team.lead || '',
+        members: Array.isArray(team.members) ? team.members : [],
+      });
+    }
   };
 
-  const handleEditTeam = (team) => {
-    setSelectedTeam(team);
-    setFormData({
-      name: team.name,
-      description: team.description,
-      department: team.department,
-      location: team.location,
-      lead: team.lead,
-      members: team.members
-    });
-    setShowEditModal(true);
+  const closePanel = () => {
+    setSelectedTeam(null);
+    setPanelMode('view');
   };
 
   const handleCreateTeam = () => {
-    setFormData({
-      name: '',
-      description: '',
-      department: '',
-      location: '',
-      lead: '',
-      members: []
-    });
-    setShowCreateModal(true);
+    if (teamLimits && teamLimits.can_create === false) {
+      showToast(`Team limit reached (${teamLimits.current_count}/${teamLimits.max_teams}). Upgrade in Billing.`, 'error');
+      return;
+    }
+    setFormData({ ...defaultForm });
+    setShowCreateForm(true);
   };
 
-  const handleSubmitForm = (e) => {
+  const mapTeamFromApi = (t) => ({
+    ...t,
+    totalMembers: t.member_count || 0,
+    activeMembers: t.active_member_count || 0,
+    status: t.is_active ? 'active' : 'inactive',
+    members: t.members_details || [],
+    members_details: t.members_details || [],
+    lead_name: t.lead_name || 'No lead assigned',
+    lead_id: t.lead,
+    is_owner: t.is_owner === true,
+  });
+
+  const handleSubmitForm = async (e) => {
     e.preventDefault();
-    // Handle form submission
-    setShowCreateModal(false);
-    setShowEditModal(false);
+    if (!(formData.name || '').trim()) {
+      showToast('Team name is required.', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      const teamData = {
+        name: (formData.name || '').trim(),
+        description: (formData.description || '').trim() || undefined,
+        department: (formData.department || '').trim() || undefined,
+        location: (formData.location || '').trim() || undefined,
+        lead: (formData.lead && String(formData.lead).trim() && String(formData.lead).match(/^[0-9a-f-]{36}$/i)) ? formData.lead.trim() : null,
+        member_ids: Array.isArray(formData.members) ? formData.members.map(m => m.id || m).filter(Boolean) : [],
+      };
+
+      if (panelMode === 'edit' && selectedTeam) {
+        const updatedTeam = await api.teams.update(selectedTeam.id, teamData);
+        const mapped = mapTeamFromApi(updatedTeam);
+        setTeams(prev => prev.map(t => (t.id === selectedTeam.id ? mapped : t)));
+        setFilteredTeams(prev => prev.map(t => (t.id === selectedTeam.id ? mapped : t)));
+        setSelectedTeam(mapped);
+        setPanelMode('view');
+        showToast('Team updated.');
+      } else {
+        const newTeam = await api.teams.create(teamData);
+        const mapped = mapTeamFromApi(newTeam);
+        setTeams(prev => [mapped, ...prev]);
+        setFilteredTeams(prev => [mapped, ...prev]);
+        setShowCreateForm(false);
+        setFormData({ ...defaultForm });
+        showToast('Team created.');
+        openTeamPanel(mapped, 'view');
+      }
+      loadLimits();
+    } catch (error) {
+      const msg = error?.message || error?.detail || 'Failed to save team.';
+      showToast(msg, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteTeam = async (teamId) => {
+    if (!window.confirm('Delete this team? This cannot be undone.')) return;
+    try {
+      setLoading(true);
+      await api.teams.delete(teamId);
+      setTeams(prev => prev.filter(t => t.id !== teamId));
+      setFilteredTeams(prev => prev.filter(t => t.id !== teamId));
+      if (selectedTeam?.id === teamId) closePanel();
+      showToast('Team deleted.');
+    } catch (error) {
+      showToast(error?.message || 'Failed to delete team.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInvite = async (teamId) => {
+    const email = (inviteEmail[teamId] || '').trim();
+    if (!email) {
+      showToast('Enter an email address.', 'error');
+      return;
+    }
+    try {
+      setInvitingTeamId(teamId);
+      await api.teams.invite(teamId, email);
+      setInviteEmail(prev => ({ ...prev, [teamId]: '' }));
+      showToast(`Invitation sent to ${email}`);
+    } catch (error) {
+      showToast(error?.message || error?.error || 'Failed to send invitation.', 'error');
+    } finally {
+      setInvitingTeamId(null);
+    }
+  };
+
+  const handleAcceptInvitation = async (invitationId) => {
+    setAcceptLoadingId(invitationId);
+    try {
+      await api.teams.acceptInvitation(invitationId);
+      setInvitations(prev => prev.filter(inv => inv.id !== invitationId));
+      loadTeams();
+      showToast('You joined the team.');
+    } catch (error) {
+      showToast(error?.message || 'Failed to accept.', 'error');
+    } finally {
+      setAcceptLoadingId(null);
+    }
+  };
+
+  const handleDeclineInvitation = async (invitationId) => {
+    setDeclineLoadingId(invitationId);
+    try {
+      await api.teams.declineInvitation(invitationId);
+      setInvitations(prev => prev.filter(inv => inv.id !== invitationId));
+      showToast('Invitation declined.');
+    } catch (error) {
+      showToast(error?.message || 'Failed to decline.', 'error');
+    } finally {
+      setDeclineLoadingId(null);
+    }
+  };
+
+  const handleLeaveTeam = async (teamId) => {
+    if (!window.confirm('Leave this team? You can rejoin only if invited again.')) return;
+    try {
+      setLoading(true);
+      await api.teams.leave(teamId);
+      setTeams(prev => prev.filter(t => t.id !== teamId));
+      setFilteredTeams(prev => prev.filter(t => t.id !== teamId));
+      if (selectedTeam?.id === teamId) closePanel();
+      showToast('You left the team.');
+    } catch (error) {
+      showToast(error?.message || 'Failed to leave team.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveMember = async (teamId, userId) => {
+    if (!window.confirm('Remove this member from the team?')) return;
+    try {
+      await api.teams.removeMember(teamId, userId);
+      const updated = await api.teams.get(teamId);
+      const mapped = mapTeamFromApi(updated);
+      setTeams(prev => prev.map(t => (t.id === teamId ? mapped : t)));
+      setFilteredTeams(prev => prev.map(t => (t.id === teamId ? mapped : t)));
+      if (selectedTeam?.id === teamId) setSelectedTeam(mapped);
+      showToast('Member removed.');
+    } catch (error) {
+      showToast(error?.message || 'Failed to remove member.', 'error');
+    }
   };
 
   if (loading) {
@@ -245,184 +319,353 @@ const Teams = () => {
   }
 
   return (
-    <div className="space-y-8 p-6">
-      {/* Header */}
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="text-center"
-      >
-        <div className="inline-flex items-center space-x-2 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
-            <Users className="w-6 h-6 text-white" />
-          </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
-            Teams
-          </h1>
-        </div>
-        <p className="text-xl text-gray-600 mb-2">Manage your support teams</p>
-        <p className="text-gray-500">Organize and coordinate IT support teams for optimal performance</p>
-      </motion.div>
+    <div className="space-y-6 p-6">
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-medium ${
+              toast.type === 'error'
+                ? 'bg-red-100 dark:bg-red-900/80 text-red-800 dark:text-red-200'
+                : 'bg-green-100 dark:bg-green-900/80 text-green-800 dark:text-green-200'
+            }`}
+          >
+            {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Quick Actions Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.1 }}
-        className="flex flex-wrap items-center justify-between gap-4 p-4 bg-white/70 backdrop-blur-md rounded-2xl border border-white/20 shadow-lg"
-      >
-        <div className="flex items-center space-x-4">
-          <Button variant="primary" size="sm" className="bg-gradient-to-r from-blue-600 to-cyan-500" onClick={handleCreateTeam}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create Team
-          </Button>
-          <Button variant="outline" size="sm">
-            <Filter className="w-4 h-4 mr-2" />
-            Filter
-          </Button>
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">Teams</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Manage your support teams</p>
+          {activeTeamContext && (
+            <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+              Using: <strong>{activeTeamContext.name}</strong> — switch in the sidebar to change which team&apos;s plan applies to your usage.
+            </p>
+          )}
         </div>
-        <div className="flex items-center space-x-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search teams..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-      </motion.div>
+      </header>
 
-      {/* Teams Grid */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.2 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-      >
+      {teamLimits && teamLimits.can_create === false && (
+        <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm">
+          Team limit reached ({teamLimits.current_count}/{teamLimits.max_teams}). Upgrade in Billing to create more.
+        </div>
+      )}
+
+      {invitations.length > 0 && (
+        <Card className="p-4 border-l-4 border-l-blue-500 dark:border-l-blue-600">
+          <div className="flex items-center gap-2 mb-3">
+            <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Team invitations</h2>
+          </div>
+          <ul className="space-y-2">
+            {invitations.map((inv) => (
+              <li key={inv.id} className="flex flex-wrap items-center justify-between gap-3 py-2 px-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700">
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">{inv.team_name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">From {inv.invited_by_name || inv.invited_by_email}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="primary" size="sm" onClick={() => handleAcceptInvitation(inv.id)} loading={acceptLoadingId === inv.id} disabled={acceptLoadingId !== null || declineLoadingId !== null}>Accept</Button>
+                  <Button variant="outline" size="sm" onClick={() => handleDeclineInvitation(inv.id)} loading={declineLoadingId === inv.id} disabled={acceptLoadingId !== null || declineLoadingId !== null}>Decline</Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-4 py-2">
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={handleCreateTeam}
+          disabled={teamLimits && teamLimits.can_create === false}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Create team
+        </Button>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search teams..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 w-56 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+      </div>
+
+      {/* Inline Create Team Form */}
+      {showCreateForm && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="mb-6"
+        >
+          <Card className="p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-2 border-blue-200 dark:border-blue-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Create new team</h2>
+            <form onSubmit={handleSubmitForm} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Team name *</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. Support Team"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department</label>
+                  <input
+                    type="text"
+                    value={formData.department}
+                    onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. IT Support"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  placeholder="Brief description of the team"
+                  rows={2}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location</label>
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 max-w-xs"
+                  placeholder="e.g. New York"
+                />
+              </div>
+              <div className="flex items-center gap-2 pt-2">
+                <Button type="submit" variant="primary" disabled={saving} loading={saving}>
+                  Create team
+                </Button>
+                <Button type="button" variant="outline" onClick={() => { setShowCreateForm(false); setFormData({ ...defaultForm }); }} disabled={saving}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </motion.div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredTeams.map((team) => (
-          <Card key={team.id} className="group hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm">
-            <div className="p-6">
-              {/* Team Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
-                    <Users className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-                      {team.name}
-                    </h3>
-                    <p className="text-sm text-gray-600">{team.department}</p>
-                  </div>
+          <Card
+            key={team.id}
+            className={`p-5 cursor-pointer transition-all duration-200 hover:shadow-md ${
+              selectedTeam?.id === team.id ? 'ring-2 ring-blue-500 dark:ring-blue-400 shadow-md' : ''
+            }`}
+            onClick={() => openTeamPanel(team, 'view')}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 shrink-0">
+                  <Users className="w-5 h-5" />
                 </div>
-                <div className="flex items-center space-x-2">
-                  {getStatusBadge(team.status)}
-                  <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-gray-900 dark:text-white truncate">{team.name}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{team.department || '—'}</p>
                 </div>
               </div>
-
-              {/* Team Description */}
-              <p className="text-gray-600 text-sm mb-4 leading-relaxed">
-                {team.description}
-              </p>
-
-              {/* Team Stats */}
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
-                  <div className="text-2xl font-bold text-gray-800">{team.totalMembers}</div>
-                  <div className="text-xs text-gray-600">Members</div>
-                </div>
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
-                  <div className="text-2xl font-bold text-gray-800">{team.ticketsHandled}</div>
-                  <div className="text-xs text-gray-600">Tickets</div>
-                </div>
-              </div>
-
-              {/* Team Members Preview */}
-              <div className="mb-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Team Members</h4>
-                <div className="space-y-2">
-                  {team.members.slice(0, 3).map((member) => (
-                    <div key={member.id} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-6 h-6 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center">
-                          <span className="text-white text-xs font-medium">
-                            {member.name.split(' ').map(n => n[0]).join('')}
-                          </span>
-                        </div>
-                        <span className="text-sm text-gray-700">{member.name}</span>
-                      </div>
-                      {getMemberStatusIcon(member.status)}
-                    </div>
-                  ))}
-                  {team.members.length > 3 && (
-                    <div className="text-sm text-gray-500">
-                      +{team.members.length - 3} more members
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Team Performance */}
-              <div className="mb-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Avg Resolution Time</span>
-                  <span className="font-medium text-gray-800">{team.avgResolutionTime}h</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Satisfaction Score</span>
-                  <div className="flex items-center space-x-1">
-                    <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                    <span className="font-medium text-gray-800">{team.satisfactionScore}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex-1"
-                  onClick={() => handleViewDetails(team)}
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  View Details
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => handleEditTeam(team)}
-                >
-                  <Edit className="w-4 h-4" />
-                </Button>
+              <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                {team.is_owner && (
+                  <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">Owner</span>
+                )}
+                {getStatusBadge(team.status)}
               </div>
             </div>
+            <div className="mt-3 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+              <span className="flex items-center gap-1">
+                <Users className="w-3.5 h-3.5" />
+                {team.totalMembers ?? 0} members
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">{team.description || 'No description'}</p>
           </Card>
         ))}
-      </motion.div>
+      </div>
 
-      {/* Footer */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.8 }}
-        className="text-center text-gray-500 text-sm p-6"
-      >
-        <div className="flex items-center justify-center space-x-2 mb-2">
-          <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
-          <span className="font-medium text-gray-600">ResolveMeQ Teams</span>
-          <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }}></div>
-        </div>
-        <p className="text-gray-500">Organized teams for efficient IT support</p>
-        <p className="mt-1 text-gray-400">© 2024 ResolveMeQ. All rights reserved.</p>
-      </motion.div>
+      {/* Inline Team Management Panel */}
+      <AnimatePresence>
+        {selectedTeam && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <Card className="p-6 border-l-4 border-l-blue-500 dark:border-l-blue-600">
+              <div className="flex items-start justify-between gap-4 mb-6">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{selectedTeam.name}</h2>
+                    {selectedTeam.is_owner && (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">Owner</span>
+                    )}
+                    {getStatusBadge(selectedTeam.status)}
+                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{selectedTeam.department || '—'} {selectedTeam.location ? ` · ${selectedTeam.location}` : ''}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closePanel}
+                  className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-300"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {panelMode === 'edit' ? (
+                <form onSubmit={handleSubmitForm} className="space-y-4 max-w-xl">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Team name *</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                      placeholder="e.g. Support Team"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department</label>
+                      <input
+                        type="text"
+                        value={formData.department}
+                        onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location</label>
+                      <input
+                        type="text"
+                        value={formData.location}
+                        onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="submit" variant="primary" size="sm" disabled={saving} loading={saving}>Save changes</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setPanelMode('view')}>Cancel</Button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  {selectedTeam.description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">{selectedTeam.description}</p>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        Members ({(selectedTeam.members_details || selectedTeam.members || []).length})
+                      </h3>
+                      <ul className="space-y-2">
+                        {(selectedTeam.members_details || selectedTeam.members || []).map((member) => (
+                          <li key={member?.id ?? member?.email} className="flex items-center justify-between gap-2 py-2 px-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">
+                                {(member?.name || member?.email || '?').toString().split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-medium text-gray-900 dark:text-white truncate">{member?.name || member?.email || 'Member'}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{member?.email}</p>
+                              </div>
+                            </div>
+                            {selectedTeam.is_owner && member?.id && String(member.id) !== String(selectedTeam.owner) && (
+                              <Button variant="ghost" size="sm" className="text-red-600 dark:text-red-400 shrink-0" onClick={() => handleRemoveMember(selectedTeam.id, member.id)}>
+                                Remove
+                              </Button>
+                            )}
+                          </li>
+                        ))}
+                        {((selectedTeam.members_details || selectedTeam.members || []).length === 0) && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 py-2">No members yet.</p>
+                        )}
+                      </ul>
+                    </div>
+                    <div>
+                      {selectedTeam.is_owner && (
+                        <>
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                            <UserPlus className="w-4 h-4" />
+                            Invite by email
+                          </h3>
+                          <div className="flex gap-2 mb-4">
+                            <input
+                              type="email"
+                              value={inviteEmail[selectedTeam.id] || ''}
+                              onChange={(e) => setInviteEmail(prev => ({ ...prev, [selectedTeam.id]: e.target.value }))}
+                              placeholder="colleague@example.com"
+                              className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                            />
+                            <Button variant="primary" size="sm" onClick={() => handleInvite(selectedTeam.id)} disabled={invitingTeamId === selectedTeam.id} loading={invitingTeamId === selectedTeam.id}>
+                              Invite
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                        {selectedTeam.is_owner && (
+                          <>
+                            <Button variant="outline" size="sm" onClick={() => openTeamPanel(selectedTeam, 'edit')}>
+                              <Edit className="w-4 h-4 mr-1" />
+                              Edit team
+                            </Button>
+                            <Button variant="outline" size="sm" className="text-red-600 dark:text-red-400" onClick={() => handleDeleteTeam(selectedTeam.id)}>
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                        {!selectedTeam.is_owner && (
+                          <Button variant="outline" size="sm" className="text-amber-600 dark:text-amber-400" onClick={() => handleLeaveTeam(selectedTeam.id)}>
+                            Leave team
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
