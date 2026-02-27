@@ -23,3 +23,9 @@
   for = "/assets/*.js"
   [headers.values]
     Content-Type = "application/javascript; charset=utf-8"
+
+# SPA fallback: serve index.html for all routes so client-side router (e.g. /login, /dashboard) works
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
