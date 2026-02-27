@@ -6,7 +6,6 @@ import {
   EyeOff, 
   ArrowLeft,
   CheckCircle,
-  Sparkles,
   Shield,
   ArrowRight
 } from 'lucide-react';
@@ -117,9 +116,7 @@ const ResetPassword = ({ onSubmit, onNavigateToLogin }) => {
           className="text-center mb-8"
         >
           <div className="inline-flex items-center space-x-2 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
+            <img src="/logo.png" alt="Resolve meQ" className="h-12 w-auto object-contain" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
               ResolveMeQ
             </h1>

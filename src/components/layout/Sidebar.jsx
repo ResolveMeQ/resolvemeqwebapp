@@ -109,9 +109,7 @@ const Sidebar = ({
               exit={{ opacity: 0, x: -20 }}
               className="flex items-center space-x-3"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">R</span>
-              </div>
+              <img src="/logo.png" alt="ResolveMeQ" className="h-8 w-auto object-contain" />
               <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">ResolveMeQ</span>
             </motion.div>
           ) : (
@@ -122,9 +120,7 @@ const Sidebar = ({
               exit={{ opacity: 0 }}
               className="flex items-center justify-center"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">R</span>
-              </div>
+              <img src="/logo.png" alt="ResolveMeQ" className="h-8 w-8 object-contain" />
             </motion.div>
           )}
         </AnimatePresence>
@@ -360,9 +356,7 @@ const Sidebar = ({
           >
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">R</span>
-                </div>
+                <img src="/logo.png" alt="ResolveMeQ" className="h-8 w-auto object-contain" />
                 <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">ResolveMeQ</span>
               </div>
               <button
