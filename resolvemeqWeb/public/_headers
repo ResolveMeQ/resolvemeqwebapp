@@ -1,0 +1,12 @@
+# Netlify: force correct MIME type for JavaScript (fixes blank page / module script error)
+/*.js
+  Content-Type: application/javascript; charset=utf-8
+
+/*.mjs
+  Content-Type: application/javascript; charset=utf-8
+
+/static/*.js
+  Content-Type: application/javascript; charset=utf-8
+
+/assets/*.js
+  Content-Type: application/javascript; charset=utf-8
