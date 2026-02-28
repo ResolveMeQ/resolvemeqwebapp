@@ -16,6 +16,7 @@ import {
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { api } from '../services/api';
+import { cn } from '../utils/cn';
 
 const KnowledgeBase = () => {
   const [articles, setArticles] = useState([]);
