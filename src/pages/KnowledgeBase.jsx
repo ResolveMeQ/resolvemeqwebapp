@@ -171,10 +171,25 @@ const KnowledgeBase = () => {
         })
       : '—';
 
+  // Strip markdown formatting for preview text
+  const stripMarkdown = (text) => {
+    if (!text) return '';
+    return text
+      .replace(/#{1,6}\s+/g, '') // Remove headers
+      .replace(/\*\*(.+?)\*\*/g, '$1') // Remove bold
+      .replace(/\*(.+?)\*/g, '$1') // Remove italic
+      .replace(/\[(.+?)\]\(.+?\)/g, '$1') // Remove links
+      .replace(/`(.+?)`/g, '$1') // Remove inline code
+      .replace(/>\s+/g, '') // Remove blockquotes
+      .replace(/[-*+]\s+/g, '') // Remove list markers
+      .replace(/\d+\.\s+/g, '') // Remove numbered list markers
+      .trim();
+  };
+
   return (
     <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-8rem)] lg:min-h-[500px]">
       {/* Left: list and filters */}
-      <div className="flex-1 min-w-0 flex flex-col space-y-6 overflow-y-auto">
+      <div className="flex-1 min-w-0 flex flex-col space-y-6 overflow-y-auto scrollbar-hide">
         <header>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">
             Knowledge Base
@@ -306,7 +321,7 @@ const KnowledgeBase = () => {
                   <BookOpen className="w-4 h-4 text-primary-600 dark:text-primary-400 shrink-0 mt-0.5" />
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 mb-4">
-                  {article.content}
+                  {stripMarkdown(article.content)}
                 </p>
                 {article.tags?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-4">
