@@ -108,108 +108,114 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-8 p-6 relative pb-20">
+    <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">Dashboard</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">Ticket overview and activity</p>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Dashboard</h1>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Operational overview and ticket metrics</p>
       </header>
 
-      {/* Overview stats */}
-      <Card className="p-6">
-        <h2 className="text-base font-medium text-gray-900 dark:text-white mb-5">Overview</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-              <Ticket className="w-5 h-5" />
-            </div>
+      {/* Metrics Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-5">
+          <div className="flex items-start justify-between">
             <div>
-              <div className="text-2xl font-semibold text-gray-900 dark:text-white tabular-nums">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Tickets</p>
+              <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
                 {analytics ? (analytics.open_tickets + analytics.closed_tickets) : 0}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Total tickets</div>
+              </p>
+            </div>
+            <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+              <Ticket className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
-          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
-              <FolderOpen className="w-5 h-5" />
-            </div>
+        </Card>
+
+        <Card className="p-5">
+          <div className="flex items-start justify-between">
             <div>
-              <div className="text-2xl font-semibold text-gray-900 dark:text-white tabular-nums">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Open</p>
+              <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
                 {analytics?.open_tickets ?? 0}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Open</div>
+              </p>
+            </div>
+            <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20">
+              <FolderOpen className="w-5 h-5 text-amber-600 dark:text-amber-400" />
             </div>
           </div>
-          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
-              <CheckCircle className="w-5 h-5" />
-            </div>
+        </Card>
+
+        <Card className="p-5">
+          <div className="flex items-start justify-between">
             <div>
-              <div className="text-2xl font-semibold text-gray-900 dark:text-white tabular-nums">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Resolved</p>
+              <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
                 {analytics?.closed_tickets ?? 0}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Resolved</div>
+              </p>
+            </div>
+            <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
+              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
             </div>
           </div>
-          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-              <Clock className="w-5 h-5" />
-            </div>
+        </Card>
+
+        <Card className="p-5">
+          <div className="flex items-start justify-between">
             <div>
-              <div className="text-2xl font-semibold text-gray-900 dark:text-white tabular-nums">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg. Resolution</p>
+              <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
                 {formatTime(analytics?.avg_resolution_time_seconds)}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Avg. resolution</div>
+              </p>
+            </div>
+            <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800">
+              <Clock className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       <AIRecommendationsPanel />
 
       {/* Recent tickets */}
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-medium text-gray-900 dark:text-white flex items-center gap-2">
-            <ListTodo className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-            Recent tickets
-          </h2>
-          <Button variant="outline" size="sm" onClick={() => navigate('/tickets')}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Recent Tickets</h2>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/tickets')}>
             View all
           </Button>
         </div>
         {recentTickets.length === 0 ? (
-          <div className="py-12 text-center text-gray-500 dark:text-gray-400 text-sm">
-            No recent tickets
+          <div className="py-12 text-center">
+            <ListTodo className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+            <p className="text-sm text-gray-600 dark:text-gray-400">No recent tickets</p>
           </div>
         ) : (
-          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+          <div className="space-y-3">
             {recentTickets.map((ticket) => (
-              <li key={ticket.ticket_id} className="py-4 first:pt-0 flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="font-medium text-gray-900 dark:text-white truncate">
+              <div key={ticket.ticket_id} className="flex items-center justify-between gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors duration-150">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
                     {ticket.issue_type || 'No title'}
-                  </div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
                     {ticket.category || 'Uncategorized'} · {formatTicketTime(ticket.created_at)}
-                  </div>
+                  </p>
                 </div>
                 {getStatusBadge(ticket.status)}
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </Card>
 
-      {/* Floating action button: create ticket */}
+      {/* Floating action button */}
       <button
         type="button"
         onClick={() => navigate('/tickets', { state: { openCreateForm: true } })}
-        className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+        className="fixed bottom-8 right-8 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-primary-600 hover:bg-primary-700 text-white shadow-lg hover:shadow-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
         aria-label="Create ticket"
         title="Create ticket"
       >
-        <Plus className="w-7 h-7" />
+        <Plus className="w-6 h-6" />
       </button>
     </div>
   );

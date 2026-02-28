@@ -48,7 +48,7 @@ const Layout = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Sidebar */}
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -64,7 +64,7 @@ const Layout = ({
         onActiveTeamChange={onActiveTeamChange}
       />
 
-      {/* Main Content Area - margin matches sidebar width so header/search push when sidebar expands */}
+      {/* Main Content Area */}
       <div
         className={cn(
           'min-h-screen transition-[margin] duration-300 ease-out',
@@ -82,7 +82,7 @@ const Layout = ({
           theme={theme}
         />
 
-        {/* Global Search Results (below header) */}
+        {/* Global Search Results */}
         <GlobalSearchPanel
           query={searchQuery}
           results={searchResults}
@@ -93,14 +93,9 @@ const Layout = ({
 
         {/* Page Content */}
         <main className="p-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="max-w-7xl mx-auto"
-          >
+          <div className="max-w-7xl mx-auto">
             {children}
-          </motion.div>
+          </div>
         </main>
       </div>
     </div>

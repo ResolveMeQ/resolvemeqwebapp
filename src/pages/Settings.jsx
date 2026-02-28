@@ -87,7 +87,6 @@ const Settings = () => {
     }
   };
 
-  // Only API-backed state (profile from GET profile; rest from GET preferences)
   const [generalSettings, setGeneralSettings] = useState({ timezone: '', language: '' });
   const [appearanceSettings, setAppearanceSettings] = useState({ theme: 'light' });
   const [notificationSettings, setNotificationSettings] = useState({
@@ -131,7 +130,7 @@ const Settings = () => {
 
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-      showToast('Preferences and profile saved. Notification and appearance settings are updated.');
+      showToast('Settings saved successfully');
     } catch (error) {
       console.error('Error saving settings:', error);
       showToast(error?.message || 'Failed to save settings.', 'error');
@@ -161,55 +160,57 @@ const Settings = () => {
     }
   };
 
-  const inputClass = 'w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent';
-  const labelClass = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2';
-  const toggleTrackClass = 'w-11 h-6 bg-gray-200 dark:bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-900/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[""] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600';
+  const inputClass = 'input-enterprise';
+  const labelClass = 'block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide';
+  const toggleTrackClass = 'w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[""] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600';
 
   const renderGeneralSettings = () => (
-    <div className="space-y-6">
-      <Card className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
+    <div className="space-y-4">
+      <Card>
         <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Profile</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Saved to your account via the backend.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Profile</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Update your personal information</p>
+          <div className="space-y-4">
+            <div>
               <label className={labelClass}>Bio</label>
               <textarea
                 value={profileSettings.bio}
                 onChange={(e) => setProfileSettings(prev => ({ ...prev, bio: e.target.value }))}
                 className={inputClass}
                 rows={3}
-                placeholder="About yourself"
+                placeholder="Tell us about yourself"
               />
             </div>
-            <div>
-              <label className={labelClass}>Location</label>
-              <input
-                type="text"
-                value={profileSettings.location}
-                onChange={(e) => setProfileSettings(prev => ({ ...prev, location: e.target.value }))}
-                className={inputClass}
-                placeholder="Location"
-              />
-            </div>
-            <div>
-              <label className={labelClass}>City</label>
-              <input
-                type="text"
-                value={profileSettings.city}
-                onChange={(e) => setProfileSettings(prev => ({ ...prev, city: e.target.value }))}
-                className={inputClass}
-                placeholder="City"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Location</label>
+                <input
+                  type="text"
+                  value={profileSettings.location}
+                  onChange={(e) => setProfileSettings(prev => ({ ...prev, location: e.target.value }))}
+                  className={inputClass}
+                  placeholder="e.g., United States"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>City</label>
+                <input
+                  type="text"
+                  value={profileSettings.city}
+                  onChange={(e) => setProfileSettings(prev => ({ ...prev, city: e.target.value }))}
+                  className={inputClass}
+                  placeholder="e.g., San Francisco"
+                />
+              </div>
             </div>
           </div>
         </div>
       </Card>
 
-      <Card className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
+      <Card>
         <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Regional</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Timezone and language are stored in your preferences.</p>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Regional Settings</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Configure timezone and language preferences</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Timezone</label>
@@ -249,56 +250,56 @@ const Settings = () => {
   );
 
   const renderNotificationSettings = () => (
-    <div className="space-y-6">
-      <Card className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
+    <div className="space-y-4">
+      <Card>
         <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Notifications</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Stored in your account. Change any option below, then click <strong>Save changes</strong> at the top to apply. You’ll see a confirmation when saved.</p>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Notification Preferences</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Manage how you receive notifications</p>
+          <div className="space-y-5">
+            <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-800 last:border-0">
               <div>
-                <h4 className="font-medium text-gray-900 dark:text-white">Email notifications</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Receive notifications via email</p>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">Email notifications</h4>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Receive notifications via email</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" checked={notificationSettings.emailNotifications} onChange={(e) => setNotificationSettings(prev => ({ ...prev, emailNotifications: e.target.checked }))} className="sr-only peer" />
                 <div className={toggleTrackClass} />
               </label>
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-800 last:border-0">
               <div>
-                <h4 className="font-medium text-gray-900 dark:text-white">Push notifications</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Receive browser push notifications</p>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">Push notifications</h4>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Receive browser push notifications</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" checked={notificationSettings.pushNotifications} onChange={(e) => setNotificationSettings(prev => ({ ...prev, pushNotifications: e.target.checked }))} className="sr-only peer" />
                 <div className={toggleTrackClass} />
               </label>
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-800 last:border-0">
               <div>
-                <h4 className="font-medium text-gray-900 dark:text-white">Ticket updates</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Notify when tickets are updated</p>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">Ticket updates</h4>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Notify when tickets are updated</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" checked={notificationSettings.ticketUpdates} onChange={(e) => setNotificationSettings(prev => ({ ...prev, ticketUpdates: e.target.checked }))} className="sr-only peer" />
                 <div className={toggleTrackClass} />
               </label>
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-800 last:border-0">
               <div>
-                <h4 className="font-medium text-gray-900 dark:text-white">System alerts</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Receive system-wide alerts</p>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">System alerts</h4>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Receive system-wide alerts</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" checked={notificationSettings.systemAlerts} onChange={(e) => setNotificationSettings(prev => ({ ...prev, systemAlerts: e.target.checked }))} className="sr-only peer" />
                 <div className={toggleTrackClass} />
               </label>
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-800 last:border-0">
               <div>
-                <h4 className="font-medium text-gray-900 dark:text-white">Daily digest</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Receive a daily digest email</p>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">Daily digest</h4>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Receive a daily summary email</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" checked={notificationSettings.dailyDigest} onChange={(e) => setNotificationSettings(prev => ({ ...prev, dailyDigest: e.target.checked }))} className="sr-only peer" />
@@ -312,11 +313,11 @@ const Settings = () => {
   );
 
   const renderAppearance = () => (
-    <div className="space-y-6">
-      <Card className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
+    <div className="space-y-4">
+      <Card>
         <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Theme</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Saved to your account preferences.</p>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Theme</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Choose your preferred interface theme</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {['light', 'dark', 'auto'].map((themeValue) => (
               <button
@@ -324,19 +325,19 @@ const Settings = () => {
                 type="button"
                 onClick={() => setAppearanceSettings(prev => ({ ...prev, theme: themeValue }))}
                 className={cn(
-                  'border-2 rounded-lg p-4 text-center cursor-pointer transition-colors',
+                  'border-2 rounded-lg p-4 text-center cursor-pointer transition-colors duration-150',
                   appearanceSettings.theme === themeValue
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-600'
-                    : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                 )}
               >
                 <div className={cn(
-                  'w-full h-20 rounded mb-2',
+                  'w-full h-20 rounded-lg mb-3',
                   themeValue === 'light' && 'bg-gradient-to-br from-gray-100 to-gray-200',
                   themeValue === 'dark' && 'bg-gradient-to-br from-gray-700 to-gray-900',
-                  themeValue === 'auto' && 'bg-gradient-to-br from-blue-500 to-purple-600'
+                  themeValue === 'auto' && 'bg-gradient-to-br from-gray-100 via-gray-400 to-gray-900'
                 )} />
-                <span className="font-medium text-gray-900 dark:text-white capitalize">{themeValue}</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">{themeValue}</span>
               </button>
             ))}
           </div>
@@ -346,60 +347,63 @@ const Settings = () => {
   );
 
   const renderIntegrations = () => (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Connected Integrations</h3>
+        <div>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white">Integrations</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">Connect external services and tools</p>
+        </div>
         <Button
           variant="primary"
           size="sm"
           type="button"
-          onClick={() => showToast('Integrations are not available yet. They will appear here when your admin enables them.')}
+          onClick={() => showToast('Integrations feature coming soon')}
         >
           <Plus size={16} className="mr-2" />
           Add Integration
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {integrations.length === 0 ? (
-          <Card className="md:col-span-2 p-8 text-center border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
-            <Database className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
-            <p className="text-gray-600 dark:text-gray-400">No integrations connected yet.</p>
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">When integrations are enabled, you can connect Slack, Jira, and similar tools here. Click &quot;Add Integration&quot; for more info.</p>
+          <Card className="md:col-span-2 p-12 text-center">
+            <Database className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+            <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-1">No integrations yet</h4>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Connect Slack, Jira, and other tools to streamline your workflow</p>
           </Card>
         ) : (
           integrations.map((integration) => (
-            <Card key={integration.id} className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
+            <Card key={integration.id}>
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-500 dark:bg-blue-600 rounded-lg flex items-center justify-center">
+                    <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
                       <span className="text-white font-semibold text-sm">{integration.name.charAt(0)}</span>
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 dark:text-white">{integration.name}</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">{integration.type.replace('-', ' ')}</p>
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{integration.name}</h4>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 capitalize">{integration.type.replace('-', ' ')}</p>
                     </div>
                   </div>
                   {getIntegrationStatusBadge(integration.status)}
                 </div>
 
-                <div className="space-y-3 mb-4">
+                <div className="space-y-2 mb-4">
                   {integration.lastSync && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                       <Clock size={14} />
                       <span>Last sync: {new Date(integration.lastSync).toLocaleString()}</span>
                     </div>
                   )}
                   {integration.status === 'connected' && (
-                    <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                    <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
                       <CheckCircle size={14} />
                       <span>Connected and working</span>
                     </div>
                   )}
                 </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-800">
                   <Button variant="ghost" size="sm" onClick={() => handleIntegrationToggle(integration.id)}>
                     {integration.status === 'connected' ? 'Disconnect' : 'Connect'}
                   </Button>
@@ -436,19 +440,13 @@ const Settings = () => {
   };
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Page Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="flex flex-wrap items-center justify-between gap-4"
-      >
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">Settings</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Configure your preferences and integrations</p>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Settings</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Manage your account preferences and integrations</p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-3">
           <AnimatePresence>
             {saved && (
               <motion.div
@@ -458,7 +456,7 @@ const Settings = () => {
                 className="flex items-center gap-2 text-green-600 dark:text-green-400"
               >
                 <CheckCircle size={16} />
-                <span className="text-sm font-medium">Saved!</span>
+                <span className="text-sm font-medium">Saved</span>
               </motion.div>
             )}
           </AnimatePresence>
@@ -473,10 +471,9 @@ const Settings = () => {
             Save changes
           </Button>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Settings Tabs */}
-      <Card className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
+      <Card>
         <div className="p-4">
           <div className="flex flex-wrap gap-2">
             {tabs.map((tab) => (
@@ -485,10 +482,10 @@ const Settings = () => {
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors',
+                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-150',
                   activeTab === tab.id
-                    ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                 )}
               >
                 <tab.icon size={16} />
@@ -499,30 +496,32 @@ const Settings = () => {
         </div>
       </Card>
 
-      {/* Settings Content */}
       <motion.div
         key={activeTab}
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.3 }}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
       >
         {renderContent()}
       </motion.div>
 
       {toast && (
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
           className={cn(
             'fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-medium',
             toast.type === 'error'
-              ? 'bg-red-100 dark:bg-red-900/80 text-red-800 dark:text-red-200'
-              : 'bg-green-100 dark:bg-green-900/80 text-green-800 dark:text-green-200'
+              ? 'bg-red-50 dark:bg-red-900/80 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800'
+              : 'bg-green-50 dark:bg-green-900/80 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800'
           )}
         >
           {toast.message}
-        </div>
+        </motion.div>
       )}
     </div>
   );
 };
 
-export default Settings; 
+export default Settings;

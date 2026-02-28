@@ -8,14 +8,13 @@ import {
   Zap, 
   Shield, 
   Users, 
-  CheckCircle,
   ArrowRight,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import { api, TokenService } from '../../services/api';
 
 /**
- * Login page component with modern design and glassmorphism effects
+ * Login page with enterprise design
  */
 const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
   const [formData, setFormData] = useState({
@@ -34,7 +33,6 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
       [name]: type === 'checkbox' ? checked : value
     }));
     
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -70,14 +68,9 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
     setErrors({});
     
     try {
-      // Call real API
       const response = await api.auth.login(formData.email, formData.password);
-      
-      // Get user profile
       const user = await api.auth.getCurrentUser();
       TokenService.setUser(user);
-      
-      // Call parent login handler
       onLogin({ ...formData, user });
     } catch (error) {
       console.error('Login error:', error);
@@ -88,41 +81,28 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-purple-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-8"
-        >
-          <div className="inline-flex items-center space-x-2 mb-4">
-            <img src="/logo.png" alt="Resolve meQ" className="h-12 w-auto object-contain" />
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 mb-6">
+            <img src="/logo.png" alt="ResolveMeQ" className="h-10 w-auto object-contain" />
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
               ResolveMeQ
             </h1>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Welcome Back</h2>
-          <p className="text-gray-600 dark:text-gray-300">Sign in to your account to continue</p>
-        </motion.div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Welcome back</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Sign in to your account</p>
+        </div>
 
-        {/* Login Form */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 dark:border-gray-700/20 p-8"
-        >
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field */}
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Email Address
+              <label htmlFor="email" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">
+                Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
+                  <Mail className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
                   id="email"
@@ -130,33 +110,28 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
                   type="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                  className={`input-enterprise pl-10 ${
                     errors.email 
-                      ? 'border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/20' 
-                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700'
+                      ? 'border-red-300 dark:border-red-600' 
+                      : ''
                   }`}
-                  placeholder="Enter your email"
+                  placeholder="you@company.com"
                 />
               </div>
               {errors.email && (
-                <motion.p 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-1 text-sm text-red-600 dark:text-red-400"
-                >
+                <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
                   {errors.email}
-                </motion.p>
+                </p>
               )}
             </div>
 
-            {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="password" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">
                 Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
+                  <Lock className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
                   id="password"
@@ -164,10 +139,10 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                  className={`input-enterprise pl-10 pr-10 ${
                     errors.password 
-                      ? 'border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/20' 
-                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700'
+                      ? 'border-red-300 dark:border-red-600' 
+                      : ''
                   }`}
                   placeholder="Enter your password"
                 />
@@ -177,24 +152,19 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+                    <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
                   ) : (
-                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+                    <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
                   )}
                 </button>
               </div>
               {errors.password && (
-                <motion.p 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-1 text-sm text-red-600 dark:text-red-400"
-                >
+                <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
                   {errors.password}
-                </motion.p>
+                </p>
               )}
             </div>
 
-            {/* Remember Me & Forgot Password */}
             <div className="flex items-center justify-between">
               <label className="flex items-center">
                 <input
@@ -202,67 +172,59 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
                   name="rememberMe"
                   checked={formData.rememberMe}
                   onChange={handleInputChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-700 rounded"
                 />
                 <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Remember me</span>
               </label>
               <button
                 type="button"
                 onClick={onNavigateToForgotPassword}
-                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+                className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
               >
                 Forgot password?
               </button>
             </div>
 
-            {/* General Error */}
             {errors.general && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
-              >
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p>
-              </motion.div>
+              </div>
             )}
 
-            {/* Submit Button */}
             <Button
               type="submit"
               variant="primary"
               size="lg"
-              className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-medium py-3 rounded-xl transition-all duration-200 transform hover:scale-105"
+              className="w-full"
               disabled={loading}
             >
               {loading ? (
                 <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
                   Signing in...
                 </div>
               ) : (
                 <div className="flex items-center justify-center">
-                  Sign In
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                  Sign in
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </div>
               )}
             </Button>
           </form>
 
-          {/* Divider */}
-          <div className="my-6">
+          <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                <div className="w-full border-t border-gray-200 dark:border-gray-800"></div>
               </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">Or continue with</span>
+              <div className="relative flex justify-center text-xs">
+                <span className="px-2 bg-white dark:bg-gray-900 text-gray-500">Or continue with</span>
               </div>
             </div>
           </div>
 
-          {/* Social Login Buttons */}
-          <div className="space-y-3">
-            <button className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+          <div className="mt-6">
+            <button className="w-full flex items-center justify-center px-4 py-2.5 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                 <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -273,47 +235,40 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
             </button>
           </div>
 
-          {/* Sign Up Link */}
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Don't have an account?{' '}
               <button
                 type="button"
                 onClick={onNavigateToSignup}
-                className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                className="font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
               >
                 Sign up
               </button>
             </p>
           </div>
-        </motion.div>
+        </div>
 
-        {/* Features */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4"
-        >
-          <div className="text-center p-4 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl border border-white/20 dark:border-gray-700/20">
-            <Zap className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-            <h3 className="font-semibold text-gray-800 dark:text-white">AI-Powered</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300">Intelligent support automation</p>
+        <div className="mt-8 grid grid-cols-3 gap-4">
+          <div className="text-center p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+            <Zap className="w-6 h-6 text-primary-600 mx-auto mb-2" />
+            <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-1">AI-Powered</h3>
+            <p className="text-xs text-gray-600 dark:text-gray-400">Intelligent automation</p>
           </div>
-          <div className="text-center p-4 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl border border-white/20 dark:border-gray-700/20">
-            <Shield className="w-8 h-8 text-green-600 mx-auto mb-2" />
-            <h3 className="font-semibold text-gray-800 dark:text-white">Secure</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300">Enterprise-grade security</p>
+          <div className="text-center p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+            <Shield className="w-6 h-6 text-green-600 mx-auto mb-2" />
+            <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-1">Secure</h3>
+            <p className="text-xs text-gray-600 dark:text-gray-400">Enterprise-grade</p>
           </div>
-          <div className="text-center p-4 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl border border-white/20 dark:border-gray-700/20">
-            <Users className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-            <h3 className="font-semibold text-gray-800 dark:text-white">Team Ready</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300">Collaborative support platform</p>
+          <div className="text-center p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+            <Users className="w-6 h-6 text-purple-600 mx-auto mb-2" />
+            <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-1">Team Ready</h3>
+            <p className="text-xs text-gray-600 dark:text-gray-400">Collaborative</p>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
 };
 
-export default Login; 
+export default Login;

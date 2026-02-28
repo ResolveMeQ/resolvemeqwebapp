@@ -171,43 +171,40 @@ const KnowledgeBase = () => {
 
   return (
     <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-8rem)] lg:min-h-[500px]">
-      {/* Left: list and filters - always visible */}
-      <div className="flex-1 min-w-0 flex flex-col space-y-6 p-6 overflow-y-auto scrollbar-hide">
+      {/* Left: list and filters */}
+      <div className="flex-1 min-w-0 flex flex-col space-y-6 overflow-y-auto">
         <header>
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">
             Knowledge Base
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Search articles and solutions. Rate what helps.
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Search documentation and solutions
           </p>
         </header>
 
-      {/* Toolbar: search, sort, tags */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-lg">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           <input
             type="text"
             placeholder="Search articles..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+            className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none text-gray-900 dark:text-white placeholder-gray-500"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white"
-          >
-            <option value="recent">Most recent</option>
-            <option value="popular">Most popular</option>
-            <option value="helpful">Most helpful</option>
-          </select>
-        </div>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
+        >
+          <option value="recent">Most recent</option>
+          <option value="popular">Most popular</option>
+          <option value="helpful">Most helpful</option>
+        </select>
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={loadArticles}
           disabled={loading}
@@ -219,17 +216,18 @@ const KnowledgeBase = () => {
 
       {allTags.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <Tag className="w-4 h-4 text-gray-500 dark:text-gray-400 shrink-0" />
+          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Tags:</span>
           {(tagsExpanded ? allTags : allTags.slice(0, TAGS_VISIBLE_COLLAPSED)).map((tag) => (
             <button
               key={tag}
               type="button"
               onClick={() => toggleTag(tag)}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-medium transition-colors duration-150',
                 selectedTags.includes(tag)
-                  ? 'bg-blue-600 text-white dark:bg-blue-500'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
+                  ? 'bg-primary-600 text-white dark:bg-primary-600'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
+              )}
             >
               {tag}
             </button>
@@ -238,37 +236,37 @@ const KnowledgeBase = () => {
             <button
               type="button"
               onClick={() => setTagsExpanded(!tagsExpanded)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-colors duration-150"
             >
-              {tagsExpanded ? 'Show less' : `+${allTags.length - TAGS_VISIBLE_COLLAPSED} more tags`}
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${tagsExpanded ? 'rotate-180' : ''}`} />
+              {tagsExpanded ? 'Show less' : `+${allTags.length - TAGS_VISIBLE_COLLAPSED}`}
+              <ChevronDown className={`w-3 h-3 transition-transform ${tagsExpanded ? 'rotate-180' : ''}`} />
             </button>
           )}
         </div>
       )}
 
       {selectedTags.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-gray-500 dark:text-gray-400">Active:</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Filtered by:</span>
           {selectedTags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 rounded"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800/50 rounded-md text-xs font-medium"
             >
               {tag}
               <button
                 type="button"
                 onClick={() => toggleTag(tag)}
-                className="hover:opacity-80"
+                className="hover:text-primary-900 dark:hover:text-primary-300"
               >
-                ×
+                <X className="w-3 h-3" />
               </button>
             </span>
           ))}
           <button
             type="button"
             onClick={() => setSelectedTags([])}
-            className="text-blue-600 dark:text-blue-400 hover:underline"
+            className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
           >
             Clear all
           </button>
@@ -278,16 +276,16 @@ const KnowledgeBase = () => {
       {/* Articles grid */}
       {loading && articles.length === 0 ? (
         <div className="flex items-center justify-center min-h-64">
-          <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-600 border-t-transparent" />
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary-600 border-t-transparent" />
         </div>
       ) : filteredArticles.length === 0 ? (
-        <Card className="p-12 text-center border border-gray-200 dark:border-gray-700">
-          <BookOpen className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+        <Card className="p-12 text-center">
+          <BookOpen className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
             No articles found
           </h3>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">
-            Try a different search or clear filters.
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Try a different search or clear filters
           </p>
         </Card>
       ) : (
@@ -296,36 +294,36 @@ const KnowledgeBase = () => {
             {filteredArticles.map((article) => (
               <Card
                 key={article.kb_id}
-                className="p-5 cursor-pointer border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md dark:bg-gray-800/50 dark:border-gray-700"
+                className="p-5 cursor-pointer hover:shadow-md transition-shadow duration-150"
                 onClick={() => openArticle(article)}
               >
-                <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-start justify-between gap-2 mb-3">
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white line-clamp-2">
                     {article.title}
                   </h3>
-                  <BookOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                  <BookOpen className="w-4 h-4 text-primary-600 dark:text-primary-400 shrink-0 mt-0.5" />
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-3 mb-3">
+                <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 mb-4">
                   {article.content}
                 </p>
                 {article.tags?.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-3">
+                  <div className="flex flex-wrap gap-1.5 mb-4">
                     {article.tags.slice(0, 3).map((t) => (
                       <span
                         key={t}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-xs"
+                        className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded text-xs"
                       >
                         {t}
                       </span>
                     ))}
                     {article.tags.length > 3 && (
-                      <span className="text-xs text-gray-500 dark:text-gray-500">
+                      <span className="text-xs text-gray-500 dark:text-gray-500 px-2 py-0.5">
                         +{article.tags.length - 3}
                       </span>
                     )}
                   </div>
                 )}
-                <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500 pt-3 border-t border-gray-200 dark:border-gray-800">
                   <div className="flex items-center gap-3">
                     <span className="flex items-center gap-1">
                       <Eye className="w-3.5 h-3.5" />
@@ -338,18 +336,17 @@ const KnowledgeBase = () => {
               </Card>
             ))}
           </div>
-
         </>
       )}
 
       {!loading && filteredArticles.length > 0 && (
-        <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-center text-xs text-gray-500 dark:text-gray-500 pt-2">
           Showing {filteredArticles.length} of {articles.length} articles
         </p>
       )}
       </div>
 
-      {/* Right-side panel: article detail - only when an article is selected */}
+      {/* Right-side panel: article detail */}
       <AnimatePresence mode="wait">
         {selectedArticle && (
           <motion.div
@@ -357,38 +354,39 @@ const KnowledgeBase = () => {
             initial={{ width: 0, opacity: 0 }}
             animate={{ width: panelWidth, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
-            transition={{ type: 'tween', duration: 0.25, ease: 'easeInOut' }}
-            className="shrink-0 overflow-hidden border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50 flex flex-col max-w-[100vw]"
+            transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
+            className="shrink-0 overflow-hidden border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex flex-col max-w-[100vw]"
             style={{ minHeight: 'inherit' }}
           >
             <div className="w-full min-w-[280px] max-w-[420px] h-full flex flex-col overflow-hidden">
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between shrink-0">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate pr-2">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between shrink-0">
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white truncate pr-2">
                   {selectedArticle.title}
                 </h2>
                 <button
                   type="button"
                   onClick={closeArticle}
-                  className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 shrink-0"
+                  className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0 transition-colors"
                   aria-label="Close panel"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4">
-                <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
                   <span className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
+                    <Calendar className="w-3.5 h-3.5" />
                     {formatDate(selectedArticle.created_at)}
                   </span>
+                  <span>·</span>
                   <span className="flex items-center gap-1">
-                    <Eye className="w-4 h-4" />
+                    <Eye className="w-3.5 h-3.5" />
                     {selectedArticle.views ?? 0} views
                   </span>
+                  <span>·</span>
                   <span>
-                    {getHelpfulnessScore(selectedArticle)}% helpful (
-                    {selectedArticle.total_votes ?? 0} votes)
+                    {getHelpfulnessScore(selectedArticle)}% helpful
                   </span>
                 </div>
 
@@ -397,9 +395,9 @@ const KnowledgeBase = () => {
                     {selectedArticle.tags.map((t) => (
                       <span
                         key={t}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 rounded-full text-sm"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800/50 rounded-md text-xs font-medium"
                       >
-                        <Tag className="w-3.5 h-3.5" />
+                        <Tag className="w-3 h-3" />
                         {t}
                       </span>
                     ))}
@@ -407,14 +405,14 @@ const KnowledgeBase = () => {
                 )}
 
                 <div>
-                  <div className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap text-sm rounded-lg border border-gray-200/50 dark:border-gray-700/50 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                  <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-gray-50 dark:bg-gray-900">
                     {selectedArticle.content}
                   </div>
                 </div>
 
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                  <p className="text-gray-700 dark:text-gray-300 font-medium mb-3">
-                    Was this article helpful?
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                    Was this helpful?
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -423,7 +421,7 @@ const KnowledgeBase = () => {
                       onClick={() => handleRate(selectedArticle.kb_id, true)}
                       disabled={ratingArticleId === selectedArticle.kb_id}
                     >
-                      <ThumbsUp className="w-4 h-4 mr-1" />
+                      <ThumbsUp className="w-4 h-4 mr-1.5" />
                       Yes
                     </Button>
                     <Button
@@ -432,7 +430,7 @@ const KnowledgeBase = () => {
                       onClick={() => handleRate(selectedArticle.kb_id, false)}
                       disabled={ratingArticleId === selectedArticle.kb_id}
                     >
-                      <ThumbsDown className="w-4 h-4 mr-1" />
+                      <ThumbsDown className="w-4 h-4 mr-1.5" />
                       No
                     </Button>
                   </div>

@@ -17,32 +17,22 @@ const Badge = React.forwardRef(({
   className,
   ...rest
 }, ref) => {
-  const baseClasses = 'inline-flex items-center rounded-full font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
+  const baseClasses = 'inline-flex items-center rounded-md font-medium';
   
   const variants = {
-    default: 'bg-neutral-100 text-neutral-800 border border-neutral-200',
-    primary: 'bg-primary-100 text-primary-800 border border-primary-200',
-    secondary: 'bg-secondary-100 text-secondary-800 border border-secondary-200',
-    success: 'bg-success-100 text-success-800 border border-success-200',
-    warning: 'bg-warning-100 text-warning-800 border border-warning-200',
-    error: 'bg-error-100 text-error-800 border border-error-200',
-    outline: 'bg-transparent border border-neutral-300 text-neutral-700',
+    default: 'bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700',
+    primary: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/50',
+    secondary: 'bg-cyan-50 text-cyan-700 border border-cyan-200 dark:bg-cyan-900/20 dark:text-cyan-400 dark:border-cyan-800/50',
+    success: 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/50',
+    warning: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50',
+    error: 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/50',
+    info: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/50',
   };
   
   const sizes = {
     sm: 'px-2 py-0.5 text-xs',
-    md: 'px-2.5 py-1 text-sm',
-    lg: 'px-3 py-1.5 text-sm',
-  };
-  
-  const focusRings = {
-    default: 'focus:ring-neutral-500',
-    primary: 'focus:ring-primary-500',
-    secondary: 'focus:ring-secondary-500',
-    success: 'focus:ring-success-500',
-    warning: 'focus:ring-warning-500',
-    error: 'focus:ring-error-500',
-    outline: 'focus:ring-neutral-500',
+    md: 'px-2.5 py-0.5 text-xs',
+    lg: 'px-3 py-1 text-sm',
   };
   
   return (
@@ -52,7 +42,6 @@ const Badge = React.forwardRef(({
         baseClasses,
         variants[variant],
         sizes[size],
-        focusRings[variant],
         className
       )}
       {...rest}

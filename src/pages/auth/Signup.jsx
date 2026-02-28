@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import { 
   Mail, 
   Lock, 
@@ -8,14 +7,12 @@ import {
   User, 
   Building,
   ArrowRight,
-  CheckCircle,
-  X
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import { api } from '../../services/api';
 
 /**
- * Signup page component with modern design and form validation
+ * Signup page with enterprise design
  */
 const Signup = ({ onSignup, onNavigateToLogin }) => {
   const [formData, setFormData] = useState({
@@ -39,7 +36,6 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
       [name]: type === 'checkbox' ? checked : value
     }));
     
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -48,13 +44,8 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = 'First name is required';
-    }
-    
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
-    }
+    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
+    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
     
     if (!formData.email) {
       newErrors.email = 'Email is required';
@@ -62,16 +53,14 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
       newErrors.email = 'Please enter a valid email';
     }
     
-    if (!formData.company.trim()) {
-      newErrors.company = 'Company name is required';
-    }
+    if (!formData.company.trim()) newErrors.company = 'Company name is required';
     
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 8) {
       newErrors.password = 'Password must be at least 8 characters';
     } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
+      newErrors.password = 'Must contain uppercase, lowercase, and number';
     }
     
     if (!formData.confirmPassword) {
@@ -81,7 +70,7 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
     }
     
     if (!formData.agreeToTerms) {
-      newErrors.agreeToTerms = 'You must agree to the terms and conditions';
+      newErrors.agreeToTerms = 'You must agree to the terms';
     }
     
     setErrors(newErrors);
@@ -91,15 +80,12 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
     
     setLoading(true);
     setErrors({});
     
     try {
-      // Prepare user data for API
       const userData = {
         email: formData.email,
         password: formData.password,
@@ -110,10 +96,7 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
         department: formData.company,
       };
       
-      // Call real API
       await api.auth.register(userData);
-      
-      // Show success message and redirect to login
       alert('Registration successful! Please check your email to verify your account.');
       onNavigateToLogin();
     } catch (error) {
@@ -135,11 +118,11 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
     if (/[^A-Za-z0-9]/.test(password)) score++;
     
     const strengthMap = {
-      0: { label: 'Very Weak', color: 'text-red-500' },
-      1: { label: 'Weak', color: 'text-red-500' },
-      2: { label: 'Fair', color: 'text-yellow-500' },
-      3: { label: 'Good', color: 'text-blue-500' },
-      4: { label: 'Strong', color: 'text-green-500' },
+      0: { label: 'Very Weak', color: 'text-red-600' },
+      1: { label: 'Weak', color: 'text-red-600' },
+      2: { label: 'Fair', color: 'text-amber-600' },
+      3: { label: 'Good', color: 'text-blue-600' },
+      4: { label: 'Strong', color: 'text-green-600' },
       5: { label: 'Very Strong', color: 'text-green-600' }
     };
     
@@ -149,42 +132,29 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
   const passwordStrength = getPasswordStrength(formData.password);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-purple-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
-        {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-8"
-        >
-          <div className="inline-flex items-center space-x-2 mb-4">
-            <img src="/logo.png" alt="Resolve meQ" className="h-12 w-auto object-contain" />
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 mb-6">
+            <img src="/logo.png" alt="ResolveMeQ" className="h-10 w-auto object-contain" />
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
               ResolveMeQ
             </h1>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Create Account</h2>
-          <p className="text-gray-600 dark:text-gray-300">Join ResolveMeQ and transform your IT support</p>
-        </motion.div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Create your account</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Get started with enterprise IT support</p>
+        </div>
 
-        {/* Signup Form */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 dark:border-gray-700/20 p-8"
-        >
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Name Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="firstName" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">
                   First Name
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-gray-400" />
+                    <User className="h-4 w-4 text-gray-400" />
                   </div>
                   <input
                     id="firstName"
@@ -192,32 +162,20 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
                     type="text"
                     value={formData.firstName}
                     onChange={handleInputChange}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                      errors.firstName 
-                        ? 'border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/20' 
-                        : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700'
-                    }`}
-                    placeholder="Enter first name"
+                    className={`input-enterprise pl-10 ${errors.firstName ? 'border-red-300 dark:border-red-600' : ''}`}
+                    placeholder="John"
                   />
                 </div>
-                {errors.firstName && (
-                  <motion.p 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-1 text-sm text-red-600 dark:text-red-400"
-                  >
-                    {errors.firstName}
-                  </motion.p>
-                )}
+                {errors.firstName && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.firstName}</p>}
               </div>
 
               <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="lastName" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">
                   Last Name
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-gray-400" />
+                    <User className="h-4 w-4 text-gray-400" />
                   </div>
                   <input
                     id="lastName"
@@ -225,34 +183,21 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
                     type="text"
                     value={formData.lastName}
                     onChange={handleInputChange}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                      errors.lastName 
-                        ? 'border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/20' 
-                        : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700'
-                    }`}
-                    placeholder="Enter last name"
+                    className={`input-enterprise pl-10 ${errors.lastName ? 'border-red-300 dark:border-red-600' : ''}`}
+                    placeholder="Doe"
                   />
                 </div>
-                {errors.lastName && (
-                  <motion.p 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-1 text-sm text-red-600 dark:text-red-400"
-                  >
-                    {errors.lastName}
-                  </motion.p>
-                )}
+                {errors.lastName && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.lastName}</p>}
               </div>
             </div>
 
-            {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Email Address
+              <label htmlFor="email" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">
+                Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
+                  <Mail className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
                   id="email"
@@ -260,33 +205,20 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
                   type="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                    errors.email 
-                      ? 'border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/20' 
-                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700'
-                  }`}
-                  placeholder="Enter your email"
+                  className={`input-enterprise pl-10 ${errors.email ? 'border-red-300 dark:border-red-600' : ''}`}
+                  placeholder="you@company.com"
                 />
               </div>
-              {errors.email && (
-                <motion.p 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-1 text-sm text-red-600 dark:text-red-400"
-                >
-                  {errors.email}
-                </motion.p>
-              )}
+              {errors.email && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.email}</p>}
             </div>
 
-            {/* Company Field */}
             <div>
-              <label htmlFor="company" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Company Name
+              <label htmlFor="company" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">
+                Company
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Building className="h-5 w-5 text-gray-400" />
+                  <Building className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
                   id="company"
@@ -294,33 +226,20 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
                   type="text"
                   value={formData.company}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                    errors.company 
-                      ? 'border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/20' 
-                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700'
-                  }`}
-                  placeholder="Enter company name"
+                  className={`input-enterprise pl-10 ${errors.company ? 'border-red-300 dark:border-red-600' : ''}`}
+                  placeholder="Acme Inc."
                 />
               </div>
-              {errors.company && (
-                <motion.p 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-1 text-sm text-red-600 dark:text-red-400"
-                >
-                  {errors.company}
-                </motion.p>
-              )}
+              {errors.company && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.company}</p>}
             </div>
 
-            {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="password" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">
                 Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
+                  <Lock className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
                   id="password"
@@ -328,12 +247,8 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                    errors.password 
-                      ? 'border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/20' 
-                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700'
-                  }`}
-                  placeholder="Create a password"
+                  className={`input-enterprise pl-10 pr-10 ${errors.password ? 'border-red-300 dark:border-red-600' : ''}`}
+                  placeholder="Create a strong password"
                 />
                 <button
                   type="button"
@@ -341,56 +256,45 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+                    <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
                   ) : (
-                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+                    <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
                   )}
                 </button>
               </div>
               {formData.password && (
-                <div className="mt-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className={`font-medium ${passwordStrength.color}`}>
-                      {passwordStrength.label}
-                    </span>
-                    <div className="flex space-x-1">
-                      {[1, 2, 3, 4, 5].map((level) => (
-                        <div
-                          key={level}
-                          className={`h-1 w-8 rounded-full ${
-                            level <= passwordStrength.score
-                              ? passwordStrength.score <= 2
-                                ? 'bg-red-500'
-                                : passwordStrength.score <= 3
-                                ? 'bg-yellow-500'
-                                : 'bg-green-500'
-                              : 'bg-gray-200 dark:bg-gray-600'
-                          }`}
-                        />
-                      ))}
-                    </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className={`text-xs font-medium ${passwordStrength.color}`}>
+                    {passwordStrength.label}
+                  </span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((level) => (
+                      <div
+                        key={level}
+                        className={`h-1 w-6 rounded-full ${
+                          level <= passwordStrength.score
+                            ? passwordStrength.score <= 2
+                              ? 'bg-red-600'
+                              : passwordStrength.score <= 3
+                              ? 'bg-amber-600'
+                              : 'bg-green-600'
+                            : 'bg-gray-200 dark:bg-gray-700'
+                        }`}
+                      />
+                    ))}
                   </div>
                 </div>
               )}
-              {errors.password && (
-                <motion.p 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-1 text-sm text-red-600 dark:text-red-400"
-                >
-                  {errors.password}
-                </motion.p>
-              )}
+              {errors.password && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.password}</p>}
             </div>
 
-            {/* Confirm Password Field */}
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="confirmPassword" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">
                 Confirm Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
+                  <Lock className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
                   id="confirmPassword"
@@ -398,11 +302,7 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                    errors.confirmPassword 
-                      ? 'border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/20' 
-                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700'
-                  }`}
+                  className={`input-enterprise pl-10 pr-10 ${errors.confirmPassword ? 'border-red-300 dark:border-red-600' : ''}`}
                   placeholder="Confirm your password"
                 />
                 <button
@@ -411,24 +311,15 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
                   {showConfirmPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+                    <EyeOff className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
                   ) : (
-                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+                    <Eye className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
                   )}
                 </button>
               </div>
-              {errors.confirmPassword && (
-                <motion.p 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-1 text-sm text-red-600 dark:text-red-400"
-                >
-                  {errors.confirmPassword}
-                </motion.p>
-              )}
+              {errors.confirmPassword && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.confirmPassword}</p>}
             </div>
 
-            {/* Terms and Conditions */}
             <div>
               <label className="flex items-start">
                 <input
@@ -436,80 +327,65 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
                   name="agreeToTerms"
                   checked={formData.agreeToTerms}
                   onChange={handleInputChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1"
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-700 rounded mt-0.5"
                 />
                 <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                   I agree to the{' '}
-                  <a href="#" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">
+                  <a href="#" className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium">
                     Terms of Service
                   </a>{' '}
                   and{' '}
-                  <a href="#" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">
+                  <a href="#" className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium">
                     Privacy Policy
                   </a>
                 </span>
               </label>
-              {errors.agreeToTerms && (
-                <motion.p 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-1 text-sm text-red-600 dark:text-red-400"
-                >
-                  {errors.agreeToTerms}
-                </motion.p>
-              )}
+              {errors.agreeToTerms && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.agreeToTerms}</p>}
             </div>
 
-            {/* General Error */}
             {errors.general && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
-              >
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p>
-              </motion.div>
+              </div>
             )}
 
-            {/* Submit Button */}
             <Button
               type="submit"
               variant="primary"
               size="lg"
-              className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-medium py-3 rounded-xl transition-all duration-200 transform hover:scale-105"
+              className="w-full"
               disabled={loading}
             >
               {loading ? (
                 <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
                   Creating account...
                 </div>
               ) : (
                 <div className="flex items-center justify-center">
-                  Create Account
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                  Create account
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </div>
               )}
             </Button>
           </form>
 
-          {/* Sign In Link */}
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Already have an account?{' '}
               <button
                 type="button"
                 onClick={onNavigateToLogin}
-                className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                className="font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
               >
                 Sign in
               </button>
             </p>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
 };
 
-export default Signup; 
+export default Signup;

@@ -120,50 +120,41 @@ const Header = ({
 
   return (
     <header className={cn(
-      'sticky top-0 z-30 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border-b border-gray-200/20 dark:border-gray-700/20 shadow-lg',
+      'sticky top-0 z-30 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800',
       className
     )}>
-      <div className="flex items-center justify-between px-6 py-4">
+      <div className="flex items-center justify-between px-6 py-3">
         {/* Search Bar */}
-        <div className="flex-1 max-w-md">
-          <form onSubmit={handleSearch} className="relative group">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-xl blur-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-hover:text-blue-500 group-focus-within:text-blue-500 transition-colors duration-200 z-10" size={20} />
-              <input
-                type="text"
-                placeholder="Search tickets, users, or anything..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl border border-gray-200/30 dark:border-gray-600/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white shadow-lg hover:shadow-xl focus:shadow-2xl transition-all duration-200 group-hover:bg-white/80 dark:group-hover:bg-gray-800/80 group-hover:border-blue-300/50 dark:group-hover:border-blue-600/50 focus:bg-white/90 dark:focus:bg-gray-800/90 focus:border-blue-500/50 dark:focus:border-blue-400/50 focus:scale-[1.02]"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-cyan-500/5 rounded-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 pointer-events-none"></div>
-            </div>
+        <div className="flex-1 max-w-xl">
+          <form onSubmit={handleSearch} className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
+            <input
+              type="text"
+              placeholder="Search tickets, users, knowledge base..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-10 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-500 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100 text-sm transition-colors duration-150"
+            />
             {searchQuery && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
+              <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200 hover:scale-110"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 aria-label="Clear search"
               >
-                <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </motion.button>
+                <X size={14} />
+              </button>
             )}
           </form>
         </div>
 
         {/* Right Side Actions */}
-        <div className="flex items-center space-x-4">
-          {/* Billing Status - dynamic from subscription when available */}
+        <div className="flex items-center space-x-3">
+          {/* Billing Status */}
           {planName && (
-            <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border border-blue-200/30 dark:border-blue-700/30 rounded-lg">
-              <div className="w-2 h-2 bg-green-500 rounded-full" />
-              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{planName}</span>
+            <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/50 rounded-lg">
+              <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+              <span className="text-xs font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wide">{planName}</span>
             </div>
           )}
 
@@ -175,13 +166,13 @@ const Header = ({
                 setIsNotificationsOpen(false);
                 setIsUserMenuOpen(false);
               }}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus-visible-ring"
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
               aria-label="Theme options"
             >
               {themeOptions.find(option => option.value === theme)?.icon && 
                 React.createElement(themeOptions.find(option => option.value === theme).icon, { 
-                  size: 20,
-                  className: "text-gray-600 dark:text-gray-300"
+                  size: 18,
+                  className: "text-gray-600 dark:text-gray-400"
                 })
               }
             </button>
@@ -189,27 +180,27 @@ const Header = ({
             <AnimatePresence>
               {isThemeMenuOpen && (
                 <motion.div
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-48 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-gray-200/20 dark:border-gray-700/20 rounded-lg shadow-lg z-50"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  className="absolute right-0 mt-2 w-44 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50"
                 >
-                  <div className="p-2">
+                  <div className="p-1">
                     {themeOptions.map((option) => (
                       <button
                         key={option.value}
                         onClick={() => handleThemeChange(option.value)}
                         className={cn(
-                          'w-full flex items-center space-x-3 px-3 py-2 text-sm rounded-lg transition-colors',
+                          'w-full flex items-center space-x-2.5 px-3 py-2 text-sm rounded-md transition-colors duration-150',
                           theme === option.value
-                            ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 font-medium'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                         )}
                       >
                         <option.icon size={16} />
                         <span>{option.label}</span>
                         {theme === option.value && (
-                          <div className="ml-auto w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full" />
+                          <div className="ml-auto w-1.5 h-1.5 bg-primary-600 dark:bg-primary-400 rounded-full" />
                         )}
                       </button>
                     ))}
@@ -225,33 +216,32 @@ const Header = ({
               onClick={() => {
                 setIsNotificationsOpen(!isNotificationsOpen);
                 setIsUserMenuOpen(false);
+                setIsThemeMenuOpen(false);
               }}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus-visible-ring relative"
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 relative"
               aria-label="Notifications"
             >
-              <Bell size={20} className="text-gray-600 dark:text-gray-300" />
+              <Bell size={18} className="text-gray-600 dark:text-gray-400" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
+                <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-red-500 rounded-full" />
               )}
             </button>
 
             <AnimatePresence>
               {isNotificationsOpen && (
                 <motion.div
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-80 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-gray-200/20 dark:border-gray-700/20 rounded-lg shadow-lg z-50"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50"
                 >
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
+                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
                     {unreadCount > 0 && (
                       <button
                         type="button"
                         onClick={handleMarkAllRead}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                        className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
                       >
                         Mark all read
                       </button>
@@ -259,15 +249,15 @@ const Header = ({
                   </div>
                   <div className="max-h-96 overflow-y-auto">
                     {notificationsLoading ? (
-                      <div className="p-6 text-center text-gray-500 dark:text-gray-400 text-sm">
+                      <div className="p-8 text-center text-gray-500 dark:text-gray-400 text-sm">
                         Loading…
                       </div>
                     ) : notificationsError ? (
-                      <div className="p-6 text-center text-red-500 dark:text-red-400 text-sm">
+                      <div className="p-8 text-center text-red-600 dark:text-red-400 text-sm">
                         {notificationsError}
                       </div>
                     ) : notifications.length === 0 ? (
-                      <div className="p-6 text-center text-gray-500 dark:text-gray-400 text-sm">
+                      <div className="p-8 text-center text-gray-500 dark:text-gray-400 text-sm">
                         No notifications
                       </div>
                     ) : (
@@ -277,28 +267,28 @@ const Header = ({
                           key={notification.id}
                           onClick={() => handleNotificationClick(notification)}
                           className={cn(
-                            'w-full text-left p-4 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer',
-                            !notification.is_read && 'bg-blue-50/50 dark:bg-blue-900/10'
+                            'w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150 cursor-pointer',
+                            !notification.is_read && 'bg-primary-50/30 dark:bg-primary-900/10'
                           )}
                         >
                           <div className="flex items-start space-x-3">
                             <div className={cn(
-                              'w-2 h-2 rounded-full mt-2 flex-shrink-0',
+                              'w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0',
                               notification.type === 'info' && 'bg-blue-500',
                               notification.type === 'success' && 'bg-green-500',
-                              notification.type === 'warning' && 'bg-yellow-500',
+                              notification.type === 'warning' && 'bg-amber-500',
                               notification.type === 'error' && 'bg-red-500'
                             )} />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">
                                 {notification.title}
                               </p>
                               {notification.message && (
-                                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">
                                   {notification.message}
                                 </p>
                               )}
-                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                                 {notification.time}
                               </p>
                             </div>
@@ -318,45 +308,46 @@ const Header = ({
               onClick={() => {
                 setIsUserMenuOpen(!isUserMenuOpen);
                 setIsNotificationsOpen(false);
+                setIsThemeMenuOpen(false);
               }}
-              className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus-visible-ring"
+              className="flex items-center space-x-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
               aria-label="User menu"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-full flex items-center justify-center">
+              <div className="w-7 h-7 bg-gradient-to-br from-primary-600 to-primary-700 rounded-full flex items-center justify-center">
                 {user?.avatar || user?.profile_image_url ? (
                   <img src={user.avatar || user.profile_image_url} alt={displayName} className="w-full h-full rounded-full object-cover" />
                 ) : (
-                  <span className="text-white font-medium text-sm">
+                  <span className="text-white font-semibold text-xs">
                     {String(displayName).charAt(0).toUpperCase()}
                   </span>
                 )}
               </div>
               <div className="hidden md:block text-left">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[140px]">{displayName}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{displayRole}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[120px]">{displayName}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-500">{displayRole}</p>
               </div>
-              <ChevronDown size={16} className="text-gray-500 dark:text-gray-400" />
+              <ChevronDown size={14} className="text-gray-400 dark:text-gray-500 hidden md:block" />
             </button>
 
             <AnimatePresence>
               {isUserMenuOpen && (
                 <motion.div
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-56 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-gray-200/20 dark:border-gray-700/20 rounded-lg shadow-lg z-50"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  className="absolute right-0 mt-2 w-52 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50"
                 >
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{displayName}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{user?.email ?? '—'}</p>
+                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{displayName}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 truncate mt-0.5">{user?.email ?? '—'}</p>
                   </div>
-                  <div className="p-2">
+                  <div className="p-1">
                     <button
                       onClick={() => {
                         setIsUserMenuOpen(false);
                         onNavigate?.('settings');
                       }}
-                      className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                      className="w-full flex items-center space-x-2.5 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors duration-150"
                     >
                       <Settings size={16} />
                       <span>Settings</span>
@@ -366,7 +357,7 @@ const Header = ({
                         setIsUserMenuOpen(false);
                         onLogout?.();
                       }}
-                      className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      className="w-full flex items-center space-x-2.5 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors duration-150"
                     >
                       <LogOut size={16} />
                       <span>Sign out</span>

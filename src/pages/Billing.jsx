@@ -113,62 +113,62 @@ const Billing = () => {
   }
 
   return (
-    <div className="space-y-8 p-6">
+    <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">Billing & Plans</h1>
-        <p className="mt-1 text-gray-500 dark:text-gray-400">Manage your subscription, view invoices, and change your plan</p>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Billing & Plans</h1>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Manage your subscription and billing</p>
       </header>
 
       {usage && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {usage.teams_used != null && (
-            <Card className="p-4 border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Teams used</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{usage.teams_used}{usage.teams_limit != null ? ` / ${usage.teams_limit}` : ''}</p>
+            <Card className="p-5">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Teams used</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{usage.teams_used}{usage.teams_limit != null ? ` / ${usage.teams_limit}` : ''}</p>
             </Card>
           )}
           {usage.tickets_this_month != null && (
-            <Card className="p-4 border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Tickets this month</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{usage.tickets_this_month}</p>
+            <Card className="p-5">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Tickets this month</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{usage.tickets_this_month}</p>
             </Card>
           )}
           {usage.members_used != null && (
-            <Card className="p-4 border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Seats used</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{usage.members_used}</p>
+            <Card className="p-5">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Seats used</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{usage.members_used}</p>
             </Card>
           )}
         </div>
       )}
 
-      <Card className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50 overflow-hidden">
-        <div className="p-6 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-b border-gray-100 dark:border-gray-700">
+      <Card className="overflow-hidden">
+        <div className="p-6 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-600 dark:bg-blue-500 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-primary-600 rounded-lg flex items-center justify-center">
                 {currentPlanDetail ? (currentPlanSlug === 'enterprise' ? <Crown size={24} className="text-white" /> : <Zap size={24} className="text-white" />) : <Users size={24} className="text-white" />}
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Current plan: {currentPlanDetail?.name || 'None'}</h2>
-                <p className="text-gray-600 dark:text-gray-400">
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white">Current plan: {currentPlanDetail?.name || 'None'}</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   {currentPlanDetail ? formatPrice(billingCycle === 'monthly' ? currentPlanDetail.price_monthly : currentPlanDetail.price_yearly) : '—'} / {billingCycle === 'monthly' ? 'month' : 'year'}
                 </p>
               </div>
             </div>
             <span className={cn(
-              'inline-flex items-center px-3 py-1 rounded-full text-sm font-medium',
-              subscription?.status === 'active' && 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-              subscription?.status === 'past_due' && 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-              (!subscription?.status || subscription?.status === 'canceled') && 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+              'inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium',
+              subscription?.status === 'active' && 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/50',
+              subscription?.status === 'past_due' && 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50',
+              (!subscription?.status || subscription?.status === 'canceled') && 'bg-gray-50 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
             )}>
-              {subscription?.status === 'active' && <span className="w-2 h-2 bg-green-500 rounded-full mr-2 inline-block" />}
+              {subscription?.status === 'active' && <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 inline-block" />}
               {(subscription?.status || 'No subscription').replace('_', ' ')}
             </span>
           </div>
         </div>
         <div className="p-6">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Recurring payment</h3>
+          <h3 className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">Recurring payment</h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {nextBillingDate ? (
               <>Your subscription {subscription?.status === 'active' ? 'renews' : 'renewed'} on <strong className="text-gray-900 dark:text-white">{nextBillingDate}</strong>. {nextAmount != null && nextAmount > 0 && <>You will be charged <strong>{formatPrice(nextAmount)}</strong>.</>}</>
@@ -177,9 +177,9 @@ const Billing = () => {
             )}
           </p>
           {currentPlanDetail && (
-            <ul className="mt-3 space-y-1 text-sm text-gray-600 dark:text-gray-400">
-              <li className="flex items-center gap-2"><Check size={14} className="text-green-500 shrink-0" /> Up to {currentPlanDetail.max_teams} teams</li>
-              <li className="flex items-center gap-2"><Check size={14} className="text-green-500 shrink-0" /> Up to {currentPlanDetail.max_members} members per team</li>
+            <ul className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-400">
+              <li className="flex items-center gap-2"><Check size={14} className="text-green-600 shrink-0" /> Up to {currentPlanDetail.max_teams} teams</li>
+              <li className="flex items-center gap-2"><Check size={14} className="text-green-600 shrink-0" /> Up to {currentPlanDetail.max_members} members per team</li>
             </ul>
           )}
         </div>
@@ -187,8 +187,8 @@ const Billing = () => {
 
       <div className="flex justify-center">
         <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-1 inline-flex">
-          <button type="button" onClick={() => setBillingCycle('monthly')} className={cn('px-4 py-2 text-sm font-medium rounded-md transition-colors', billingCycle === 'monthly' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white')}>Monthly</button>
-          <button type="button" onClick={() => setBillingCycle('yearly')} className={cn('px-4 py-2 text-sm font-medium rounded-md transition-colors', billingCycle === 'yearly' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white')}>Yearly <span className="ml-1 text-xs text-green-600 dark:text-green-400">(Save)</span></button>
+          <button type="button" onClick={() => setBillingCycle('monthly')} className={cn('px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150', billingCycle === 'monthly' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white')}>Monthly</button>
+          <button type="button" onClick={() => setBillingCycle('yearly')} className={cn('px-4 py-2 text-sm font-medium rounded-md transition-colors duration-150', billingCycle === 'yearly' ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white')}>Yearly <span className="ml-1 text-xs text-green-600 dark:text-green-400">(Save 15%)</span></button>
         </div>
       </div>
 
@@ -199,56 +199,54 @@ const Billing = () => {
           const isCurrent = plan.id === currentPlanId || (currentPlanId == null && plan.slug === (currentPlanSlug || 'pro'));
           const isUpgrading = upgradingPlanId === plan.id;
           return (
-            <motion.div
+            <Card
               key={plan.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={cn('relative rounded-xl border p-6 transition-all duration-200', isCurrent ? 'border-blue-500 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/10 shadow-lg' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 hover:border-gray-300 dark:hover:border-gray-600')}
+              className={cn('relative p-6 transition-all duration-150', isCurrent ? 'ring-2 ring-primary-500 shadow-md' : 'hover:shadow-md')}
             >
               {plan.popular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300"><Star size={12} /> Popular</span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50"><Star size={12} /> Popular</span>
                 </div>
               )}
               <div className="text-center mb-6">
-                <div className="w-12 h-12 bg-blue-600 dark:bg-blue-500 rounded-lg flex items-center justify-center mx-auto mb-3"><Icon size={24} className="text-white" /></div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{plan.name}</h3>
+                <div className="w-12 h-12 bg-primary-600 rounded-lg flex items-center justify-center mx-auto mb-3"><Icon size={24} className="text-white" /></div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{plan.name}</h3>
                 <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">{plan.description}</p>
-                <div className="mt-4"><span className="text-3xl font-bold text-gray-900 dark:text-white">{formatPrice(price)}</span><span className="text-gray-500 dark:text-gray-400">/{billingCycle === 'monthly' ? 'month' : 'year'}</span></div>
+                <div className="mt-4"><span className="text-3xl font-semibold text-gray-900 dark:text-white">{formatPrice(price)}</span><span className="text-sm text-gray-500 dark:text-gray-400">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span></div>
               </div>
               <ul className="space-y-2 mb-6 text-sm text-gray-600 dark:text-gray-400">
-                <li className="flex items-center gap-2"><Check size={14} className="text-green-500 shrink-0" /> Up to {plan.max_teams} teams</li>
-                <li className="flex items-center gap-2"><Check size={14} className="text-green-500 shrink-0" /> Up to {plan.max_members} members</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-green-600 shrink-0" /> Up to {plan.max_teams} teams</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-green-600 shrink-0" /> Up to {plan.max_members} members</li>
               </ul>
               <Button variant={isCurrent ? 'outline' : 'primary'} size="md" className="w-full" disabled={isCurrent || isUpgrading} loading={isUpgrading} onClick={() => handleChangePlan(plan.id)}>
-                {isCurrent ? 'Current plan' : 'Switch to this plan'}
+                {isCurrent ? 'Current plan' : 'Upgrade'}
               </Button>
-            </motion.div>
+            </Card>
           );
         })}
       </div>
 
-      <Card className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50 overflow-hidden">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Receipt size={20} /> Transaction history</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Invoices and payment history for your subscription</p>
+      <Card className="overflow-hidden">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Receipt size={18} /> Transaction History</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Invoices and payment history</p>
         </div>
         <div className="overflow-x-auto">
           {invoices.length === 0 ? (
             <div className="p-12 text-center">
-              <Receipt className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
-              <p className="text-gray-600 dark:text-gray-400">No invoices yet</p>
-              <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">Invoices will appear here after your first billing cycle</p>
+              <Receipt className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+              <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-1">No invoices yet</h4>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Invoices will appear here after your first billing cycle</p>
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Period</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Amount</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Status</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase w-24">Receipt</th>
+                <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Date</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Period</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Amount</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Status</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide w-24">Receipt</th>
                 </tr>
               </thead>
               <tbody>
@@ -257,13 +255,13 @@ const Billing = () => {
                   const periodStr = [inv.period_start, inv.period_end].filter(Boolean).map((d) => formatDate(d)).join(' – ') || '—';
                   return (
                     <React.Fragment key={inv.id}>
-                      <tr className={cn('border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-800/50', isExpanded && 'bg-gray-50 dark:bg-gray-800/80')}>
-                        <td className="py-3 px-4 text-gray-900 dark:text-white">{formatDate(inv.created_at)}</td>
-                        <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{periodStr}</td>
-                        <td className="py-3 px-4 font-medium text-gray-900 dark:text-white">{new Intl.NumberFormat('en-US', { style: 'currency', currency: inv.currency || 'USD' }).format(Number(inv.amount))}</td>
-                        <td className="py-3 px-4"><span className={cn('capitalize', inv.status === 'paid' && 'text-green-600 dark:text-green-400', inv.status === 'open' && 'text-amber-600 dark:text-amber-400', (inv.status === 'void' || inv.status === 'draft') && 'text-gray-500 dark:text-gray-500')}>{inv.status}</span></td>
+                      <tr className={cn('border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors', isExpanded && 'bg-gray-50 dark:bg-gray-900/50')}>
+                        <td className="py-3 px-4 text-sm text-gray-900 dark:text-white">{formatDate(inv.created_at)}</td>
+                        <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">{periodStr}</td>
+                        <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white">{new Intl.NumberFormat('en-US', { style: 'currency', currency: inv.currency || 'USD' }).format(Number(inv.amount))}</td>
+                        <td className="py-3 px-4"><span className={cn('capitalize text-sm', inv.status === 'paid' && 'text-green-600 dark:text-green-400', inv.status === 'open' && 'text-amber-600 dark:text-amber-400', (inv.status === 'void' || inv.status === 'draft') && 'text-gray-500 dark:text-gray-500')}>{inv.status}</span></td>
                         <td className="py-3 px-4">
-                          <button type="button" onClick={() => setExpandedInvoiceId(isExpanded ? null : inv.id)} className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline">
+                          <button type="button" onClick={() => setExpandedInvoiceId(isExpanded ? null : inv.id)} className="inline-flex items-center gap-1 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300">
                             {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />} View
                           </button>
                         </td>
@@ -296,31 +294,31 @@ const Billing = () => {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="p-6 border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-              <CreditCard size={20} className="text-blue-600 dark:text-blue-400" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+              <CreditCard size={18} className="text-blue-600 dark:text-blue-400" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Payment methods</h3>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Payment Methods</h3>
           </div>
-          <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">Payment methods are managed per subscription. Contact support to update billing details.</p>
-          <a href="mailto:support@resolvemeq.com" className="inline-flex items-center px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white">Contact billing support <ArrowRight size={14} className="ml-1" /></a>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Payment methods are managed per subscription. Contact support to update billing details.</p>
+          <a href="mailto:support@resolvemeq.com" className="inline-flex items-center px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-white transition-colors">Contact billing support <ArrowRight size={14} className="ml-1" /></a>
         </Card>
-        <Card className="p-6 border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-              <Receipt size={20} className="text-green-600 dark:text-green-400" />
+        <Card className="p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
+              <Receipt size={18} className="text-green-600 dark:text-green-400" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Need help?</h3>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Need Help?</h3>
           </div>
-          <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">Questions about your bill or plan? Our team can help.</p>
-          <a href="mailto:support@resolvemeq.com" className="inline-flex items-center px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white">Contact support <ArrowRight size={14} className="ml-1" /></a>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Questions about your bill or plan? Our team can help.</p>
+          <a href="mailto:support@resolvemeq.com" className="inline-flex items-center px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-white transition-colors">Contact support <ArrowRight size={14} className="ml-1" /></a>
         </Card>
       </div>
 
       {toast && (
-        <div className={cn('fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-medium', toast.type === 'error' ? 'bg-red-100 dark:bg-red-900/80 text-red-800 dark:text-red-200' : 'bg-green-100 dark:bg-green-900/80 text-green-800 dark:text-green-200')}>
+        <div className={cn('fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-medium', toast.type === 'error' ? 'bg-red-50 dark:bg-red-900/80 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800' : 'bg-green-50 dark:bg-green-900/80 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800')}>
           {toast.message}
         </div>
       )}

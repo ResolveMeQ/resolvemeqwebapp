@@ -66,8 +66,9 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 font-sans antialiased;
+    @apply bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 font-sans antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+    letter-spacing: -0.011em;
   }
   
   html {
@@ -76,125 +77,53 @@
 }
 
 @layer components {
-  /* Glassmorphism Components */
-  .glass {
-    @apply bg-white/10 dark:bg-gray-800/10 backdrop-blur-md border border-white/20 dark:border-gray-700/20 shadow-lg;
-  }
-  
-  .glass-card {
-    @apply glass rounded-lg p-6 transition-all duration-300 hover:shadow-xl hover:scale-[1.02];
-  }
-  
-  .glass-panel {
-    @apply glass rounded-xl p-8 shadow-xl;
-  }
-  
-  /* Button Components */
+  /* Enterprise Button Components */
   .btn-primary {
-    @apply bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-medium px-6 py-3 rounded-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+    @apply bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-medium px-4 py-2 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   
   .btn-secondary {
-    @apply bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-medium px-6 py-3 rounded-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2;
+    @apply bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium px-4 py-2 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
   }
   
   .btn-ghost {
-    @apply bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm border border-white/20 dark:border-gray-700/20 text-gray-700 dark:text-gray-300 hover:bg-white/20 dark:hover:bg-gray-700/20 hover:text-gray-900 dark:hover:text-gray-100 font-medium px-6 py-3 rounded-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+    @apply text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium px-4 py-2 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
   }
   
-  /* Status Indicators */
+  /* Status Indicators - Subtle Enterprise Style */
   .status-resolved {
-    @apply bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800;
+    @apply bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/10 dark:text-green-400 dark:border-green-800/50;
   }
   
   .status-pending {
-    @apply bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800;
+    @apply bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/10 dark:text-amber-400 dark:border-amber-800/50;
   }
   
   .status-open {
-    @apply bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800;
+    @apply bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/10 dark:text-blue-400 dark:border-blue-800/50;
   }
   
   .status-critical {
-    @apply bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800;
+    @apply bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/10 dark:text-red-400 dark:border-red-800/50;
   }
   
   .status-processing {
-    @apply bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800;
-  }
-  
-  /* AI-specific effects */
-  .ai-glow {
-    @apply shadow-glow;
-  }
-  
-  .ai-processing {
-    @apply relative overflow-hidden;
-  }
-  
-  .ai-processing::after {
-    content: '';
-    @apply absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent animate-pulse;
-  }
-  
-  .typing-animation {
-    @apply overflow-hidden border-r-2 border-cyan-500 animate-typing whitespace-nowrap;
-  }
-  
-  /* Skeleton loading */
-  .skeleton {
-    @apply animate-pulse bg-gray-200 dark:bg-gray-700 rounded;
-  }
-  
-  .skeleton-text {
-    @apply skeleton h-4 w-full;
-  }
-  
-  .skeleton-title {
-    @apply skeleton h-6 w-3/4;
-  }
-  
-  .skeleton-avatar {
-    @apply skeleton h-12 w-12 rounded-full;
-  }
-  
-  /* Custom scrollbar */
-  .custom-scrollbar {
-    @apply scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar {
-    @apply w-2;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-transparent;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 dark:bg-gray-600 rounded-full;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-400 dark:bg-gray-500;
-  }
-  
-  /* Text gradients */
-  .text-gradient-primary {
-    @apply bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent;
-  }
-  
-  .text-gradient-secondary {
-    @apply bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent;
-  }
-  
-  .text-gradient-accent {
-    @apply bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent;
+    @apply bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/10 dark:text-purple-400 dark:border-purple-800/50;
   }
   
   /* Focus ring utility */
   .focus-visible-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900;
+  }
+  
+  /* Enterprise Input */
+  .input-enterprise {
+    @apply w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+  }
+  
+  /* Enterprise Card */
+  .card-enterprise {
+    @apply bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm;
   }
 
   /* Hide scrollbar but keep scroll behavior */

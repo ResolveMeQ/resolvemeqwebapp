@@ -12,21 +12,20 @@ import { cn } from '../../utils/cn';
  */
 const Card = React.forwardRef(({
   variant = 'default',
-  hover = true,
+  hover = false,
   children,
   className,
   ...rest
 }, ref) => {
-  const baseClasses = 'rounded-lg transition-all duration-300';
+  const baseClasses = 'rounded-lg transition-shadow duration-150';
   
   const variants = {
-    default: 'bg-white dark:bg-gray-900/80 border border-neutral-200 dark:border-gray-700 shadow-sm',
-    glass: 'glass-card',
-    elevated: 'bg-white dark:bg-gray-900/80 border border-neutral-200 dark:border-gray-700 shadow-lg hover:shadow-xl',
-    interactive: 'bg-white dark:bg-gray-900/80 border border-neutral-200 dark:border-gray-700 shadow-sm hover:shadow-lg hover:scale-[1.02] cursor-pointer',
+    default: 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm',
+    elevated: 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-md',
+    interactive: 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md cursor-pointer',
   };
   
-  const hoverClasses = hover ? 'hover:shadow-lg hover:scale-[1.02]' : '';
+  const hoverClasses = hover ? 'hover:shadow-md' : '';
   
   return (
     <div
