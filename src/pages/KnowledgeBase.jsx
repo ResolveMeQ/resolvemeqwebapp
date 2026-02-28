@@ -17,6 +17,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { api } from '../services/api';
 import { cn } from '../utils/cn';
+import { renderMarkdown } from '../utils/markdown';
 
 const KnowledgeBase = () => {
   const [articles, setArticles] = useState([]);
@@ -374,7 +375,7 @@ const KnowledgeBase = () => {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              <div className="flex-1 overflow-y-auto p-6 space-y-5 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
                 <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5" />
@@ -406,9 +407,10 @@ const KnowledgeBase = () => {
                 )}
 
                 <div>
-                  <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-gray-50 dark:bg-gray-900">
-                    {selectedArticle.content}
-                  </div>
+                  <div 
+                    className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-gray-50 dark:bg-gray-900"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedArticle.content) }}
+                  />
                 </div>
 
                 <div className="pt-4 border-t border-gray-200 dark:border-gray-800">

@@ -142,3 +142,79 @@
     }
   }
 }
+
+@layer utilities {
+  /* Custom scrollbar styles */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-gray-700 rounded-full;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400 dark:bg-gray-600;
+  }
+
+  /* Markdown prose styles */
+  .prose h1, .prose h2, .prose h3, .prose h4 {
+    @apply font-semibold text-gray-900 dark:text-white mt-6 mb-3;
+  }
+
+  .prose h1 {
+    @apply text-xl;
+  }
+
+  .prose h2 {
+    @apply text-lg;
+  }
+
+  .prose h3 {
+    @apply text-base;
+  }
+
+  .prose h4 {
+    @apply text-sm;
+  }
+
+  .prose p {
+    @apply my-3;
+  }
+
+  .prose ul, .prose ol {
+    @apply my-3 pl-5;
+  }
+
+  .prose li {
+    @apply my-1;
+  }
+
+  .prose strong {
+    @apply font-semibold text-gray-900 dark:text-white;
+  }
+
+  .prose code {
+    @apply px-1.5 py-0.5 bg-gray-200 dark:bg-gray-800 rounded text-xs font-mono;
+  }
+
+  .prose pre {
+    @apply p-3 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-x-auto my-3;
+  }
+
+  .prose pre code {
+    @apply p-0 bg-transparent;
+  }
+
+  .prose a {
+    @apply text-primary-600 dark:text-primary-400 hover:underline;
+  }
+
+  .prose blockquote {
+    @apply border-l-4 border-gray-300 dark:border-gray-700 pl-4 italic my-3;
+  }
+}
