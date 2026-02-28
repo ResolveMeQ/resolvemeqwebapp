@@ -76,7 +76,7 @@ const Settings = () => {
           language: data.language ?? 'en'
         });
         setAppearanceSettings({
-          theme: data.theme ?? 'light'
+          theme: data.theme ?? 'dark'
         });
       }
     } catch (error) {
@@ -88,7 +88,7 @@ const Settings = () => {
   };
 
   const [generalSettings, setGeneralSettings] = useState({ timezone: '', language: '' });
-  const [appearanceSettings, setAppearanceSettings] = useState({ theme: 'light' });
+  const [appearanceSettings, setAppearanceSettings] = useState({ theme: 'dark' });
   const [notificationSettings, setNotificationSettings] = useState({
     emailNotifications: true,
     pushNotifications: true,

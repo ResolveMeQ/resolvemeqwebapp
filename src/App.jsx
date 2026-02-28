@@ -27,7 +27,7 @@ function App() {
     knowledgeBase: [],
     users: [],
   });
-  const [theme, setTheme] = useState(THEME_MODES.LIGHT);
+  const [theme, setTheme] = useState(THEME_MODES.DARK);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authPage, setAuthPage] = useState('login');
   const [user, setUser] = useState(null);
@@ -102,7 +102,7 @@ function App() {
 
   // Theme management
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') || THEME_MODES.LIGHT;
+    const savedTheme = localStorage.getItem('theme') || THEME_MODES.DARK;
     console.log('Initial theme:', savedTheme);
     setTheme(savedTheme);
     applyTheme(savedTheme);
