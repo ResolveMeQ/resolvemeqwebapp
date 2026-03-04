@@ -5,7 +5,7 @@ import {
   Plus,
   Search,
   Zap,
-  Send,
+  Sparkles,
   X,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
@@ -14,6 +14,8 @@ import Badge from '../components/ui/Badge';
 import AgentInsights from '../components/AgentInsights';
 import ActionHistory from '../components/ActionHistory';
 import ResolutionFeedback from '../components/ResolutionFeedback';
+import SimpleTicketCreation from '../components/SimpleTicketCreation';
+import AIChatPanel from '../components/AIChatPanel';
 import { api, TokenService } from '../services/api';
 import { cn } from '../utils/cn';
 
@@ -32,10 +34,8 @@ const Tickets = () => {
   const navigate = useNavigate();
   const [activeTickets, setActiveTickets] = useState([]);
   const [showAIAgent, setShowAIAgent] = useState(false);
+  const [showSimpleCreation, setShowSimpleCreation] = useState(false);
   const [currentTicket, setCurrentTicket] = useState(null);
-  const [aiMessages, setAiMessages] = useState([]);
-  const [userMessage, setUserMessage] = useState('');
-  const [isAiTyping, setIsAiTyping] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -247,18 +247,7 @@ const Tickets = () => {
   };
 
   const startAIAgent = async (issue = null) => {
-    setShowAIAgent(true);
-    const welcomeMessage = {
-      id: Date.now(),
-      type: 'ai',
-      message: issue
-        ? `I see you're having trouble with "${issue}". I'll create a ticket and help you step by step.`
-        : `Hi! I'm your AI assistant for ResolveMeQ. What can I help you with today?`,
-      timestamp: new Date().toISOString(),
-      suggestions: issue ? [] : ['Hardware problems', 'Software issues', 'Network connectivity', 'Account access'],
-    };
-    setAiMessages([welcomeMessage]);
-
+    // If issue provided, create a ticket first
     if (issue) {
       try {
         const user = TokenService.getUser();
@@ -271,35 +260,23 @@ const Tickets = () => {
         };
         const newTicket = await api.tickets.create(ticketData);
         setCurrentTicket(newTicket);
-        setTimeout(() => {
-          setAiMessages((prev) => [
-            ...prev,
-            {
-              id: Date.now(),
-              type: 'ai',
-              message: `Ticket #${newTicket.ticket_id ?? newTicket.id} created. I'll help you resolve this.`,
-              timestamp: new Date().toISOString(),
-            },
-          ]);
-        }, 800);
+        setShowAIAgent(true);
         loadTickets();
       } catch (err) {
         console.error('Error creating ticket:', err);
       }
+    } else {
+      // Just open chat without a specific ticket (general help)
+      setShowAIAgent(true);
     }
   };
 
   const openAIChatForTicket = (ticket) => {
     setCurrentTicket(ticket);
     setShowAIAgent(true);
-    setAiMessages([
-      {
-        id: Date.now(),
-        type: 'ai',
-        message: `You're viewing ticket #${ticket.ticket_id ?? ticket.id}: "${ticket.issue_type || 'No title'}". How can I help?`,
-        timestamp: new Date().toISOString(),
-      },
-    ]);
+    // Close ticket detail panel when AI chat opens to avoid overlap
+    setDetailTicket(null);
+    setDetailEditing(false);
   };
 
   const determineCategory = (issue) => {
@@ -310,109 +287,6 @@ const Tickets = () => {
     if (issueLower.includes('phone') || issueLower.includes('mobile')) return 'mobile';
     if (issueLower.includes('printer')) return 'hardware';
     return 'other';
-  };
-
-  const sendMessageToAI = async (textOrChoice) => {
-    const messageText = typeof textOrChoice === 'string' ? textOrChoice : (textOrChoice?.value ?? textOrChoice?.label ?? '');
-    if (!messageText.trim()) return;
-
-    const userMsg = {
-      id: Date.now(),
-      type: 'user',
-      message: messageText,
-      timestamp: new Date().toISOString(),
-    };
-    setAiMessages((prev) => [...prev, userMsg]);
-    setUserMessage('');
-    setIsAiTyping(true);
-
-    try {
-      if (!currentTicket) {
-        const user = TokenService.getUser();
-        const ticketData = {
-          user: user?.id ?? user?.user_id,
-          issue_type: messageText.substring(0, 100),
-          description: messageText,
-          category: determineCategory(messageText),
-          status: 'new',
-        };
-        const newTicket = await api.tickets.create(ticketData);
-        setCurrentTicket(newTicket);
-        loadTickets();
-      }
-      setTimeout(() => {
-        const aiResponse = generateAIResponse(messageText);
-        setAiMessages((prev) => [...prev, aiResponse]);
-        setIsAiTyping(false);
-      }, 1500);
-    } catch (err) {
-      console.error('Error sending message:', err);
-      setIsAiTyping(false);
-    }
-  };
-
-  const generateAIResponse = (userInput) => {
-    const input = userInput.toLowerCase();
-    let message = "I'm looking into that. Try a quick restart and check for updates.";
-    let suggestions = [];
-    let choices = [];
-
-    if (input.includes('printer') || input.includes('printing')) {
-      message = "To suggest the right steps I need one detail: Is the printer connected over the network or via USB?";
-      choices = [
-        { label: 'Network printer', value: 'network printer' },
-        { label: 'USB printer', value: 'usb printer' },
-        { label: 'Not sure', value: 'not sure printer' },
-      ];
-    } else if (input.includes('network') && (input.includes('printer') || input.includes('usb'))) {
-      message = "I can create a ticket and assign it to the hardware team, or I can show you self-service steps to try first. Which do you prefer?";
-      choices = [
-        { label: 'Create ticket & assign', value: 'create ticket assign hardware' },
-        { label: 'Show self-service steps', value: 'show self-service steps' },
-      ];
-    } else if (input.includes('computer') || input.includes('laptop') || input.includes("won't start")) {
-      message = "For computer issues I'll need: Does it power on at all (lights, fan), or nothing happens when you press the button?";
-      choices = [
-        { label: 'Powers on but no display', value: 'powers on no display' },
-        { label: 'Nothing happens at all', value: 'nothing happens' },
-        { label: 'It starts then stops / restarts', value: 'starts then stops' },
-      ];
-    } else if (input.includes('internet') || input.includes('wifi') || input.includes('connection')) {
-      message = "For connectivity I can: create a ticket for the network team, or walk you through quick checks (router restart, other devices). Which do you want?";
-      choices = [
-        { label: 'Create ticket for network team', value: 'create ticket network' },
-        { label: 'Walk me through quick checks', value: 'walk through quick checks' },
-      ];
-    } else if (input.includes('software') || input.includes('app') || input.includes('program')) {
-      message = "Is the problem that the app won't open, it's slow, or you get an error message?";
-      choices = [
-        { label: "Won't open", value: 'software wont open' },
-        { label: 'Slow or freezing', value: 'software slow' },
-        { label: 'Error message', value: 'software error' },
-      ];
-    } else if (
-      input.includes('create ticket') || input.includes('assign') ||
-      input.includes('self-service') || input.includes('quick checks') ||
-      input.includes('powers on') || input.includes('nothing happens') || input.includes('starts then')
-    ) {
-      message = "I've created your ticket and added your answers. I recommend trying the steps in the Knowledge Base first—I can open the relevant article for you.";
-      choices = [
-        { label: 'Open suggested article', value: 'open suggested article' },
-        { label: 'Just show my ticket', value: 'show my ticket' },
-      ];
-    } else {
-      message = "I'm looking into that. To give you the best next step: is this about hardware, software, network, or account access?";
-      suggestions = ['Hardware', 'Software', 'Network', 'Account access'];
-    }
-
-    return {
-      id: Date.now(),
-      type: 'ai',
-      message,
-      timestamp: new Date().toISOString(),
-      suggestions: suggestions.length ? suggestions : undefined,
-      choices: choices.length ? choices : undefined,
-    };
   };
 
   const formatTicketTime = (timestamp) => {
@@ -461,19 +335,37 @@ const Tickets = () => {
       <header className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Tickets</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Manage and resolve support tickets</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Get instant AI help or manage existing tickets</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => startAIAgent()} variant="ghost" size="sm">
-            <Zap className="w-4 h-4 mr-2" />
-            AI Assistant
+          {/* PRIMARY BUTTON - AI Help (Simple Flow) */}
+          <Button onClick={() => setShowSimpleCreation(true)} variant="primary" size="md" className="font-semibold">
+            <Sparkles className="w-5 h-5 mr-2" />
+            Get AI Help
           </Button>
-          <Button onClick={() => setShowCreateForm(true)} variant="primary" size="sm">
+          {/* Secondary - Manual ticket */}
+          <Button onClick={() => setShowCreateForm(true)} variant="outline" size="sm">
             <Plus className="w-4 h-4 mr-2" />
-            New Ticket
+            Manual Ticket
           </Button>
         </div>
       </header>
+
+      {/* Simple AI-First Ticket Creation */}
+      <AnimatePresence>
+        {showSimpleCreation && (
+          <SimpleTicketCreation
+            onTicketCreated={(ticket) => {
+              loadTickets();
+              // Keep modal open for conversation
+            }}
+            onClose={() => {
+              setShowSimpleCreation(false);
+              loadTickets();
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Create Ticket Modal */}
       <AnimatePresence>
@@ -554,99 +446,20 @@ const Tickets = () => {
         )}
       </AnimatePresence>
 
-      {/* AI Chat panel */}
+      {/* AI Chat Panel - New Real Backend Integration */}
       <AnimatePresence>
-        {showAIAgent && (
-          <Card className="overflow-hidden">
-            <div className="bg-primary-600 dark:bg-primary-700 px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/10 rounded-lg">
-                  <Zap className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-base text-white">AI Support Agent</h3>
-                  <p className="text-primary-100 text-xs mt-0.5">Guided troubleshooting and resolution</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowAIAgent(false)}
-                className="p-1.5 rounded-md text-white/80 hover:bg-white/10 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="h-96 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-gray-900">
-              {aiMessages.map((msg) => {
-                const isLastAi = msg.type === 'ai' && msg.id === aiMessages.filter((m) => m.type === 'ai').pop()?.id;
-                const showPrompts = isLastAi && !isAiTyping && (msg.suggestions?.length || msg.choices?.length);
-                return (
-                  <div key={msg.id} className="space-y-2">
-                    <div className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div
-                        className={`max-w-md rounded-lg px-4 py-2.5 text-sm ${
-                          msg.type === 'user'
-                            ? 'bg-primary-600 text-white'
-                            : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100'
-                        }`}
-                      >
-                        <p className="whitespace-pre-line">{msg.message}</p>
-                      </div>
-                    </div>
-                    {showPrompts && (
-                      <div className="flex justify-start pl-1">
-                        <div className="flex flex-wrap gap-2 max-w-md">
-                          {msg.choices?.map((c) => (
-                            <button
-                              key={c.value}
-                              type="button"
-                              onClick={() => sendMessageToAI(c)}
-                              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors duration-150"
-                            >
-                              {c.label}
-                            </button>
-                          ))}
-                          {msg.suggestions?.map((s) => (
-                            <button
-                              key={s}
-                              type="button"
-                              onClick={() => sendMessageToAI(s)}
-                              className="px-3 py-1.5 rounded-lg text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
-                            >
-                              {s}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {isAiTyping && (
-                <div className="flex justify-start">
-                  <div className="rounded-lg px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800">
-                    <span className="inline-flex gap-1">
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="border-t border-gray-200 dark:border-gray-800 p-4 flex gap-2 bg-white dark:bg-gray-950">
-              <input
-                type="text"
-                value={userMessage}
-                onChange={(e) => setUserMessage(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && sendMessageToAI(userMessage)}
-                placeholder="Describe your issue..."
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
-              />
-              <Button onClick={() => sendMessageToAI(userMessage)} disabled={!userMessage.trim()} variant="primary" loading={isAiTyping}>
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          </Card>
+        {showAIAgent && currentTicket && (
+          <AIChatPanel
+            ticket={currentTicket}
+            isOpen={showAIAgent}
+            onClose={() => setShowAIAgent(false)}
+            onActionComplete={() => {
+              loadTickets();
+              if (detailTicket && (detailTicket?.ticket_id ?? detailTicket?.id) === (currentTicket?.ticket_id ?? currentTicket?.id)) {
+                loadTicketDetail(detailTicket?.ticket_id ?? detailTicket?.id);
+              }
+            }}
+          />
         )}
       </AnimatePresence>
 
@@ -929,7 +742,7 @@ const Tickets = () => {
                             </Button>
                           )}
                           <Button variant="ghost" size="sm" onClick={() => openAIChatForTicket(detailTicket)}>
-                            <Zap className="w-4 h-4 mr-1.5" />
+                            <Sparkles className="w-4 h-4 mr-1.5" />
                             AI Chat
                           </Button>
                         </div>

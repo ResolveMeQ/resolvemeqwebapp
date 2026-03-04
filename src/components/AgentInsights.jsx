@@ -39,7 +39,8 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete }) => {
   const handleProcessWithAgent = async () => {
     try {
       setProcessing(true);
-      await api.agent.processTicket(ticketId);
+      // Use force parameter to allow re-processing already-processed tickets
+      await api.agent.processTicket(ticketId, { force: true });
       setTimeout(() => {
         loadAgentData();
         setProcessing(false);
@@ -136,21 +137,21 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete }) => {
       {confidence > 0 && (
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h4 className="font-semibold text-gray-900">Confidence Score</h4>
+            <h4 className="font-semibold text-gray-900 dark:text-white">Confidence Score</h4>
             <span className={`text-2xl font-bold ${
-              confidence >= 0.8 ? 'text-green-600' :
-              confidence >= 0.6 ? 'text-yellow-600' :
-              'text-red-600'
+              confidence >= 0.8 ? 'text-green-600 dark:text-green-400' :
+              confidence >= 0.6 ? 'text-yellow-600 dark:text-yellow-400' :
+              'text-red-600 dark:text-red-400'
             }`}>
               {(confidence * 100).toFixed(0)}%
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
             <div
               className={`h-3 rounded-full transition-all ${
-                confidence >= 0.8 ? 'bg-green-600' :
-                confidence >= 0.6 ? 'bg-yellow-600' :
-                'bg-red-600'
+                confidence >= 0.8 ? 'bg-green-600 dark:bg-green-500' :
+                confidence >= 0.6 ? 'bg-yellow-600 dark:bg-yellow-500' :
+                'bg-red-600 dark:bg-red-500'
               }`}
               style={{ width: `${confidence * 100}%` }}
             ></div>
@@ -161,42 +162,42 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete }) => {
       {/* Analysis Details */}
       {Object.keys(analysis).length > 0 && (
         <Card className="p-6">
-          <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-blue-600" />
+          <h4 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             Analysis Details
           </h4>
           <div className="grid grid-cols-2 gap-4">
             {analysis.priority && (
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="text-sm text-gray-600">Priority</div>
+              <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-600 dark:text-gray-400">Priority</div>
                 <div className={`font-semibold capitalize ${
-                  analysis.priority === 'high' ? 'text-red-600' :
-                  analysis.priority === 'medium' ? 'text-yellow-600' :
-                  'text-green-600'
+                  analysis.priority === 'high' ? 'text-red-600 dark:text-red-400' :
+                  analysis.priority === 'medium' ? 'text-yellow-600 dark:text-yellow-400' :
+                  'text-green-600 dark:text-green-400'
                 }`}>
                   {analysis.priority}
                 </div>
               </div>
             )}
             {analysis.complexity && (
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="text-sm text-gray-600">Complexity</div>
-                <div className="font-semibold capitalize">{analysis.complexity}</div>
+              <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-600 dark:text-gray-400">Complexity</div>
+                <div className="font-semibold capitalize text-gray-900 dark:text-white">{analysis.complexity}</div>
               </div>
             )}
             {analysis.estimated_resolution_time && (
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="text-sm text-gray-600">Est. Time</div>
-                <div className="font-semibold flex items-center gap-1">
+              <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-600 dark:text-gray-400">Est. Time</div>
+                <div className="font-semibold flex items-center gap-1 text-gray-900 dark:text-white">
                   <Clock className="h-4 w-4" />
                   {analysis.estimated_resolution_time}
                 </div>
               </div>
             )}
             {analysis.suggested_category && (
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="text-sm text-gray-600">Category</div>
-                <div className="font-semibold">{analysis.suggested_category}</div>
+              <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-600 dark:text-gray-400">Category</div>
+                <div className="font-semibold text-gray-900 dark:text-white">{analysis.suggested_category}</div>
               </div>
             )}
           </div>
@@ -250,14 +251,14 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete }) => {
       {/* Assignment Suggestion */}
       {assignment.suggested_assignee && (
         <Card className="p-6">
-          <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Users className="h-5 w-5 text-purple-600" />
+          <h4 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             Assignment Recommendation
           </h4>
           <div className="space-y-3">
-            <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-              <div className="font-medium text-gray-900">Suggested Team: {assignment.team}</div>
-              <div className="text-sm text-gray-600 mt-1">{assignment.reason}</div>
+            <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-200 dark:border-purple-800">
+              <div className="font-medium text-gray-900 dark:text-white">Suggested Team: {assignment.team}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">{assignment.reason}</div>
             </div>
           </div>
         </Card>
@@ -266,16 +267,16 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete }) => {
       {/* Similar Tickets */}
       {suggestions?.similar_tickets && suggestions.similar_tickets.length > 0 && (
         <Card className="p-6">
-          <h4 className="font-semibold text-gray-900 mb-4">Similar Resolved Tickets</h4>
+          <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Similar Resolved Tickets</h4>
           <div className="space-y-2">
             {suggestions.similar_tickets.map((ticket) => (
-              <div key={ticket.ticket_id} className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+              <div key={ticket.ticket_id} className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900">#{ticket.ticket_id} - {ticket.issue_type}</div>
-                    <div className="text-sm text-gray-600">{ticket.category}</div>
+                    <div className="font-medium text-gray-900 dark:text-white">#{ticket.ticket_id} - {ticket.issue_type}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">{ticket.category}</div>
                   </div>
-                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                 </div>
               </div>
             ))}
@@ -286,9 +287,9 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete }) => {
       {/* No Analysis Message */}
       {!agentStatus?.agent_processed && (
         <Card className="p-8 text-center">
-          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-          <h4 className="text-lg font-semibold text-gray-900 mb-2">No AI Analysis Yet</h4>
-          <p className="text-gray-600 mb-4">
+          <AlertCircle className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
+          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No AI Analysis Yet</h4>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
             Click "Analyze Now" to get AI-powered insights and recommendations for this ticket.
           </p>
         </Card>

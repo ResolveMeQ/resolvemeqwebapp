@@ -571,9 +571,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({
           query,
-          limit: options.limit || 5,
-          category: options.category,
-          min_helpfulness: options.minHelpfulness,
+          max_results: options.maxResults || 5,
+          min_relevance: options.minRelevance || 0.7,
         }),
       });
     },
@@ -584,10 +583,10 @@ export const api = {
     },
 
     // Process ticket with AI agent
-    processTicket: async (ticketId, reset = false) => {
+    processTicket: async (ticketId, options = {}) => {
       return apiFetch(`/api/tickets/${ticketId}/process/`, {
         method: 'POST',
-        body: JSON.stringify({ reset }),
+        body: JSON.stringify(options), // Supports { force: true } or { reset: true }
       });
     },
 
@@ -599,6 +598,155 @@ export const api = {
     // Get AI suggestions for a ticket
     getTicketSuggestions: async (ticketId) => {
       return apiFetch(`/api/tickets/${ticketId}/ai-suggestions/`);
+    },
+
+    // Get task status (for polling after processing)
+    getTaskStatus: async (taskId) => {
+      return apiFetch(`/api/tickets/tasks/${taskId}/status/`);
+    },
+
+    // Get action history for a ticket
+    getActionHistory: async (ticketId) => {
+      return apiFetch(`/api/tickets/${ticketId}/action-history/`);
+    },
+
+    // Rollback an action
+    rollbackAction: async (actionHistoryId, reason) => {
+      return apiFetch(`/api/tickets/actions/${actionHistoryId}/rollback/`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+    },
+
+    // Submit resolution feedback
+    submitResolutionFeedback: async (ticketId, feedback) => {
+      return apiFetch(`/api/tickets/${ticketId}/resolution-feedback/`, {
+        method: 'POST',
+        body: JSON.stringify(feedback),
+      });
+    },
+
+    // Get resolution analytics
+    getResolutionAnalytics: async () => {
+      return apiFetch('/api/tickets/resolution-analytics/');
+    },
+
+    // Chat endpoints for real-time AI interaction
+    sendChatMessage: async (ticketId, message, conversationId = null) => {
+      return apiFetch(`/api/tickets/${ticketId}/chat/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          message,
+          conversation_id: conversationId,
+        }),
+      });
+    },
+
+    getChatHistory: async (ticketId) => {
+      return apiFetch(`/api/tickets/${ticketId}/chat/history/`);
+    },
+
+    submitChatFeedback: async (ticketId, messageId, helpful, comment = null) => {
+      return apiFetch(`/api/tickets/${ticketId}/chat/${messageId}/feedback/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          rating: helpful ? 'helpful' : 'not_helpful',
+          comment,
+        }),
+      });
+    },
+
+    getChatSuggestions: async (ticketId) => {
+      return apiFetch(`/api/tickets/${ticketId}/chat/suggestions/`);
+    },
+
+    // NEW: Dashboard Summary (single API call - replaces 7 calls)
+    getDashboardSummary: async () => {
+      return apiFetch('/api/tickets/agent/dashboard-summary/');
+    },
+
+    // NEW: Paginated Action History
+    getActionHistoryPaginated: async (ticketId, page = 1, limit = 20, sort = 'desc') => {
+      return apiFetch(`/api/tickets/${ticketId}/action-history-paginated/?page=${page}&limit=${limit}&sort=${sort}`);
+    },
+
+    // NEW: Filtered Recommendations
+    getFilteredRecommendations: async (filters = {}) => {
+      const params = new URLSearchParams();
+      if (filters.confidence_min !== undefined) params.append('confidence_min', filters.confidence_min);
+      if (filters.confidence_max !== undefined) params.append('confidence_max', filters.confidence_max);
+      if (filters.action_type) params.append('action_type', filters.action_type);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.category) params.append('category', filters.category);
+      if (filters.created_after) params.append('created_after', filters.created_after);
+      if (filters.created_before) params.append('created_before', filters.created_before);
+      if (filters.sort_by) params.append('sort_by', filters.sort_by);
+      if (filters.limit) params.append('limit', filters.limit);
+      
+      return apiFetch(`/api/tickets/agent/recommendations/filtered/?${params.toString()}`);
+    },
+
+    // NEW: Batch Operations
+    batchProcess: async (ticket_ids, action, force = false) => {
+      return apiFetch('/api/tickets/agent/batch-process/', {
+        method: 'POST',
+        body: JSON.stringify({
+          ticket_ids,
+          action, // 'process', 'accept', or 'reject'
+          force,
+        }),
+      });
+    },
+
+    // NEW: Batch Status
+    getBatchStatus: async (batchId) => {
+      return apiFetch(`/api/tickets/agent/batch/${batchId}/status/`);
+    },
+
+    // NEW: Action Validation
+    validateAction: async (ticketId, actionType, solutionData = {}) => {
+      return apiFetch(`/api/tickets/${ticketId}/actions/validate/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          action_type: actionType,
+          solution_data: solutionData,
+        }),
+      });
+    },
+
+    // NEW: Solution Templates (Browse & Apply)
+    getTemplateCategories: async () => {
+      return apiFetch('/api/tickets/agent/templates/categories/');
+    },
+
+    getTemplatesByCategory: async (category) => {
+      return apiFetch(`/api/tickets/agent/templates/?category=${category}`);
+    },
+
+    searchTemplates: async (query) => {
+      return apiFetch(`/api/tickets/agent/templates/?search=${encodeURIComponent(query)}`);
+    },
+
+    applyTemplate: async (ticketId, templateId, customizations = {}) => {
+      return apiFetch(`/api/tickets/${ticketId}/apply-template/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          template_id: templateId,
+          customizations,
+        }),
+      });
+    },
+
+    // NEW: Confidence Explanation (AI Transparency)
+    getConfidenceExplanation: async (ticketId) => {
+      return apiFetch(`/api/tickets/${ticketId}/confidence-explanation/`);
+    },
+
+    // NEW: Similar Tickets
+    getSimilarTickets: async (ticketId, threshold = 0.7, limit = 5, status = null) => {
+      const params = new URLSearchParams({ threshold, limit });
+      if (status) params.append('status', status);
+      return apiFetch(`/api/tickets/${ticketId}/similar/?${params.toString()}`);
     },
   },
 };
