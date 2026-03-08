@@ -14,7 +14,7 @@ import Badge from '../components/ui/Badge';
 import AgentInsights from '../components/AgentInsights';
 import ActionHistory from '../components/ActionHistory';
 import ResolutionFeedback from '../components/ResolutionFeedback';
-import SimpleTicketCreation from '../components/SimpleTicketCreation';
+import DescribeIssueModal from '../components/DescribeIssueModal';
 import AIChatPanel from '../components/AIChatPanel';
 import { api, TokenService } from '../services/api';
 import { cn } from '../utils/cn';
@@ -34,7 +34,7 @@ const Tickets = () => {
   const navigate = useNavigate();
   const [activeTickets, setActiveTickets] = useState([]);
   const [showAIAgent, setShowAIAgent] = useState(false);
-  const [showSimpleCreation, setShowSimpleCreation] = useState(false);
+  const [showDescribeModal, setShowDescribeModal] = useState(false);
   const [currentTicket, setCurrentTicket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -124,6 +124,9 @@ const Tickets = () => {
       if (detailTicket && (detailTicket.ticket_id ?? detailTicket.id) === ticketId) {
         setDetailTicket((prev) => (prev ? { ...prev, status: newStatus } : null));
       }
+      if (newStatus === 'resolved' || newStatus === 'escalated') {
+        window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
+      }
     } catch (err) {
       console.error('Error updating status:', err);
     } finally {
@@ -143,6 +146,7 @@ const Tickets = () => {
       if (detailTicket && (detailTicket.ticket_id ?? detailTicket.id) === ticketId) {
         setDetailTicket((prev) => (prev ? { ...prev, status: 'escalated' } : null));
       }
+      window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
     } catch (err) {
       console.error('Error escalating:', err);
     } finally {
@@ -239,6 +243,7 @@ const Tickets = () => {
       setCreateForm({ issue_type: '', description: '', category: 'other' });
       setShowCreateForm(false);
       loadTickets();
+      window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
     } catch (err) {
       console.error('Error creating ticket:', err);
     } finally {
@@ -339,7 +344,7 @@ const Tickets = () => {
         </div>
         <div className="flex items-center gap-2">
           {/* PRIMARY BUTTON - AI Help (Simple Flow) */}
-          <Button onClick={() => setShowSimpleCreation(true)} variant="primary" size="md" className="font-semibold">
+          <Button onClick={() => setShowDescribeModal(true)} variant="primary" size="md" className="font-semibold">
             <Sparkles className="w-5 h-5 mr-2" />
             Get AI Help
           </Button>
@@ -351,21 +356,19 @@ const Tickets = () => {
         </div>
       </header>
 
-      {/* Simple AI-First Ticket Creation */}
-      <AnimatePresence>
-        {showSimpleCreation && (
-          <SimpleTicketCreation
-            onTicketCreated={(ticket) => {
-              loadTickets();
-              // Keep modal open for conversation
-            }}
-            onClose={() => {
-              setShowSimpleCreation(false);
-              loadTickets();
-            }}
-          />
-        )}
-      </AnimatePresence>
+      {/* Describe issue → then AI Assistant panel opens (same section as when opening AI for existing ticket) */}
+      {showDescribeModal && (
+        <DescribeIssueModal
+          onReady={(ticket) => {
+            setShowDescribeModal(false);
+            setCurrentTicket(ticket);
+            setShowAIAgent(true);
+            setDetailTicket(null);
+            loadTickets();
+          }}
+          onClose={() => setShowDescribeModal(false)}
+        />
+      )}
 
       {/* Create Ticket Modal */}
       <AnimatePresence>
@@ -453,6 +456,11 @@ const Tickets = () => {
             ticket={currentTicket}
             isOpen={showAIAgent}
             onClose={() => setShowAIAgent(false)}
+            onBackToTicket={() => {
+              setShowAIAgent(false);
+              setDetailTicket(currentTicket);
+              loadTicketDetail(currentTicket?.ticket_id ?? currentTicket?.id);
+            }}
             onActionComplete={() => {
               loadTickets();
               if (detailTicket && (detailTicket?.ticket_id ?? detailTicket?.id) === (currentTicket?.ticket_id ?? currentTicket?.id)) {
@@ -485,7 +493,17 @@ const Tickets = () => {
 
         {filteredTickets.length === 0 ? (
           <div className="px-6 py-16 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">No tickets found</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              {activeTickets.length === 0
+                ? "You don't have any tickets yet. Get started in one step:"
+                : "No tickets match your search. Try a different filter or create one."}
+            </p>
+            {activeTickets.length === 0 && (
+              <Button onClick={() => setShowDescribeModal(true)} variant="primary" size="md">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Get AI Help
+              </Button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -527,11 +545,21 @@ const Tickets = () => {
                       <td className="px-6 py-4">{getStatusBadge(ticket.status)}</td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{formatTicketTime(ticket.created_at)}</td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => openAIChatForTicket(ticket)}
+                            className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium inline-flex items-center gap-1"
+                            title="Chat with AI"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            AI Chat
+                          </button>
+                          <span className="text-gray-300 dark:text-gray-700">·</span>
                           <button
                             type="button"
                             onClick={() => handleViewDetail(ticket)}
-                            className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
+                            className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 font-medium"
                           >
                             View
                           </button>
@@ -715,6 +743,12 @@ const Tickets = () => {
                           </div>
                         </div>
 
+                        {detailTicket?.status === 'resolved' && (
+                          <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 text-sm text-green-800 dark:text-green-200">
+                            This issue is marked as resolved. Need something else? Use <strong>AI Chat</strong> below or create a new ticket.
+                          </div>
+                        )}
+
                         <div>
                           <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Description</p>
                           <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
@@ -748,7 +782,20 @@ const Tickets = () => {
                         </div>
 
                         <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
-                          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">Add Comment</p>
+                          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">Comments {(detailTicket?.comments?.length ?? 0) ? `(${detailTicket.comments.length})` : ''}</p>
+                          {(detailTicket?.comments?.length ?? 0) > 0 && (
+                            <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+                              {(detailTicket.comments || []).map((c) => (
+                                <div key={c.id} className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{c.author ?? 'User'}</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">{c.created_at ? formatTicketTime(c.created_at) : ''}</span>
+                                  </div>
+                                  <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{c.content}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                           <div className="flex gap-2">
                             <input
                               type="text"

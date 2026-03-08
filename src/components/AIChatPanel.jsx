@@ -8,6 +8,7 @@ import {
   ThumbsDown,
   CheckCircle,
   AlertCircle,
+  ArrowLeft,
 } from 'lucide-react';
 import { api } from '../services/api';
 import ConfidenceBadge from './ui/ConfidenceBadge';
@@ -18,7 +19,7 @@ import { cn } from '../utils/cn';
  * AIChatPanel - Real AI chat interface with backend integration
  * Features: Real-time chat, confidence scores, feedback, conversation history
  */
-const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
+const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete }) => {
   const ticketId = ticket?.id ?? ticket?.ticket_id;
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
@@ -26,6 +27,7 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
   const messagesEndRef = useRef(null);
 
   // Load conversation history on mount (ticket must exist first)
@@ -34,6 +36,20 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
       loadConversationHistory();
     }
   }, [isOpen, ticketId]);
+
+  // Load contextual suggestions when chat is empty so users can start easily
+  useEffect(() => {
+    if (!isOpen || !ticketId || messages.length > 1) return;
+    let cancelled = false;
+    api.agent.getChatSuggestions(ticketId)
+      .then((data) => {
+        if (cancelled) return;
+        const list = data?.suggestions ?? [];
+        setSuggestions(Array.isArray(list) ? list.slice(0, 6) : []);
+      })
+      .catch(() => setSuggestions([]));
+    return () => { cancelled = true; };
+  }, [isOpen, ticketId, messages.length]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -51,24 +67,22 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
       const data = await api.agent.getChatHistory(ticketId);
       const conv = data.conversation || data;
       const convId = conv.id || data.id;
-      const msgList = conv.messages || data.messages || [];
+      const msgList = Array.isArray(conv.messages) ? conv.messages : (data.messages || []);
       
-      if (convId && msgList.length >= 0) {
-        setConversationId(convId);
-        setMessages(
-          (Array.isArray(msgList) ? msgList : []).map((msg) => ({
-            id: msg.id,
-            type: msg.sender_type || msg.type,
-            text: msg.text,
-            confidence: msg.confidence,
-            metadata: msg.metadata || {},
-            messageType: msg.message_type,
-            wasHelpful: msg.was_helpful,
-            createdAt: msg.created_at,
-          }))
-        );
+      if (convId) setConversationId(convId);
+      if (msgList.length > 0) {
+        setMessages(msgList.map((msg) => ({
+          id: msg.id,
+          type: msg.sender_type || msg.type,
+          text: msg.text,
+          confidence: msg.confidence,
+          metadata: msg.metadata || {},
+          messageType: msg.message_type,
+          wasHelpful: msg.was_helpful,
+          createdAt: msg.created_at,
+        })));
       } else {
-        // No history, start with welcome message
+        // No messages yet (new or empty conversation) — show welcome so user can start easily
         startNewConversation();
       }
     } catch (error) {
@@ -83,7 +97,7 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
     const welcomeMessage = {
       id: `welcome-${Date.now()}`,
       type: 'ai',
-      text: `Hi! I'm your AI assistant. I can help you resolve ticket #${ticketId}. What would you like to know?`,
+      text: `Hi! I'm here to help you resolve this issue in the easiest way. Tell me what's going on or pick a suggestion below.`,
       metadata: {
         quick_replies: [
           { label: 'Analyze this ticket', value: 'Please analyze this ticket' },
@@ -181,7 +195,7 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
     const action = String(actionLabel).toLowerCase();
     setActionInProgress(actionLabel);
     try {
-      if (action.includes('resolve') && action.includes('auto')) {
+      if (action.includes('resolve') && (action.includes('auto') || action.includes('mark'))) {
         await api.tickets.updateStatus(ticketId, 'resolved');
         setMessages((prev) => [...prev, {
           id: `sys-${Date.now()}`,
@@ -189,6 +203,7 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
           text: 'Ticket marked as resolved.',
           createdAt: new Date().toISOString(),
         }]);
+        window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
         onActionComplete?.();
       } else if (action.includes('escalate')) {
         await api.tickets.escalate(ticketId);
@@ -198,6 +213,7 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
           text: 'Ticket escalated to support.',
           createdAt: new Date().toISOString(),
         }]);
+        window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
         onActionComplete?.();
       } else if (action.includes('clarification')) {
         sendMessage('I need more information to proceed. Could you provide more details?');
@@ -209,7 +225,7 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
       setMessages((prev) => [...prev, {
         id: `err-${Date.now()}`,
         type: 'system',
-        text: 'Action could not be completed. Please try again.',
+        text: 'Action could not be completed. Please try again or get human help below.',
         createdAt: new Date().toISOString(),
       }]);
     } finally {
@@ -232,17 +248,30 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
       transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
-      className="fixed right-0 top-0 bottom-0 w-full md:w-[480px] bg-white dark:bg-gray-950 shadow-2xl z-50 flex flex-col border-l border-gray-200 dark:border-gray-800"
+      className="fixed right-0 top-0 bottom-0 w-full max-w-2xl bg-white dark:bg-gray-950 shadow-2xl z-50 flex flex-col border-l border-gray-200 dark:border-gray-800"
     >
-      {/* Header - Match ticket detail panel design */}
+      {/* Header with breadcrumb / back */}
       <div className="flex-shrink-0 flex items-center justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
-        <div className="min-w-0 flex items-center gap-3">
-          <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
-            <Sparkles className="w-5 h-5 text-primary-600 dark:text-primary-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">AI Assistant</h2>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Ticket #{ticketId}</p>
+        <div className="min-w-0 flex items-center gap-3 flex-1">
+          <button
+            type="button"
+            onClick={onBackToTicket || onClose}
+            className="flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200 transition-colors text-sm font-medium"
+            aria-label={onBackToTicket ? 'Back to ticket' : 'Back to tickets'}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {onBackToTicket ? 'Back to ticket' : 'Back to tickets'}
+          </button>
+          <div className="min-w-0 flex items-center gap-3 flex-1">
+            <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex-shrink-0">
+              <Sparkles className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">AI Assistant</h2>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 truncate max-w-[200px]" title={ticket?.issue_type || ticket?.description || `Ticket #${ticketId}`}>
+                {ticket?.issue_type || ticket?.description || `Ticket #${ticketId}`}
+              </p>
+            </div>
           </div>
         </div>
         <button
@@ -276,37 +305,56 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
                           {msg.text}
                         </p>
 
-                        {/* Confidence badge */}
-                        {msg.confidence && (
-                          <div className="mt-3">
+                        {/* Confidence badge + low-confidence hint for easier resolution path */}
+                        {msg.confidence != null && (
+                          <div className="mt-3 space-y-1">
                             <ConfidenceBadge
                               confidence={msg.confidence}
                               size="sm"
                             />
+                            {msg.confidence < 0.6 && (
+                              <p className="text-xs text-amber-600 dark:text-amber-400">
+                                Confidence is low — you can still try the steps above, or choose &quot;Talk to a human&quot; to get support.
+                              </p>
+                            )}
                           </div>
                         )}
 
-                        {/* Steps message type */}
-                        {msg.messageType === 'steps' && msg.metadata.steps && (
-                          <div className="space-y-2 mt-4">
-                            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                              Steps to follow:
-                            </p>
-                            {msg.metadata.steps.map((step, stepIdx) => (
-                              <div
-                                key={stepIdx}
-                                className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700"
-                              >
-                                <span className="flex-shrink-0 w-6 h-6 rounded-lg bg-primary-600 dark:bg-primary-600 text-white text-xs font-semibold flex items-center justify-center">
-                                  {stepIdx + 1}
-                                </span>
-                                <span className="text-sm text-gray-700 dark:text-gray-300">
-                                  {step}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        {/* Steps: use metadata.steps or full_solution.steps for best resolution UX */}
+                        {(() => {
+                          const steps = msg.metadata?.steps ?? msg.metadata?.full_solution?.steps;
+                          if (!steps || !Array.isArray(steps) || steps.length === 0) return null;
+                          return (
+                            <div className="space-y-2 mt-4">
+                              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                                Steps to follow:
+                              </p>
+                              {steps.map((step, stepIdx) => (
+                                <div
+                                  key={stepIdx}
+                                  className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700"
+                                >
+                                  <span className="flex-shrink-0 w-6 h-6 rounded-lg bg-primary-600 dark:bg-primary-600 text-white text-xs font-semibold flex items-center justify-center">
+                                    {stepIdx + 1}
+                                  </span>
+                                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                                    {step}
+                                  </span>
+                                </div>
+                              ))}
+                              {(msg.metadata?.estimated_time || msg.metadata?.success_probability != null) && (
+                                <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400">
+                                  {msg.metadata?.estimated_time && (
+                                    <span>⏱ About {msg.metadata.estimated_time}</span>
+                                  )}
+                                  {msg.metadata?.success_probability != null && (
+                                    <span>✓ {(msg.metadata.success_probability * 100).toFixed(0)}% success rate for similar issues</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Suggested Actions: trigger backend actions (Auto Resolve, Escalate, etc.) */}
                         {msg.metadata.suggested_actions?.length > 0 && (
@@ -352,21 +400,23 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
                         )}
                       </div>
 
-                      {/* Feedback buttons */}
+                      {/* Feedback buttons - users know their input leads to better help */}
                       {msg.wasHelpful === null && msg.type === 'ai' && (
-                        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                           <span className="text-xs text-gray-500 dark:text-gray-400">
-                            Was this helpful?
+                            Was this helpful? Your feedback helps us suggest something different if needed.
                           </span>
                           <button
                             onClick={() => submitFeedback(msg.id, true)}
                             className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors"
+                            title="Yes, helpful"
                           >
                             <ThumbsUp className="w-4 h-4 text-gray-400 hover:text-green-600 dark:hover:text-green-400" />
                           </button>
                           <button
                             onClick={() => submitFeedback(msg.id, false)}
                             className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                            title="No, I need different help"
                           >
                             <ThumbsDown className="w-4 h-4 text-gray-400 hover:text-red-600 dark:hover:text-red-400" />
                           </button>
@@ -396,11 +446,42 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
                   </div>
                 ) : msg.type === 'system' ? (
                   <div className="flex justify-center my-4">
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-lg px-4 py-3 flex items-center gap-2 max-w-md">
-                      <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
-                      <p className="text-sm text-green-700 dark:text-green-300">
-                        {msg.text}
-                      </p>
+                    <div className={`rounded-lg px-4 py-3 flex flex-wrap items-center gap-2 max-w-md ${
+                      msg.text && (msg.text.includes('trouble') || msg.text.includes('try again') || msg.text.includes('could not be completed'))
+                        ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50'
+                        : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50'
+                    }`}>
+                      {msg.text && (msg.text.includes('trouble') || msg.text.includes('try again') || msg.text.includes('could not be completed')) ? (
+                        <>
+                          <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                          <p className="text-sm text-amber-700 dark:text-amber-300 flex-1">
+                            {msg.text}
+                          </p>
+                          <div className="flex gap-2 w-full mt-2">
+                            <button
+                              type="button"
+                              onClick={() => sendMessage('Please try again')}
+                              className="px-3 py-1.5 text-xs font-medium rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800/50"
+                            >
+                              Try again
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => sendMessage('I need to speak with support staff')}
+                              className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
+                            >
+                              Get human help
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            {msg.text}
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -436,15 +517,33 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onActionComplete }) => {
         )}
       </div>
 
-      {/* Input - Match app design */}
+      {/* Input and contextual suggestions for easiest path to resolution */}
       <div className="border-t border-gray-200 dark:border-gray-800 p-4 bg-white dark:bg-gray-950">
+        {suggestions.length > 0 && messages.length <= 1 && (
+          <div className="mb-3">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Quick options:</p>
+            <div className="flex flex-wrap gap-2">
+              {suggestions.map((s) => (
+                <button
+                  key={s.id || s.label}
+                  type="button"
+                  onClick={() => sendMessage(s.message_text || s.label)}
+                  disabled={isTyping || isLoading}
+                  className="px-3 py-1.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="flex gap-2">
           <input
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Type your message..."
+            placeholder="Describe your issue or ask a question..."
             disabled={isTyping || isLoading}
             className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           />

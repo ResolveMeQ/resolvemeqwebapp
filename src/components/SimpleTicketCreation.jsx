@@ -216,8 +216,9 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
     const action = String(actionLabel).toLowerCase();
     setActionInProgress(actionLabel);
     try {
-      if (action.includes('resolve') && action.includes('auto')) {
+      if (action.includes('resolve') && (action.includes('auto') || action.includes('mark'))) {
         await api.tickets.updateStatus(tid, 'resolved');
+        window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
         setConversation(prev => [...prev, {
           type: 'system',
           text: 'Ticket marked as resolved.',
@@ -226,6 +227,7 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
         setTimeout(() => onClose?.(), 1500);
       } else if (action.includes('escalate')) {
         await api.tickets.escalate(tid);
+        window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
         setConversation(prev => [...prev, {
           type: 'system',
           text: 'Ticket escalated to support.',
@@ -252,6 +254,7 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
     if (!ticket) return;
     try {
       await api.tickets.updateStatus(ticket.id || ticket.ticket_id, 'resolved');
+      window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
       setConversation(prev => [
         ...prev,
         {
@@ -362,10 +365,34 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
                             <p className="text-gray-900 dark:text-white whitespace-pre-wrap leading-relaxed">
                               {msg.text}
                             </p>
-                            
-                            {msg.confidence && (
-                              <div className="mt-3">
+                            {/* Steps from metadata for clearer resolution (same as AIChatPanel) */}
+                            {(() => {
+                              const steps = msg.metadata?.steps ?? msg.metadata?.full_solution?.steps;
+                              if (!steps || !Array.isArray(steps) || steps.length === 0) return null;
+                              return (
+                                <div className="mt-4 space-y-2">
+                                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Steps to follow:</p>
+                                  {steps.map((step, i) => (
+                                    <div key={i} className="flex items-start gap-2 p-2.5 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                                      <span className="flex-shrink-0 w-5 h-5 rounded bg-primary-600 text-white text-xs font-semibold flex items-center justify-center">{i + 1}</span>
+                                      <span className="text-sm text-gray-700 dark:text-gray-300">{step}</span>
+                                    </div>
+                                  ))}
+                                  {(msg.metadata?.estimated_time || msg.metadata?.success_probability != null) && (
+                                    <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                      {msg.metadata?.estimated_time && <span>⏱ About {msg.metadata.estimated_time}</span>}
+                                      {msg.metadata?.success_probability != null && <span>✓ {(msg.metadata.success_probability * 100).toFixed(0)}% success rate</span>}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                            {msg.confidence != null && (
+                              <div className="mt-3 space-y-1">
                                 <ConfidenceBadge confidence={msg.confidence} size="sm" />
+                                {msg.confidence < 0.6 && (
+                                  <p className="text-xs text-amber-600 dark:text-amber-400">Confidence is low — try the steps or choose &quot;Talk to a human&quot; for support.</p>
+                                )}
                               </div>
                             )}
 
@@ -398,7 +425,7 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
                                     <button
                                       key={rIdx}
                                       type="button"
-                                      onClick={() => sendMessage(reply.value)}
+                                      onClick={() => sendMessage(reply.value ?? reply.message_text ?? reply.label)}
                                       className="px-3 py-1.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-full text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                                     >
                                       {reply.label}
@@ -468,9 +495,12 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
                   </Button>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Ticket #{ticket?.id || ticket?.ticket_id}
+                    <span className="block mt-0.5 text-gray-400 dark:text-gray-500">
+                      You can close anytime and continue this conversation later from Tickets.
+                    </span>
                   </p>
                   <Button
                     onClick={markAsResolved}

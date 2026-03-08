@@ -94,6 +94,13 @@ const Header = ({
     if (isNotificationsOpen && user) fetchNotifications();
   }, [isNotificationsOpen]);
 
+  // Refresh when ticket actions (create, resolve, escalate) trigger from elsewhere
+  useEffect(() => {
+    const onRefresh = () => { if (user) fetchNotifications(); };
+    window.addEventListener('resolvemeq:refresh-notifications', onRefresh);
+    return () => window.removeEventListener('resolvemeq:refresh-notifications', onRefresh);
+  }, [user]);
+
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const handleNotificationClick = async (notification) => {

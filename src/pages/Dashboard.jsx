@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ticket, FolderOpen, CheckCircle, Clock, ListTodo, Plus } from 'lucide-react';
+import { Ticket, FolderOpen, CheckCircle, Clock, ListTodo, Sparkles } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import AIRecommendationsPanel from '../components/AIRecommendationsPanel';
+import DescribeIssueModal from '../components/DescribeIssueModal';
+import AIChatPanel from '../components/AIChatPanel';
 import { api } from '../services/api';
 
 /**
@@ -16,6 +18,9 @@ const Dashboard = () => {
   const [recentTickets, setRecentTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showDescribeModal, setShowDescribeModal] = useState(false);
+  const [chatTicket, setChatTicket] = useState(null);
+  const [showAIChatPanel, setShowAIChatPanel] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -109,6 +114,32 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* Primary action: resolve your issue — what brought users to the platform */}
+      <Card className="p-6 md:p-8 border-2 border-primary-200 dark:border-primary-900/50 bg-gradient-to-br from-primary-50/80 to-white dark:from-primary-950/30 dark:to-gray-950">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="min-w-0">
+            <h2 className="text-xl md:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">
+              Resolve your issue
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 max-w-xl">
+              Describe your IT or support problem and get AI-powered help right away. Our assistant will analyze your issue and guide you to a solution.
+            </p>
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => setShowDescribeModal(true)}
+              className="mt-4"
+            >
+              <Sparkles className="w-5 h-5 mr-2" />
+              Describe your problem — Get AI help
+            </Button>
+          </div>
+          <div className="hidden md:flex flex-shrink-0 w-16 h-16 rounded-xl bg-primary-100 dark:bg-primary-900/40 items-center justify-center">
+            <Sparkles className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+          </div>
+        </div>
+      </Card>
+
       <header>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Dashboard</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Operational overview and ticket metrics</p>
@@ -207,15 +238,41 @@ const Dashboard = () => {
         )}
       </Card>
 
-      {/* Floating action button */}
+      {/* Step 1: describe issue (minimal modal). Step 2: AI Assistant panel opens — conversation flows there. */}
+      {showDescribeModal && (
+        <DescribeIssueModal
+          onReady={(ticket) => {
+            setShowDescribeModal(false);
+            setChatTicket(ticket);
+            setShowAIChatPanel(true);
+          }}
+          onClose={() => setShowDescribeModal(false)}
+        />
+      )}
+
+      {/* AI Assistant panel: the section where interaction flows. No redirect. */}
+      {showAIChatPanel && chatTicket && (
+        <AIChatPanel
+          ticket={chatTicket}
+          isOpen={true}
+          onClose={() => {
+            setShowAIChatPanel(false);
+            setChatTicket(null);
+            loadDashboardData();
+          }}
+          onActionComplete={loadDashboardData}
+        />
+      )}
+
+      {/* Floating action: describe problem → then AI panel opens */}
       <button
         type="button"
-        onClick={() => navigate('/tickets', { state: { openCreateForm: true } })}
-        className="fixed bottom-8 right-8 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-primary-600 hover:bg-primary-700 text-white shadow-lg hover:shadow-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-        aria-label="Create ticket"
-        title="Create ticket"
+        onClick={() => setShowDescribeModal(true)}
+        className="fixed bottom-8 right-8 z-40 flex items-center justify-center w-14 h-14 rounded-full bg-primary-600 hover:bg-primary-700 text-white shadow-lg hover:shadow-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+        aria-label="Resolve an issue"
+        title="Resolve an issue"
       >
-        <Plus className="w-6 h-6" />
+        <Sparkles className="w-6 h-6" />
       </button>
     </div>
   );
