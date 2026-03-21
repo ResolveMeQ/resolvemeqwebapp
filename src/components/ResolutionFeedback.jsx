@@ -7,12 +7,12 @@ import Button from './ui/Button';
  * ResolutionFeedback Component
  * Allows users to provide feedback on autonomous resolutions
  */
-const ResolutionFeedback = ({ ticketId, onFeedbackSubmitted }) => {
+const ResolutionFeedback = ({ ticketId, onFeedbackSubmitted, feedbackAlreadySubmitted = false }) => {
   const [satisfaction, setSatisfaction] = useState(0);
   const [resolved, setResolved] = useState(null);
   const [feedback, setFeedback] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(feedbackAlreadySubmitted);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,7 +42,7 @@ const ResolutionFeedback = ({ ticketId, onFeedbackSubmitted }) => {
     }
   };
 
-  if (submitted) {
+  if (submitted || feedbackAlreadySubmitted) {
     return (
       <div className="bg-green-50 border border-green-200 rounded-lg p-6 dark:bg-green-900/20 dark:border-green-800">
         <div className="flex items-center space-x-3">

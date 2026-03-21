@@ -226,7 +226,12 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
         }]);
         setTimeout(() => onClose?.(), 1500);
       } else if (action.includes('escalate')) {
-        await api.tickets.escalate(tid);
+        const summary = conversation
+          .filter((m) => m.type === 'user' || m.type === 'ai')
+          .slice(-8)
+          .map((m) => (m.type === 'user' ? `User: ${(m.text || '').slice(0, 150)}` : `AI: ${(m.text || '').slice(0, 150)}`))
+          .join(' | ');
+        await api.tickets.escalate(tid, summary ? { conversation_summary: summary } : {});
         window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
         setConversation(prev => [...prev, {
           type: 'system',

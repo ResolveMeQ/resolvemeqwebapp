@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, CheckCircle, XCircle, Star, BarChart3 } from 'lucide-react';
+import { CheckCircle, XCircle, BarChart3 } from 'lucide-react';
+import Card from './ui/Card';
+import Button from './ui/Button';
 import { api } from '../services/api';
 
 /**
@@ -30,14 +32,14 @@ const ResolutionAnalytics = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary-600 border-t-transparent" />
       </div>
     );
   }
 
   if (!analytics) {
     return (
-      <div className="text-center py-12 text-gray-500">
+      <div className="text-center py-12 text-gray-500 dark:text-gray-400">
         Failed to load resolution analytics
       </div>
     );
@@ -45,154 +47,133 @@ const ResolutionAnalytics = () => {
 
   const successRate = analytics.success_rate || 0;
   const avgSatisfaction = analytics.average_satisfaction_score || 0;
+  const pendingFeedback = analytics.total_resolutions - analytics.confirmed_successful - analytics.confirmed_failed;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
           Resolution Analytics
         </h2>
-        <button
-          onClick={fetchAnalytics}
-          className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-md transition-colors dark:text-blue-400 dark:hover:bg-blue-900/20"
-        >
+        <Button variant="ghost" size="sm" onClick={fetchAnalytics}>
           Refresh
-        </button>
+        </Button>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Total Resolutions
-              </p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-2">
-                {analytics.total_resolutions}
-              </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <div className="p-6">
+            <BarChart3 className="w-5 h-5 text-gray-400 dark:text-gray-500 mb-3" />
+            <div className="text-2xl font-semibold text-gray-900 dark:text-white">
+              {analytics.total_resolutions}
             </div>
-            <BarChart3 className="w-12 h-12 text-blue-600 dark:text-blue-400" />
+            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Total Resolutions
+            </div>
           </div>
-        </div>
+        </Card>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Success Rate
-              </p>
-              <p className="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">
-                {successRate.toFixed(1)}%
-              </p>
+        <Card>
+          <div className="p-6">
+            <div className="text-2xl font-semibold text-gray-900 dark:text-white">
+              {successRate.toFixed(1)}%
             </div>
-            {successRate >= 80 ? (
-              <TrendingUp className="w-12 h-12 text-green-600 dark:text-green-400" />
-            ) : (
-              <TrendingDown className="w-12 h-12 text-red-600 dark:text-red-400" />
+            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Success Rate
+            </div>
+            <div className="mt-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+              <div
+                className="bg-primary-600 h-1.5 rounded-full transition-all duration-500"
+                style={{ width: `${successRate}%` }}
+              />
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="p-6">
+            <div className="text-2xl font-semibold text-gray-900 dark:text-white">
+              {avgSatisfaction ? avgSatisfaction.toFixed(1) : 'N/A'}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Avg Satisfaction
+            </div>
+            {avgSatisfaction && (
+              <div className="flex gap-0.5 mt-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <div
+                    key={star}
+                    className={`w-4 h-4 rounded-full ${
+                      star <= Math.round(avgSatisfaction)
+                        ? 'bg-primary-500'
+                        : 'bg-gray-200 dark:bg-gray-700'
+                    }`}
+                    title={`${avgSatisfaction}/5`}
+                  />
+                ))}
+              </div>
             )}
           </div>
-          <div className="mt-3">
-            <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-              <div
-                className="bg-green-600 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${successRate}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
+        </Card>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Avg Satisfaction
-              </p>
-              <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400 mt-2">
-                {avgSatisfaction ? avgSatisfaction.toFixed(1) : 'N/A'}
-              </p>
+        <Card>
+          <div className="p-6">
+            <div className="text-2xl font-semibold text-gray-900 dark:text-white">
+              {analytics.reopened_tickets}
             </div>
-            <Star className={`w-12 h-12 ${avgSatisfaction >= 4 ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400'}`} />
+            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Reopened Tickets
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+              Issues not actually resolved
+            </div>
           </div>
-          {avgSatisfaction && (
-            <div className="flex mt-3">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                  key={star}
-                  className={`w-5 h-5 ${
-                    star <= Math.round(avgSatisfaction)
-                      ? 'text-yellow-400 fill-yellow-400'
-                      : 'text-gray-300 dark:text-gray-600'
-                  }`}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Reopened Tickets
-              </p>
-              <p className="text-3xl font-bold text-red-600 dark:text-red-400 mt-2">
-                {analytics.reopened_tickets}
-              </p>
-            </div>
-            <XCircle className="w-12 h-12 text-red-600 dark:text-red-400" />
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Issues not actually resolved
-          </p>
-        </div>
+        </Card>
       </div>
 
-      {/* Detailed Stats */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+      <Card>
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
             Resolution Breakdown
           </h3>
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-2 dark:text-green-400" />
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            <div className="text-center py-2">
+              <CheckCircle className="w-8 h-8 text-success-600 dark:text-success-500 mx-auto mb-2" />
+              <div className="text-xl font-semibold text-gray-900 dark:text-white">
                 {analytics.confirmed_successful}
-              </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Confirmed Successful
-              </p>
+              </div>
             </div>
-            <div className="text-center">
-              <XCircle className="w-12 h-12 text-red-600 mx-auto mb-2 dark:text-red-400" />
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            <div className="text-center py-2">
+              <XCircle className="w-8 h-8 text-error-600 dark:text-error-500 mx-auto mb-2" />
+              <div className="text-xl font-semibold text-gray-900 dark:text-white">
                 {analytics.confirmed_failed}
-              </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Confirmed Failed
-              </p>
+              </div>
             </div>
-            <div className="text-center">
-              <BarChart3 className="w-12 h-12 text-blue-600 mx-auto mb-2 dark:text-blue-400" />
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {analytics.total_resolutions - analytics.confirmed_successful - analytics.confirmed_failed}
-              </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+            <div className="text-center py-2">
+              <BarChart3 className="w-8 h-8 text-gray-400 dark:text-gray-500 mx-auto mb-2" />
+              <div className="text-xl font-semibold text-gray-900 dark:text-white">
+                {pendingFeedback}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Pending Feedback
-              </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Action Type Breakdown */}
       {analytics.action_type_breakdown && analytics.action_type_breakdown.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <Card>
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
               Success Rate by Action Type
             </h3>
           </div>
@@ -210,22 +191,18 @@ const ResolutionAnalytics = () => {
                         {item.confirmed}/{item.total} ({rate}%)
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
                       <div
-                        className={`h-2 rounded-full transition-all duration-500 ${
-                          rate >= 80 ? 'bg-green-600' :
-                          rate >= 60 ? 'bg-yellow-600' :
-                          'bg-red-600'
-                        }`}
+                        className="bg-primary-600 h-1.5 rounded-full transition-all duration-500"
                         style={{ width: `${rate}%` }}
-                      ></div>
+                      />
                     </div>
                   </div>
                 );
               })}
             </div>
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import Badge from '../components/ui/Badge';
 import ResolutionAnalytics from '../components/ResolutionAnalytics';
 import { api } from '../services/api';
 
@@ -137,19 +136,14 @@ const Analytics = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-                    <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <Badge variant="default" className="text-xs">Total</Badge>
-                </div>
-                <div className="text-2xl font-semibold text-gray-900 dark:text-white mb-1">
+                <MessageSquare className="w-5 h-5 text-gray-400 dark:text-gray-500 mb-3" />
+                <div className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {totalTickets.toLocaleString()}
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Total Tickets
                 </div>
-                <div className="flex items-center text-xs text-gray-600 dark:text-gray-400">
+                <div className="flex items-center text-xs text-gray-500 dark:text-gray-500 mt-2">
                   <Activity className="w-3.5 h-3.5 mr-1" />
                   {analytics.open_tickets} open · {analytics.closed_tickets} closed
                 </div>
@@ -158,20 +152,14 @@ const Analytics = () => {
 
             <Card>
               <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
-                    <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  <Badge variant="success" className="text-xs">Rate</Badge>
-                </div>
-                <div className="text-2xl font-semibold text-gray-900 dark:text-white mb-1">
+                <CheckCircle className="w-5 h-5 text-gray-400 dark:text-gray-500 mb-3" />
+                <div className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {resolutionRate}%
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Resolution Rate
                 </div>
-                <div className="flex items-center text-xs text-gray-600 dark:text-gray-400">
-                  <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                <div className="flex items-center text-xs text-gray-500 dark:text-gray-500 mt-2">
                   {analytics.closed_tickets} resolved
                 </div>
               </div>
@@ -179,20 +167,14 @@ const Analytics = () => {
 
             <Card>
               <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-900/20">
-                    <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <Badge variant="default" className="text-xs">Avg</Badge>
-                </div>
-                <div className="text-2xl font-semibold text-gray-900 dark:text-white mb-1">
+                <Clock className="w-5 h-5 text-gray-400 dark:text-gray-500 mb-3" />
+                <div className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {formatResolutionTime(analytics.avg_resolution_time_seconds)}
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Resolution Time
                 </div>
-                <div className="flex items-center text-xs text-gray-600 dark:text-gray-400">
-                  <Clock className="w-3.5 h-3.5 mr-1" />
+                <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
                   Average duration
                 </div>
               </div>
@@ -200,20 +182,14 @@ const Analytics = () => {
 
             <Card>
               <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20">
-                    <Star className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <Badge variant="default" className="text-xs">Score</Badge>
-                </div>
-                <div className="text-2xl font-semibold text-gray-900 dark:text-white mb-1">
+                <Star className="w-5 h-5 text-gray-400 dark:text-gray-500 mb-3" />
+                <div className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {satisfactionScore != null ? `${satisfactionScore}/5` : 'N/A'}
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Satisfaction
                 </div>
-                <div className="flex items-center text-xs text-gray-600 dark:text-gray-400">
-                  <Star className="w-3.5 h-3.5 mr-1" />
+                <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
                   {satisfactionScore != null ? 'From feedback' : 'No data yet'}
                 </div>
               </div>
@@ -223,37 +199,31 @@ const Analytics = () => {
           <ResolutionAnalytics />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
+            <Card className="border border-dashed border-gray-300 dark:border-gray-600">
               <div className="p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Performance Tracking</h3>
-                  <Badge variant="default" className="text-xs">Coming soon</Badge>
-                </div>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Performance Tracking</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
                   Real-time metrics and KPIs for resolution times and agent performance
                 </p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">Coming soon</p>
               </div>
             </Card>
-            <Card>
+            <Card className="border border-dashed border-gray-300 dark:border-gray-600">
               <div className="p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Category Analysis</h3>
-                  <Badge variant="default" className="text-xs">Coming soon</Badge>
-                </div>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Category Analysis</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
                   Breakdown of tickets by category, priority, and resolution patterns
                 </p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">Coming soon</p>
               </div>
             </Card>
-            <Card>
+            <Card className="border border-dashed border-gray-300 dark:border-gray-600">
               <div className="p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Trend Analysis</h3>
-                  <Badge variant="default" className="text-xs">Coming soon</Badge>
-                </div>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Trend Analysis</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
                   Historical trends to identify patterns and optimize support
                 </p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">Coming soon</p>
               </div>
             </Card>
           </div>

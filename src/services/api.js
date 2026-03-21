@@ -169,6 +169,12 @@ export const api = {
       return apiFetch(`/api/tickets/list/${queryString ? '?' + queryString : ''}`);
     },
 
+    /** Staff only: escalation queue - tickets needing human attention */
+    getEscalationQueue: async (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return apiFetch(`/api/tickets/escalated/${qs ? '?' + qs : ''}`);
+    },
+
     get: async (ticketId) => {
       return apiFetch(`/api/tickets/${ticketId}/`);
     },
@@ -205,9 +211,10 @@ export const api = {
       });
     },
 
-    escalate: async (ticketId) => {
+    escalate: async (ticketId, body = {}) => {
       return apiFetch(`/api/tickets/${ticketId}/escalate/`, {
         method: 'POST',
+        body: JSON.stringify(body),
       });
     },
 

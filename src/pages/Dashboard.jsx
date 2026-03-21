@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ticket, FolderOpen, CheckCircle, Clock, ListTodo, Sparkles } from 'lucide-react';
+import { Ticket, FolderOpen, CheckCircle, Clock, ListTodo, Sparkles, ChevronRight, AlertCircle } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import AIRecommendationsPanel from '../components/AIRecommendationsPanel';
-import DescribeIssueModal from '../components/DescribeIssueModal';
 import AIChatPanel from '../components/AIChatPanel';
-import { api } from '../services/api';
+import { api, TokenService } from '../services/api';
 
 /**
  * Dashboard page component - Real-time analytics and ticket overview
@@ -18,17 +17,38 @@ const Dashboard = () => {
   const [recentTickets, setRecentTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showDescribeModal, setShowDescribeModal] = useState(false);
   const [chatTicket, setChatTicket] = useState(null);
   const [showAIChatPanel, setShowAIChatPanel] = useState(false);
+  const [escalatedTickets, setEscalatedTickets] = useState([]);
+  const [escalatedLoading, setEscalatedLoading] = useState(false);
+  const isStaff = TokenService.getUser()?.is_staff === true;
 
   useEffect(() => {
     loadDashboardData();
   }, []);
 
-  const loadDashboardData = async () => {
+  useEffect(() => {
+    if (isStaff) {
+      loadEscalationQueue();
+    }
+  }, [isStaff]);
+
+  const loadEscalationQueue = async () => {
+    if (!TokenService.getUser()?.is_staff) return;
+    setEscalatedLoading(true);
     try {
-      setLoading(true);
+      const data = await api.tickets.getEscalationQueue({ limit: 10 });
+      setEscalatedTickets(data?.tickets ?? []);
+    } catch {
+      setEscalatedTickets([]);
+    } finally {
+      setEscalatedLoading(false);
+    }
+  };
+
+  const loadDashboardData = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
       const [analyticsData, ticketsData] = await Promise.all([
         api.analytics.getTicketAnalytics(),
         api.tickets.list({ limit: 5 })
@@ -38,17 +58,20 @@ const Dashboard = () => {
       setRecentTickets(Array.isArray(ticketsData) ? ticketsData.slice(0, 5) : []);
     } catch (err) {
       console.error('Error loading dashboard:', err);
-      setError(err.message);
-      setAnalytics({
-        open_tickets: 0,
-        closed_tickets: 0,
-        avg_resolution_time_seconds: null,
-        tickets_per_week: []
-      });
-      setRecentTickets([]);
+      if (!silent) {
+        setError(err.message);
+        setAnalytics({
+          open_tickets: 0,
+          closed_tickets: 0,
+          avg_resolution_time_seconds: null,
+          tickets_per_week: []
+        });
+        setRecentTickets([]);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
+    if (isStaff) loadEscalationQueue();
   };
 
   const formatTime = (seconds) => {
@@ -85,18 +108,18 @@ const Dashboard = () => {
   }
 
   const getStatusBadge = (status) => {
-    switch (status) {
-      case 'open':
-      case 'new':
-        return <Badge variant="warning">Open</Badge>;
-      case 'in-progress':
-      case 'in_progress':
-        return <Badge variant="info">In Progress</Badge>;
-      case 'resolved':
-        return <Badge variant="success">Resolved</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
-    }
+    const s = (status || '').toLowerCase();
+    if (s === 'open' || s === 'new') return <Badge variant="warning">Open</Badge>;
+    if (s === 'in-progress' || s === 'in_progress') return <Badge variant="info">In Progress</Badge>;
+    if (s === 'resolved') return <Badge variant="success">Resolved</Badge>;
+    if (s === 'escalated') return <Badge variant="error">Escalated</Badge>;
+    if (s === 'pending_clarification') return <Badge variant="warning">Pending clarification</Badge>;
+    if (s === 'pending') return <Badge variant="warning">Pending</Badge>;
+    // Format unknown statuses: snake_case → Title Case
+    const friendly = (status || '—')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    return <Badge variant="default">{friendly}</Badge>;
   };
 
   const getPriorityBadge = (priority) => {
@@ -122,16 +145,16 @@ const Dashboard = () => {
               Resolve your issue
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 max-w-xl">
-              Describe your IT or support problem and get AI-powered help right away. Our assistant will analyze your issue and guide you to a solution.
+              Create a ticket with Subject, Description, and Category — then our AI assistant will help you resolve it right away.
             </p>
             <Button
               variant="primary"
               size="lg"
-              onClick={() => setShowDescribeModal(true)}
+              onClick={() => navigate('/tickets', { state: { openCreateForm: true } })}
               className="mt-4"
             >
               <Sparkles className="w-5 h-5 mr-2" />
-              Describe your problem — Get AI help
+              New Ticket — Get AI help
             </Button>
           </div>
           <div className="hidden md:flex flex-shrink-0 w-16 h-16 rounded-xl bg-primary-100 dark:bg-primary-900/40 items-center justify-center">
@@ -206,6 +229,52 @@ const Dashboard = () => {
 
       <AIRecommendationsPanel />
 
+      {/* Escalation queue – staff only */}
+      {isStaff && (
+        <Card className="p-6 border-l-4 border-l-amber-500 dark:border-l-amber-600">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              Escalation Queue
+              {escalatedTickets.length > 0 && (
+                <Badge variant="error" className="ml-1">{escalatedTickets.length}</Badge>
+              )}
+            </h2>
+            <Button variant="ghost" size="sm" onClick={loadEscalationQueue} disabled={escalatedLoading}>
+              Refresh
+            </Button>
+          </div>
+          {escalatedLoading && escalatedTickets.length === 0 ? (
+            <div className="py-8 text-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-amber-500 border-t-transparent mx-auto" />
+            </div>
+          ) : escalatedTickets.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400 py-4">No escalated tickets. All clear.</p>
+          ) : (
+            <div className="space-y-3">
+              {escalatedTickets.map((t) => (
+                <button
+                  key={t.ticket_id ?? t.id}
+                  type="button"
+                  onClick={() => navigate('/tickets', { state: { openTicketId: t.ticket_id ?? t.id } })}
+                  className="w-full flex items-center justify-between gap-4 p-3 rounded-lg bg-amber-50/50 dark:bg-amber-900/10 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors text-left group"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                      #{t.ticket_id ?? t.id}: {t.issue_type || t.description || 'No title'}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {t.category || '—'} · {formatTicketTime(t.created_at)}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-primary-500 shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
       {/* Recent tickets */}
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
@@ -222,35 +291,31 @@ const Dashboard = () => {
         ) : (
           <div className="space-y-3">
             {recentTickets.map((ticket) => (
-              <div key={ticket.ticket_id} className="flex items-center justify-between gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors duration-150">
+              <button
+                key={ticket.ticket_id}
+                type="button"
+                onClick={() => navigate('/tickets', { state: { openTicketId: ticket.ticket_id ?? ticket.id } })}
+                className="w-full flex items-center justify-between gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors duration-150 cursor-pointer text-left group"
+              >
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                    {ticket.issue_type || 'No title'}
+                  <p className="font-medium text-gray-900 dark:text-white text-sm truncate group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                    {ticket.description || ticket.issue_type || 'No title'}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
                     {ticket.category || 'Uncategorized'} · {formatTicketTime(ticket.created_at)}
                   </p>
                 </div>
-                {getStatusBadge(ticket.status)}
-              </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {getStatusBadge(ticket.status)}
+                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-primary-500 dark:group-hover:text-primary-400" />
+                </div>
+              </button>
             ))}
           </div>
         )}
       </Card>
 
-      {/* Step 1: describe issue (minimal modal). Step 2: AI Assistant panel opens — conversation flows there. */}
-      {showDescribeModal && (
-        <DescribeIssueModal
-          onReady={(ticket) => {
-            setShowDescribeModal(false);
-            setChatTicket(ticket);
-            setShowAIChatPanel(true);
-          }}
-          onClose={() => setShowDescribeModal(false)}
-        />
-      )}
-
-      {/* AI Assistant panel: the section where interaction flows. No redirect. */}
+      {/* AI Assistant panel: when user opens chat from a recent ticket. New tickets go to /tickets. */}
       {showAIChatPanel && chatTicket && (
         <AIChatPanel
           ticket={chatTicket}
@@ -258,16 +323,16 @@ const Dashboard = () => {
           onClose={() => {
             setShowAIChatPanel(false);
             setChatTicket(null);
-            loadDashboardData();
+            loadDashboardData(true);
           }}
-          onActionComplete={loadDashboardData}
+          onActionComplete={() => loadDashboardData(true)}
         />
       )}
 
-      {/* Floating action: describe problem → then AI panel opens */}
+      {/* Floating action: go to Tickets to create new ticket */}
       <button
         type="button"
-        onClick={() => setShowDescribeModal(true)}
+        onClick={() => navigate('/tickets', { state: { openCreateForm: true } })}
         className="fixed z-40 flex items-center justify-center w-14 h-14 rounded-full bg-primary-600 hover:bg-primary-700 text-white shadow-lg hover:shadow-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 touch-manipulation"
         style={{ bottom: 'max(2rem, env(safe-area-inset-bottom))', right: 'max(2rem, env(safe-area-inset-right))' }}
         aria-label="Resolve an issue"

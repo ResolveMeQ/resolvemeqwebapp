@@ -19,7 +19,7 @@ import { cn } from '../utils/cn';
  * AIChatPanel - Real AI chat interface with backend integration
  * Features: Real-time chat, confidence scores, feedback, conversation history
  */
-const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete }) => {
+const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete, onTicketUpdate }) => {
   const ticketId = ticket?.id ?? ticket?.ticket_id;
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
@@ -28,7 +28,18 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
   const [isLoading, setIsLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
+  const [typingElapsed, setTypingElapsed] = useState(0);
   const messagesEndRef = useRef(null);
+
+  // Show "Taking a moment..." after 5s of waiting for AI
+  useEffect(() => {
+    if (!isTyping) {
+      setTypingElapsed(0);
+      return;
+    }
+    const t = setTimeout(() => setTypingElapsed(5), 5000);
+    return () => clearTimeout(t);
+  }, [isTyping]);
 
   // Load conversation history on mount (ticket must exist first)
   useEffect(() => {
@@ -60,6 +71,56 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  /** Build synthetic messages from ticket.agent_response when conversation is empty (e.g. from Describe flow) */
+  const buildMessagesFromAgentResponse = (ticketData) => {
+    const ar = ticketData?.agent_response;
+    if (!ticketData?.agent_processed || !ar || typeof ar !== 'object') return null;
+    const solution = ar.solution || {};
+    const steps = solution.steps || solution.immediate_actions || [];
+    const confidence = ar.confidence ?? 0.5;
+    const reasoning = ar.reasoning || '';
+    let aiText = '';
+    if (Array.isArray(steps) && steps.length > 0) {
+      if (steps.length === 1) {
+        aiText = steps[0];
+      } else if (steps.length <= 3) {
+        aiText = "Here's what I suggest:\n\n" + steps.map((s, i) => `${i + 1}. ${s}`).join('\n');
+      } else {
+        aiText = "Here are the first steps to try:\n\n" + steps.slice(0, 3).map((s, i) => `${i + 1}. ${s}`).join('\n');
+        aiText += `\n\nThere are ${steps.length - 3} more steps. Would you like to see them?`;
+      }
+    } else {
+      aiText = reasoning || "I've analyzed your issue and I'm here to help. Can you provide more details?";
+    }
+    const userText = ticketData.description || ticketData.issue_type || 'My issue';
+    const suggestedActions = [];
+    const ra = (ar.recommended_action || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    if (ra) suggestedActions.push(ra);
+    return [
+      { id: `injected-user-${Date.now()}`, type: 'user', text: userText, createdAt: new Date().toISOString() },
+      {
+        id: `injected-ai-${Date.now()}`,
+        type: 'ai',
+        text: aiText,
+        confidence,
+        metadata: {
+          steps: Array.isArray(steps) ? steps : [],
+          suggested_actions: suggestedActions,
+          estimated_time: solution.estimated_time,
+          success_probability: solution.success_probability,
+          quick_replies: [
+            { label: 'Explain step 1', value: 'Can you explain step 1 in more detail?' },
+            { label: "That didn't work", value: "I tried that but it didn't work. What else can I try?" },
+            { label: 'Talk to a human', value: "I'd like to speak with a human agent" },
+          ],
+        },
+        messageType: steps.length > 1 ? 'steps' : 'text',
+        wasHelpful: null,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+  };
+
   const loadConversationHistory = async () => {
     if (!ticketId) return;
     setIsLoading(true);
@@ -82,8 +143,36 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
           createdAt: msg.created_at,
         })));
       } else {
-        // No messages yet (new or empty conversation) — show welcome so user can start easily
-        startNewConversation();
+        // No messages: try to inject from ticket.agent_response (from process/Describe flow)
+        let injected = false;
+        try {
+          const ticketData = await api.tickets.get(ticketId);
+          const built = buildMessagesFromAgentResponse(ticketData);
+          if (built?.length) {
+            setMessages(built);
+            injected = true;
+          }
+        } catch (_) {}
+        if (!injected) {
+          // Poll for agent_response when process may still be running (e.g. from Describe flow)
+          const pollMs = 2000;
+          const pollMax = 15000;
+          let elapsed = 0;
+          while (elapsed < pollMax) {
+            await new Promise((r) => setTimeout(r, pollMs));
+            elapsed += pollMs;
+            try {
+              const ticketData = await api.tickets.get(ticketId);
+              const built = buildMessagesFromAgentResponse(ticketData);
+              if (built?.length) {
+                setMessages(built);
+                injected = true;
+                break;
+              }
+            } catch (_) {}
+          }
+        }
+        if (!injected) startNewConversation();
       }
     } catch (error) {
       console.error('Failed to load chat history:', error);
@@ -110,8 +199,9 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
   };
 
   const sendMessage = async (textOverride = null) => {
-    const messageText = textOverride || inputText;
-    if (!messageText.trim()) return;
+    const messageText = (textOverride || inputText || '').trim();
+    if (!messageText) return;
+    if (isTyping) return; // Prevent double-send
 
     // Add user message to UI
     const userMsg = {
@@ -153,15 +243,19 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
           createdAt: aiMsg.created_at,
         },
       ]);
+      // Notify parent if ticket status changed (e.g. new→in_progress on first message)
+      if (data.ticket_status && data.ticket_status !== (ticket?.status)) {
+        onTicketUpdate?.({ ...ticket, status: data.ticket_status });
+      }
     } catch (error) {
       console.error('Chat error:', error);
-      // Show error message
       setMessages((prev) => [
         ...prev,
         {
           id: `error-${Date.now()}`,
           type: 'system',
-          text: 'Sorry, I had trouble processing that. Please try again.',
+          text: 'Sorry, I had trouble processing that. The request may have timed out.',
+          retryMessage: messageText,
           createdAt: new Date().toISOString(),
         },
       ]);
@@ -171,22 +265,34 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
   };
 
   const submitFeedback = async (messageId, helpful) => {
-    try {
-      await api.agent.submitChatFeedback(ticketId, messageId, helpful);
+    // Optimistic update: show feedback state immediately so user knows their click worked
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, wasHelpful: helpful } : msg
+      )
+    );
 
-      // Update UI
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId ? { ...msg, wasHelpful: helpful } : msg
-        )
-      );
+    try {
+      if (ticketId) {
+        await api.agent.submitChatFeedback(ticketId, messageId, helpful);
+      }
     } catch (error) {
       console.error('Feedback error:', error);
     }
   };
 
   const handleQuickReply = (reply) => {
-    sendMessage(reply.value);
+    const value = reply.value ?? reply.message_text ?? reply.label;
+    if (value && !isTyping) sendMessage(value);
+  };
+
+  /** Build a brief conversation summary for escalation (helps human agents) */
+  const buildConversationSummary = () => {
+    const relevant = messages.filter((m) => m.type === 'user' || m.type === 'ai').slice(-8);
+    if (relevant.length === 0) return '';
+    return relevant
+      .map((m) => (m.type === 'user' ? `User: ${(m.text || '').slice(0, 150)}` : `AI: ${(m.text || '').slice(0, 150)}`))
+      .join(' | ');
   };
 
   /** Trigger backend actions from AI suggested_actions (e.g. Auto Resolve, Escalate) */
@@ -196,7 +302,8 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
     setActionInProgress(actionLabel);
     try {
       if (action.includes('resolve') && (action.includes('auto') || action.includes('mark'))) {
-        await api.tickets.updateStatus(ticketId, 'resolved');
+        const res = await api.tickets.updateStatus(ticketId, 'resolved');
+        onTicketUpdate?.(res?.ticket);
         setMessages((prev) => [...prev, {
           id: `sys-${Date.now()}`,
           type: 'system',
@@ -206,7 +313,9 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
         window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
         onActionComplete?.();
       } else if (action.includes('escalate')) {
-        await api.tickets.escalate(ticketId);
+        const summary = buildConversationSummary();
+        const res = await api.tickets.escalate(ticketId, summary ? { conversation_summary: summary } : {});
+        onTicketUpdate?.(res?.ticket);
         setMessages((prev) => [...prev, {
           id: `sys-${Date.now()}`,
           type: 'system',
@@ -346,11 +455,11 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
                           );
                         })()}
 
-                        {/* Suggested Actions: trigger backend actions (Auto Resolve, Escalate, etc.) */}
+                        {/* Actions: click to resolve, escalate, or request clarification — not steps */}
                         {msg.metadata.suggested_actions?.length > 0 && (
                           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                             <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">
-                              Suggested actions:
+                              What would you like to do?
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {msg.metadata.suggested_actions.map((action, aIdx) => (
@@ -368,19 +477,20 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
                           </div>
                         )}
 
-                        {/* Quick replies: send as chat message */}
+                        {/* Quick replies: send as chat message to continue the conversation */}
                         {msg.metadata.quick_replies?.length > 0 && (
                           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                              Quick responses:
+                              Quick replies to send:
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {msg.metadata.quick_replies.map((reply, rIdx) => (
                                 <button
                                   key={rIdx}
                                   type="button"
+                                  disabled={isTyping}
                                   onClick={() => handleQuickReply(reply)}
-                                  className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                  className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {reply.label}
                                 </button>
@@ -414,19 +524,19 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
                       )}
 
                       {msg.wasHelpful !== null && (
-                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 bg-green-50/50 dark:bg-green-900/10 rounded-lg px-3 py-2 -mx-1">
                           {msg.wasHelpful ? (
                             <>
-                              <ThumbsUp className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
-                              <span className="text-xs text-green-600 dark:text-green-400">
-                                Marked as helpful
+                              <ThumbsUp className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="currentColor" />
+                              <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                                Thank you! Marked as helpful
                               </span>
                             </>
                           ) : (
                             <>
-                              <ThumbsDown className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
-                              <span className="text-xs text-red-600 dark:text-red-400">
-                                Feedback received
+                              <ThumbsDown className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" fill="currentColor" />
+                              <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                                Thank you! We'll suggest something different next time
                               </span>
                             </>
                           )}
@@ -441,7 +551,7 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
                         ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50'
                         : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50'
                     }`}>
-                      {msg.text && (msg.text.includes('trouble') || msg.text.includes('try again') || msg.text.includes('could not be completed')) ? (
+                      {msg.text && (msg.text.includes('trouble') || msg.text.includes('timed out') || msg.text.includes('try again') || msg.text.includes('could not be completed')) ? (
                         <>
                           <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                           <p className="text-sm text-amber-700 dark:text-amber-300 flex-1">
@@ -450,8 +560,9 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
                           <div className="flex gap-2 w-full mt-2">
                             <button
                               type="button"
-                              onClick={() => sendMessage('Please try again')}
-                              className="px-3 py-1.5 text-xs font-medium rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800/50"
+                              disabled={isTyping}
+                              onClick={() => sendMessage(msg.retryMessage || 'Please try again')}
+                              className="px-3 py-1.5 text-xs font-medium rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800/50 disabled:opacity-50"
                             >
                               Try again
                             </button>
@@ -497,6 +608,11 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
                       <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                       <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
+                    {typingElapsed >= 5 && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        Taking a moment — complex issues can take up to 30 seconds.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

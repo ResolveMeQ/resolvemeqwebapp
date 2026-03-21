@@ -15,7 +15,6 @@ import Badge from '../components/ui/Badge';
 import AgentInsights from '../components/AgentInsights';
 import ActionHistory from '../components/ActionHistory';
 import ResolutionFeedback from '../components/ResolutionFeedback';
-import DescribeIssueModal from '../components/DescribeIssueModal';
 import AIChatPanel from '../components/AIChatPanel';
 import { api, TokenService } from '../services/api';
 import { cn } from '../utils/cn';
@@ -23,7 +22,6 @@ import { cn } from '../utils/cn';
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
   { value: 'open', label: 'Open' },
-  { value: 'in-progress', label: 'In progress' },
   { value: 'in_progress', label: 'In progress' },
   { value: 'pending_clarification', label: 'Pending clarification' },
   { value: 'escalated', label: 'Escalated' },
@@ -35,7 +33,6 @@ const Tickets = () => {
   const navigate = useNavigate();
   const [activeTickets, setActiveTickets] = useState([]);
   const [showAIAgent, setShowAIAgent] = useState(false);
-  const [showDescribeModal, setShowDescribeModal] = useState(false);
   const [currentTicket, setCurrentTicket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -78,32 +75,36 @@ const Tickets = () => {
     }
   }, [location.state?.openCreateForm, location.pathname, navigate]);
 
-  const loadTickets = async () => {
+  const loadTickets = async (silent = false) => {
     try {
-      setLoading(true);
-      setError(null);
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+      }
       const tickets = await api.tickets.list({ limit: 100 });
       setActiveTickets(Array.isArray(tickets) ? tickets : []);
     } catch (err) {
       console.error('Error loading tickets:', err);
-      setError(err.message || 'Failed to load tickets');
-      setActiveTickets([]);
+      if (!silent) {
+        setError(err.message || 'Failed to load tickets');
+        setActiveTickets([]);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
-  const loadTicketDetail = async (ticketId) => {
+  const loadTicketDetail = async (ticketId, { silent = false } = {}) => {
     if (!ticketId) return;
-    setDetailLoading(true);
+    if (!silent) setDetailLoading(true);
     try {
       const t = await api.tickets.get(ticketId);
       setDetailTicket(t);
     } catch (err) {
       console.error('Error loading ticket:', err);
-      setDetailTicket(null);
+      if (!silent) setDetailTicket(null);
     } finally {
-      setDetailLoading(false);
+      if (!silent) setDetailLoading(false);
     }
   };
 
@@ -116,16 +117,17 @@ const Tickets = () => {
   const handleUpdateStatus = async (ticketId, newStatus) => {
     setUpdatingStatus(ticketId);
     try {
-      await api.tickets.updateStatus(ticketId, newStatus);
+      const res = await api.tickets.updateStatus(ticketId, newStatus);
+      const canonicalStatus = res?.ticket?.status ?? newStatus;
       setActiveTickets((prev) =>
         prev.map((t) =>
-          (t.ticket_id ?? t.id) === ticketId ? { ...t, status: newStatus } : t
+          (t.ticket_id ?? t.id) === ticketId ? { ...t, ...(res?.ticket || {}), status: canonicalStatus } : t
         )
       );
       if (detailTicket && (detailTicket.ticket_id ?? detailTicket.id) === ticketId) {
-        setDetailTicket((prev) => (prev ? { ...prev, status: newStatus } : null));
+        setDetailTicket((prev) => (prev ? { ...prev, ...(res?.ticket || {}), status: canonicalStatus } : null));
       }
-      if (newStatus === 'resolved' || newStatus === 'escalated') {
+      if (canonicalStatus === 'resolved' || canonicalStatus === 'escalated') {
         window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
       }
     } catch (err) {
@@ -158,13 +160,28 @@ const Tickets = () => {
   const handleAddComment = async () => {
     if (!detailTicket || !commentText.trim()) return;
     const id = detailTicket.ticket_id ?? detailTicket.id;
+    const text = commentText.trim();
     setCommentLoading(true);
+    const user = TokenService.getUser();
+    const optimisticComment = {
+      id: `temp-${Date.now()}`,
+      content: text,
+      author: user?.name || user?.email || user?.username || 'You',
+      created_at: new Date().toISOString()
+    };
+    setDetailTicket((prev) => (prev && (prev.ticket_id ?? prev.id) === id
+      ? { ...prev, comments: [...(prev.comments || []), optimisticComment] }
+      : prev));
+    setCommentText('');
     try {
-      await api.tickets.addComment(id, commentText.trim());
-      setCommentText('');
-      loadTicketDetail(id);
+      await api.tickets.addComment(id, text);
+      loadTicketDetail(id, { silent: true });
     } catch (err) {
       console.error('Error adding comment:', err);
+      setDetailTicket((prev) => (prev && (prev.ticket_id ?? prev.id) === id
+        ? { ...prev, comments: (prev.comments || []).filter((c) => c.id !== optimisticComment.id) }
+        : prev));
+      setCommentText(text);
     } finally {
       setCommentLoading(false);
     }
@@ -234,46 +251,26 @@ const Tickets = () => {
     setCreateLoading(true);
     try {
       const user = TokenService.getUser();
-      await api.tickets.create({
+      const newTicket = await api.tickets.create({
         user: user?.id ?? user?.user_id,
         issue_type: createForm.issue_type,
         description: createForm.description || createForm.issue_type,
         category: createForm.category,
         status: 'new',
       });
+      const ticketId = newTicket.id || newTicket.ticket_id;
       setCreateForm({ issue_type: '', description: '', category: 'other' });
       setShowCreateForm(false);
-      loadTickets();
+      setCurrentTicket(newTicket);
+      setShowAIAgent(true);
+      setDetailTicket(null);
+      loadTickets(true);
       window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
+      await api.agent.processTicket(ticketId, { force: true });
     } catch (err) {
       console.error('Error creating ticket:', err);
     } finally {
       setCreateLoading(false);
-    }
-  };
-
-  const startAIAgent = async (issue = null) => {
-    // If issue provided, create a ticket first
-    if (issue) {
-      try {
-        const user = TokenService.getUser();
-        const ticketData = {
-          user: user?.id ?? user?.user_id,
-          issue_type: issue,
-          description: issue,
-          category: determineCategory(issue),
-          status: 'new',
-        };
-        const newTicket = await api.tickets.create(ticketData);
-        setCurrentTicket(newTicket);
-        setShowAIAgent(true);
-        loadTickets();
-      } catch (err) {
-        console.error('Error creating ticket:', err);
-      }
-    } else {
-      // Just open chat without a specific ticket (general help)
-      setShowAIAgent(true);
     }
   };
 
@@ -283,16 +280,6 @@ const Tickets = () => {
     // Close ticket detail panel when AI chat opens to avoid overlap
     setDetailTicket(null);
     setDetailEditing(false);
-  };
-
-  const determineCategory = (issue) => {
-    const issueLower = (issue || '').toLowerCase();
-    if (issueLower.includes('wifi') || issueLower.includes('internet') || issueLower.includes('connection')) return 'network';
-    if (issueLower.includes('computer') || issueLower.includes('laptop') || issueLower.includes('start')) return 'hardware';
-    if (issueLower.includes('software') || issueLower.includes('app') || issueLower.includes('program')) return 'software';
-    if (issueLower.includes('phone') || issueLower.includes('mobile')) return 'mobile';
-    if (issueLower.includes('printer')) return 'hardware';
-    return 'other';
   };
 
   const formatTicketTime = (timestamp) => {
@@ -314,7 +301,11 @@ const Tickets = () => {
     if (s === 'escalated') return <Badge variant="error">Escalated</Badge>;
     if (s === 'in-progress' || s === 'in_progress') return <Badge variant="info">In Progress</Badge>;
     if (s === 'new' || s === 'open') return <Badge variant="warning">Open</Badge>;
-    return <Badge variant="default">{status || '—'}</Badge>;
+    if (s === 'pending_clarification') return <Badge variant="warning">Pending clarification</Badge>;
+    if (s === 'pending') return <Badge variant="warning">Pending</Badge>;
+    // Format unknown statuses: snake_case → Title Case
+    const friendly = (status || '—').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    return <Badge variant="default">{friendly}</Badge>;
   };
 
   const filteredTickets = activeTickets.filter((t) => {
@@ -343,35 +334,13 @@ const Tickets = () => {
           <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Tickets</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Get instant AI help or manage existing tickets</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* PRIMARY BUTTON - AI Help (Simple Flow) */}
-          <Button onClick={() => setShowDescribeModal(true)} variant="primary" size="md" className="font-semibold">
-            <Sparkles className="w-5 h-5 mr-2" />
-            Get AI Help
-          </Button>
-          {/* Secondary - Manual ticket */}
-          <Button onClick={() => setShowCreateForm(true)} variant="outline" size="sm">
-            <Plus className="w-4 h-4 mr-2" />
-            Manual Ticket
-          </Button>
-        </div>
+        <Button onClick={() => setShowCreateForm(true)} variant="primary" size="md" className="font-semibold">
+          <Plus className="w-5 h-5 mr-2" />
+          New Ticket
+        </Button>
       </header>
 
-      {/* Describe issue → then AI Assistant panel opens (same section as when opening AI for existing ticket) */}
-      {showDescribeModal && (
-        <DescribeIssueModal
-          onReady={(ticket) => {
-            setShowDescribeModal(false);
-            setCurrentTicket(ticket);
-            setShowAIAgent(true);
-            setDetailTicket(null);
-            loadTickets();
-          }}
-          onClose={() => setShowDescribeModal(false)}
-        />
-      )}
-
-      {/* Create Ticket Modal */}
+      {/* Create Ticket Modal - structured form, then AI chat opens */}
       <AnimatePresence>
         {showCreateForm && (
           <>
@@ -390,7 +359,10 @@ const Tickets = () => {
             >
               <Card className="w-full max-w-lg p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Create New Ticket</h2>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">New Ticket</h2>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">We'll open the AI assistant to help you right after</p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowCreateForm(false)}
@@ -437,7 +409,8 @@ const Tickets = () => {
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button type="submit" variant="primary" size="md" loading={createLoading} className="flex-1">
-                      Create Ticket
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      {createLoading ? 'Creating & starting AI…' : 'Create & get AI help'}
                     </Button>
                     <Button type="button" variant="ghost" size="md" onClick={() => setShowCreateForm(false)} disabled={createLoading}>
                       Cancel
@@ -460,12 +433,25 @@ const Tickets = () => {
             onBackToTicket={() => {
               setShowAIAgent(false);
               setDetailTicket(currentTicket);
-              loadTicketDetail(currentTicket?.ticket_id ?? currentTicket?.id);
+              loadTicketDetail(currentTicket?.ticket_id ?? currentTicket?.id, { silent: true });
+            }}
+            onTicketUpdate={(updated) => {
+              if (!updated) return;
+              const id = updated.ticket_id ?? updated.id;
+              setActiveTickets((prev) =>
+                prev.map((t) => ((t.ticket_id ?? t.id) === id ? { ...t, ...updated } : t))
+              );
+              if (currentTicket && (currentTicket?.ticket_id ?? currentTicket?.id) === id) {
+                setCurrentTicket((prev) => (prev ? { ...prev, ...updated } : null));
+              }
+              if (detailTicket && (detailTicket?.ticket_id ?? detailTicket?.id) === id) {
+                setDetailTicket((prev) => (prev ? { ...prev, ...updated } : null));
+              }
             }}
             onActionComplete={() => {
-              loadTickets();
+              loadTickets(true);
               if (detailTicket && (detailTicket?.ticket_id ?? detailTicket?.id) === (currentTicket?.ticket_id ?? currentTicket?.id)) {
-                loadTicketDetail(detailTicket?.ticket_id ?? detailTicket?.id);
+                loadTicketDetail(detailTicket?.ticket_id ?? detailTicket?.id, { silent: true });
               }
             }}
           />
@@ -500,9 +486,9 @@ const Tickets = () => {
                 : "No tickets match your search. Try a different filter or create one."}
             </p>
             {activeTickets.length === 0 && (
-              <Button onClick={() => setShowDescribeModal(true)} variant="primary" size="md">
-                <Sparkles className="w-4 h-4 mr-2" />
-                Get AI Help
+              <Button onClick={() => setShowCreateForm(true)} variant="primary" size="md">
+                <Plus className="w-4 h-4 mr-2" />
+                New Ticket
               </Button>
             )}
           </div>
@@ -804,20 +790,7 @@ const Tickets = () => {
                           </div>
                         </div>
 
-                        {detailTicket?.status === 'resolved' && (
-                          <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 text-sm text-green-800 dark:text-green-200">
-                            This issue is marked as resolved. Need something else? Use <strong>AI Chat</strong> below or create a new ticket.
-                          </div>
-                        )}
-
-                        <div>
-                          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Description</p>
-                          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-                            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{detailTicket?.description || '—'}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-800">
+                        <div className="flex flex-wrap items-center gap-2 border-t border-gray-200 dark:border-gray-800 pt-4">
                           <Button variant="ghost" size="sm" onClick={() => { setEditTicket(detailTicket); setEditForm({ issue_type: detailTicket?.issue_type || '', description: detailTicket?.description || '', category: detailTicket?.category || 'other', status: detailTicket?.status || 'new' }); setDetailEditing(true); }}>
                             Edit
                           </Button>
@@ -842,7 +815,29 @@ const Tickets = () => {
                           </Button>
                         </div>
 
-                        <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+                        <div>
+                          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Description</p>
+                          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+                            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{detailTicket?.description || '—'}</p>
+                          </div>
+                        </div>
+
+                        {detailTicket?.status === 'resolved' && (
+                          <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 text-sm text-green-800 dark:text-green-200">
+                            This issue is marked as resolved. Need something else? Use <strong>AI Chat</strong> above or create a new ticket.
+                          </div>
+                        )}
+
+                        <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
+                          <AgentInsights
+                            ticketId={detailTicket?.ticket_id ?? detailTicket?.id}
+                            onEscalate={() => handleEscalate(detailTicket?.ticket_id ?? detailTicket?.id)}
+                            onActionComplete={() => loadTicketDetail(detailTicket?.ticket_id ?? detailTicket?.id, { silent: true })}
+                            onOpenTicket={(id) => loadTicketDetail(id)}
+                          />
+                        </div>
+
+                        <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
                           <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">Comments {(detailTicket?.comments?.length ?? 0) ? `(${detailTicket.comments.length})` : ''}</p>
                           {(detailTicket?.comments?.length ?? 0) > 0 && (
                             <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
@@ -872,21 +867,14 @@ const Tickets = () => {
                         </div>
 
                         <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
-                          <AgentInsights
-                            ticketId={detailTicket?.ticket_id ?? detailTicket?.id}
-                            onEscalate={() => handleEscalate(detailTicket?.ticket_id ?? detailTicket?.id)}
-                            onActionComplete={() => loadTicketDetail(detailTicket?.ticket_id ?? detailTicket?.id)}
-                          />
-                        </div>
-
-                        <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
                           <ActionHistory ticketId={detailTicket?.ticket_id ?? detailTicket?.id} />
                         </div>
 
                         <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
                           <ResolutionFeedback
                             ticketId={detailTicket?.ticket_id ?? detailTicket?.id}
-                            onFeedbackSubmitted={() => loadTicketDetail(detailTicket?.ticket_id ?? detailTicket?.id)}
+                            onFeedbackSubmitted={() => setDetailTicket((prev) => (prev ? { ...prev, resolution_feedback_submitted: true } : null))}
+                            feedbackAlreadySubmitted={!!detailTicket?.resolution_feedback_submitted}
                           />
                         </div>
                       </>

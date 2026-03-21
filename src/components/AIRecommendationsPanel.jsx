@@ -159,24 +159,36 @@ const AIRecommendationsPanel = () => {
       {/* Recommendations List */}
       {recommendations.length > 0 && visibleCount > 0 && (
         <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-2">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">AI Recommendations</h3>
             <span className="text-xs text-gray-500 dark:text-gray-500 font-medium">
-              {visibleCount} active
+              {visibleCount} need attention
             </span>
           </div>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
+            Open tickets the AI has analyzed. Click a ticket to view the suggested solution or chat with the AI.
+          </p>
 
           <div className="space-y-3">
             {visibleRecommendations.slice(0, 5).map((rec) => (
-              <div key={rec.ticket_id} className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors duration-150">
+              <div
+                key={rec.ticket_id}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleViewTicket(rec.ticket_id)}
+                onKeyDown={(e) => e.key === 'Enter' && handleViewTicket(rec.ticket_id)}
+                className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors duration-150 cursor-pointer group"
+              >
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono text-gray-500 dark:text-gray-500">
+                      <span className="text-xs font-mono text-gray-500 dark:text-gray-500 shrink-0">
                         #{rec.ticket_id}
                       </span>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {rec.title}
+                      <span className="text-sm font-medium text-gray-900 dark:text-white truncate" title={rec.description || rec.issue_type}>
+                        {rec.description
+                          ? (rec.description.length > 60 ? `${rec.description.slice(0, 60)}…` : rec.description)
+                          : (rec.issue_type || rec.title || 'Open ticket')}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-500">
@@ -200,17 +212,17 @@ const AIRecommendationsPanel = () => {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => handleViewTicket(rec.ticket_id)}
+                      onClick={(e) => { e.stopPropagation(); handleViewTicket(rec.ticket_id); }}
                       className="p-1.5 rounded-md text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 dark:hover:text-primary-400 transition-colors duration-150"
-                      title="View ticket"
+                      title="Open ticket to view AI solution"
                     >
                       <ExternalLink className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDismiss(rec.ticket_id)}
-                      className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:text-gray-300 transition-colors duration-150"
-                      title="Dismiss"
+                      onClick={(e) => { e.stopPropagation(); handleDismiss(rec.ticket_id); }}
+                      className="p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:text-gray-300 transition-colors duration-150 opacity-70 group-hover:opacity-100"
+                      title="Dismiss from dashboard"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -227,7 +239,15 @@ const AIRecommendationsPanel = () => {
                         {getRecommendationIcon(subRec.type)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900 dark:text-white">{subRec.message}</p>
+                        <p className="text-sm text-gray-900 dark:text-white">
+                          {subRec.type === 'similar_tickets'
+                            ? `Similar issues were resolved before — open this ticket to see the AI's suggested fix based on past solutions.`
+                            : subRec.type === 'high_confidence_solution'
+                            ? `Ready to resolve — the AI is confident this fix will work. Open the ticket to apply it.`
+                            : subRec.type === 'suggested_solution'
+                            ? `Solution available — open the ticket to review the AI's suggested steps.`
+                            : subRec.message}
+                        </p>
                         {subRec.confidence && (
                           <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                             {(subRec.confidence * 100).toFixed(0)}% confidence
@@ -248,7 +268,7 @@ const AIRecommendationsPanel = () => {
                 onClick={() => handleViewTicket()}
                 className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
               >
-                View all {visibleCount} recommendations
+                View all tickets in queue
               </button>
             </div>
           )}
@@ -258,15 +278,15 @@ const AIRecommendationsPanel = () => {
       {visibleCount === 0 && recommendations.length > 0 && (
         <Card className="p-8 text-center">
           <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">All recommendations reviewed</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">New suggestions will appear as tickets are analyzed</p>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">All caught up</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">You've reviewed all recommendations. New ones will appear as the AI analyzes open tickets.</p>
         </Card>
       )}
       {recommendations.length === 0 && (
         <Card className="p-8 text-center">
           <CheckCircle className="h-12 w-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">No active recommendations</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">The AI agent will suggest actions as it analyzes tickets</p>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">No tickets need attention</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">When open tickets are analyzed by the AI, actionable recommendations will appear here.</p>
         </Card>
       )}
     </>

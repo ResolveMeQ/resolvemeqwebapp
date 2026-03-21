@@ -134,18 +134,20 @@ const KnowledgeBase = () => {
   };
 
   const handleRate = async (articleId, isHelpful) => {
-    setRatingArticleId(articleId);
+    const id = articleId ?? selectedArticle?.kb_id ?? selectedArticle?.id;
+    if (!id) return;
+    setRatingArticleId(id);
     try {
-      await api.knowledgeBase.rate(articleId, isHelpful);
+      await api.knowledgeBase.rate(id, isHelpful);
       setArticles((prev) =>
         prev.map((a) => {
-          if (a.kb_id !== articleId) return a;
+          if ((a.kb_id ?? a.id) !== id) return a;
           const total = (a.total_votes || 0) + 1;
           const helpful = (a.helpful_votes || 0) + (isHelpful ? 1 : 0);
           return { ...a, total_votes: total, helpful_votes: helpful };
         })
       );
-      if (selectedArticle?.kb_id === articleId) {
+      if ((selectedArticle?.kb_id ?? selectedArticle?.id) === id) {
         const total = (selectedArticle.total_votes || 0) + 1;
         const helpful = (selectedArticle.helpful_votes || 0) + (isHelpful ? 1 : 0);
         setSelectedArticle({
@@ -156,7 +158,8 @@ const KnowledgeBase = () => {
       }
       showToast(isHelpful ? 'Thanks for your feedback.' : 'Feedback recorded.');
     } catch (err) {
-      showToast(err?.message || 'Failed to submit rating.', 'error');
+      console.error('KB rate error:', err);
+      showToast(err?.message || 'Failed to submit rating. Please try again.', 'error');
     } finally {
       setRatingArticleId(null);
     }
@@ -434,19 +437,23 @@ const KnowledgeBase = () => {
                   </p>
                   <div className="flex gap-2">
                     <Button
+                      type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => handleRate(selectedArticle.kb_id, true)}
-                      disabled={ratingArticleId === selectedArticle.kb_id}
+                      loading={ratingArticleId === (selectedArticle?.kb_id ?? selectedArticle?.id)}
+                      disabled={ratingArticleId === (selectedArticle?.kb_id ?? selectedArticle?.id)}
+                      onClick={() => handleRate(selectedArticle?.kb_id ?? selectedArticle?.id, true)}
                     >
                       <ThumbsUp className="w-4 h-4 mr-1.5" />
                       Yes
                     </Button>
                     <Button
+                      type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => handleRate(selectedArticle.kb_id, false)}
-                      disabled={ratingArticleId === selectedArticle.kb_id}
+                      loading={ratingArticleId === (selectedArticle?.kb_id ?? selectedArticle?.id)}
+                      disabled={ratingArticleId === (selectedArticle?.kb_id ?? selectedArticle?.id)}
+                      onClick={() => handleRate(selectedArticle?.kb_id ?? selectedArticle?.id, false)}
                     >
                       <ThumbsDown className="w-4 h-4 mr-1.5" />
                       No

@@ -7,7 +7,7 @@ const Card = ({ children, className }) => (
   <div className={`bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-none dark:border dark:border-gray-700 ${className || ''}`}>{children}</div>
 );
 
-const AgentInsights = ({ ticketId, onEscalate, onActionComplete }) => {
+const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket }) => {
   const [agentStatus, setAgentStatus] = useState(null);
   const [suggestions, setSuggestions] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -72,6 +72,21 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete }) => {
 
   const handleEscalateClick = () => {
     if (typeof onEscalate === 'function') onEscalate(ticketId);
+  };
+
+  const handleOpenSimilarTicket = (ticket) => {
+    const id = ticket?.ticket_id ?? ticket?.id;
+    if (id && typeof onOpenTicket === 'function') onOpenTicket(id);
+  };
+
+  const handleCopyAssignment = () => {
+    const team = assignment?.team || '';
+    const reason = assignment?.reason || '';
+    const text = team ? `Suggested Team: ${team}${reason ? `\nReason: ${reason}` : ''}` : reason || '';
+    if (text && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text);
+      // Brief feedback could be added via toast if available
+    }
   };
 
   if (loading) {
@@ -249,17 +264,24 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete }) => {
       )}
 
       {/* Assignment Suggestion */}
-      {assignment.suggested_assignee && (
+      {(assignment?.team || assignment?.reason) && (
         <Card className="p-6">
           <h4 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
             <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             Assignment Recommendation
           </h4>
           <div className="space-y-3">
-            <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-200 dark:border-purple-800">
-              <div className="font-medium text-gray-900 dark:text-white">Suggested Team: {assignment.team}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">{assignment.reason}</div>
-            </div>
+            <button
+              type="button"
+              onClick={handleCopyAssignment}
+              className="w-full text-left p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors cursor-pointer group"
+            >
+              <div className="font-medium text-gray-900 dark:text-white">Suggested Team: {assignment.team || '—'}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{assignment.reason}</div>
+              <span className="text-xs text-purple-600 dark:text-purple-400 mt-2 inline-block opacity-0 group-hover:opacity-100 transition-opacity">
+                Click to copy
+              </span>
+            </button>
           </div>
         </Card>
       )}
@@ -268,17 +290,23 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete }) => {
       {suggestions?.similar_tickets && suggestions.similar_tickets.length > 0 && (
         <Card className="p-6">
           <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Similar Resolved Tickets</h4>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Click to open and view resolution</p>
           <div className="space-y-2">
             {suggestions.similar_tickets.map((ticket) => (
-              <div key={ticket.ticket_id} className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
+              <button
+                key={ticket.ticket_id ?? ticket.id}
+                type="button"
+                onClick={() => handleOpenSimilarTicket(ticket)}
+                className="w-full text-left p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-primary-300 dark:hover:border-primary-700 transition-colors cursor-pointer"
+              >
                 <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-900 dark:text-white">#{ticket.ticket_id} - {ticket.issue_type}</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">{ticket.category}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 dark:text-white truncate">#{ticket.ticket_id ?? ticket.id} - {ticket.issue_type || 'No title'}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">{ticket.category || '—'}</div>
                   </div>
-                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 ml-2" />
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </Card>

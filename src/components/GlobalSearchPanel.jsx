@@ -94,7 +94,9 @@ const GlobalSearchPanel = ({
                         }
                         className="text-[10px] px-1.5 py-0.5"
                       >
-                        {status}
+                        {status === 'pending_clarification'
+                          ? 'Pending clarification'
+                          : status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                       </Badge>
                     )}
                   </div>
