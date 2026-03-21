@@ -13,6 +13,9 @@ import {
 import Button from '../../components/ui/Button';
 import { api, TokenService } from '../../services/api';
 
+const isUnverifiedError = (msg) =>
+  msg && (msg.toLowerCase().includes('not verified') || msg.toLowerCase().includes('verify your email'));
+
 /**
  * Login page with enterprise design
  */
@@ -25,6 +28,10 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [needsVerification, setNeedsVerification] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -57,17 +64,27 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const showCodeEntry = needsVerification || resendSuccess || (errors.general && isUnverifiedError(errors.general));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validateForm()) {
+    if (!validateForm()) return;
+    
+    if (showCodeEntry && !verificationCode.trim()) {
+      setErrors((prev) => ({ ...prev, general: 'Please enter the 6-digit verification code from your email.' }));
       return;
     }
+    
+    const needsVerify = showCodeEntry && verificationCode.trim();
     
     setLoading(true);
     setErrors({});
     
     try {
+      if (needsVerify) {
+        await api.auth.verifyUser({ token: verificationCode.trim(), email: formData.email });
+      }
       const response = await api.auth.login(formData.email, formData.password);
       const user = await api.auth.getCurrentUser();
       TokenService.setUser(user);
@@ -75,10 +92,32 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
     } catch (error) {
       console.error('Login error:', error);
       setErrors({ general: error.message || 'Login failed. Please check your credentials.' });
+      setResendSuccess(false);
+      if (error?.message && isUnverifiedError(error.message)) {
+        setNeedsVerification(true);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const handleResendVerification = async () => {
+    if (!formData.email) return;
+    setResendLoading(true);
+    setResendSuccess(false);
+    setErrors((prev) => (prev.general ? { ...prev, general: '' } : prev));
+    setNeedsVerification(true);
+    try {
+      await api.auth.resendVerificationCode(formData.email);
+      setResendSuccess(true);
+    } catch (err) {
+      setErrors({ general: err?.message || 'Failed to resend. Please try again.' });
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  const showResendOption = errors.general && isUnverifiedError(errors.general);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
@@ -186,8 +225,43 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
             </div>
 
             {errors.general && (
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <div className="p-3 rounded-lg border bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
                 <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p>
+                {showResendOption && (
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={resendLoading}
+                    className="mt-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 disabled:opacity-50"
+                  >
+                    {resendLoading ? 'Sending...' : 'Resend verification email'}
+                  </button>
+                )}
+              </div>
+            )}
+            {resendSuccess && (
+              <div className="p-3 rounded-lg border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                <p className="text-sm text-green-600 dark:text-green-400">Verification email sent. Check your inbox (and spam folder).</p>
+              </div>
+            )}
+
+            {showCodeEntry && (
+              <div>
+                <label htmlFor="verification-code" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">
+                  Verification code
+                </label>
+                <input
+                  id="verification-code"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                  className="input-enterprise font-mono text-center text-lg tracking-widest"
+                  placeholder="6-digit code from email"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Enter the 6-digit code from your verification email, then click Sign in.</p>
               </div>
             )}
 

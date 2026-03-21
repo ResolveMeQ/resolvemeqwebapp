@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Mail, 
   ArrowLeft,
@@ -7,11 +8,13 @@ import {
   Lock
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import { api } from '../../services/api';
 
 /**
  * ForgotPassword page with enterprise design
  */
-const ForgotPassword = ({ onSubmit, onNavigateToLogin }) => {
+const ForgotPassword = ({ onNavigateToLogin }) => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -34,11 +37,10 @@ const ForgotPassword = ({ onSubmit, onNavigateToLogin }) => {
     setError('');
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      onSubmit(email);
+      await api.auth.requestPasswordReset(email);
       setSuccess(true);
     } catch (err) {
-      setError('Failed to send reset email. Please try again.');
+      setError(err?.message || 'Failed to send reset email. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -58,23 +60,32 @@ const ForgotPassword = ({ onSubmit, onNavigateToLogin }) => {
             </h2>
             
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              We've sent a password reset link to <strong className="text-gray-900 dark:text-white">{email}</strong>. Please check your email and click the link to reset your password.
+              We've sent a 6-digit code and reset link to <strong className="text-gray-900 dark:text-white">{email}</strong>. Check your email and either click the link or enter the code on the reset page.
             </p>
             
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
               <p className="text-xs text-blue-800 dark:text-blue-200">
-                <strong>Note:</strong> The reset link will expire in 1 hour for security reasons.
+                <strong>Note:</strong> The code will expire in 1 hour. If the link doesn't work, go to the reset page and enter the code manually.
               </p>
             </div>
             
-            <Button
-              onClick={onNavigateToLogin}
-              variant="outline"
-              className="w-full"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to login
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={() => navigate(`/reset-password?email=${encodeURIComponent(email)}`)}
+                variant="primary"
+                className="w-full"
+              >
+                Enter code and reset password
+              </Button>
+              <Button
+                onClick={onNavigateToLogin}
+                variant="outline"
+                className="w-full"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to login
+              </Button>
+            </div>
           </div>
         </div>
       </div>

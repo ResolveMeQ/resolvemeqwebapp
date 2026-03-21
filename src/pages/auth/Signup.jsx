@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Mail, 
   Lock, 
@@ -7,6 +8,7 @@ import {
   User, 
   Building,
   ArrowRight,
+  CheckCircle,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import { api } from '../../services/api';
@@ -15,6 +17,7 @@ import { api } from '../../services/api';
  * Signup page with enterprise design
  */
 const Signup = ({ onSignup, onNavigateToLogin }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -28,6 +31,7 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [success, setSuccess] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -89,6 +93,7 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
       const userData = {
         email: formData.email,
         password: formData.password,
+        confirm_password: formData.confirmPassword,
         username: formData.email.split('@')[0],
         first_name: formData.firstName,
         last_name: formData.lastName,
@@ -97,8 +102,7 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
       };
       
       await api.auth.register(userData);
-      alert('Registration successful! Please check your email to verify your account.');
-      onNavigateToLogin();
+      setSuccess(true);
     } catch (error) {
       console.error('Signup error:', error);
       setErrors({ general: error.message || 'Signup failed. Please try again.' });
@@ -130,6 +134,48 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
   };
 
   const passwordStrength = getPasswordStrength(formData.password);
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8 text-center">
+            <div className="w-16 h-16 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center justify-center mx-auto mb-6">
+              <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+              Check your email
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Registration successful! We've sent a 6-digit verification code to <strong className="text-gray-900 dark:text-white">{formData.email}</strong>. Check your email and enter the code at the verify page, or click the link in the email.
+            </p>
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+              <p className="text-xs text-blue-800 dark:text-blue-200">
+                <strong>Note:</strong> The verification link will expire in 10 minutes. If you don't see the email, check your spam folder.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => navigate('/verify?email=' + encodeURIComponent(formData.email))}
+                variant="outline"
+                className="flex-1"
+              >
+                Enter verification code
+              </Button>
+              <Button
+                onClick={onNavigateToLogin}
+                variant="primary"
+                className="flex-1"
+              >
+                <ArrowRight className="w-4 h-4 mr-2" />
+                Go to login
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
@@ -331,11 +377,11 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
                 />
                 <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                   I agree to the{' '}
-                  <a href="#" className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium">
+                  <a href="https://resolvemeq.net/terms" target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium">
                     Terms of Service
                   </a>{' '}
                   and{' '}
-                  <a href="#" className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium">
+                  <a href="https://resolvemeq.net/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium">
                     Privacy Policy
                   </a>
                 </span>

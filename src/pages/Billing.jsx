@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Check,
@@ -12,14 +13,18 @@ import {
   Receipt,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
+  Mail,
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { api } from '../services/api';
 
-const Billing = () => {
+const Billing = ({ onRefreshUserData }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [plansFromApi, setPlansFromApi] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [usage, setUsage] = useState(null);
@@ -28,14 +33,18 @@ const Billing = () => {
   const [upgradingPlanId, setUpgradingPlanId] = useState(null);
   const [toast, setToast] = useState(null);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState(null);
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), 4000);
   }, []);
 
-  const loadBilling = useCallback(async () => {
-    setLoading(true);
+  const loadBilling = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setLoadError(null);
     try {
       const [plansData, subData, usageData, invoicesData] = await Promise.all([
         api.billing.getPlans(),
@@ -47,54 +56,132 @@ const Billing = () => {
       setSubscription(subData || null);
       setUsage(usageData || null);
       setInvoices(Array.isArray(invoicesData) ? invoicesData : []);
+      try {
+        const prefs = await api.settings.getPreferences();
+        setEmailNotifications(prefs?.email_notifications ?? true);
+      } catch {
+        setEmailNotifications(true);
+      }
+      return true;
     } catch (err) {
       console.error('Billing load error:', err);
-      showToast(err?.message || 'Failed to load billing.', 'error');
+      setLoadError(err?.message || 'Failed to load billing.');
+      if (!silent) showToast(err?.message || 'Failed to load billing.', 'error');
+      return false;
     } finally {
       setLoading(false);
     }
   }, [showToast]);
 
   useEffect(() => {
-    loadBilling();
-  }, [loadBilling]);
+    const checkoutSuccess = searchParams.get('checkout') === 'success' || searchParams.get('session_id');
+    loadBilling().then((ok) => {
+      if (ok && checkoutSuccess) {
+        showToast('Subscription updated successfully. Thank you!', 'success');
+        onRefreshUserData?.();
+      }
+      if (checkoutSuccess) setSearchParams({}, { replace: true });
+    });
+  }, [onRefreshUserData]);
 
   const currentPlanDetail = subscription?.plan_detail || subscription?.plan;
   const currentPlanId = currentPlanDetail?.id ? String(currentPlanDetail.id) : null;
   const currentPlanSlug = (currentPlanDetail?.slug || currentPlanDetail?.name || '').toLowerCase();
 
+  const isPlanUuid = (id) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(id));
+
+  const hasDodoSubscription = Boolean(subscription?.gateway_subscription_id);
+
   const handleChangePlan = async (planId) => {
     if (!planId || planId === currentPlanId) return;
+
+    if (hasDodoSubscription && planId !== currentPlanId) {
+      if (!isPlanUuid(planId) || !canCheckout(planId)) {
+        showToast('This plan is not available. Please refresh or contact support.', 'error');
+        return;
+      }
+      setUpgradingPlanId(planId);
+      try {
+        await api.billing.changePlan({
+          plan: planId,
+          billing_interval: billingCycle === 'monthly' ? 'monthly' : 'yearly',
+        });
+        await loadBilling();
+        onRefreshUserData?.();
+        showToast('Plan updated successfully.');
+      } catch (err) {
+        showToast(err?.message || err?.detail || 'Failed to change plan.', 'error');
+      } finally {
+        setUpgradingPlanId(null);
+      }
+      return;
+    }
+
+    if (isPlanUuid(planId) && !canCheckout(planId)) {
+      showToast('This plan is not available for checkout. Please refresh or contact support.', 'error');
+      return;
+    }
+
+    if (!isPlanUuid(planId)) {
+      setUpgradingPlanId(planId);
+      try {
+        await api.billing.updateSubscription({ plan: planId });
+        await loadBilling();
+        onRefreshUserData?.();
+        showToast('Plan updated successfully.');
+      } catch (err) {
+        showToast(err?.message || err?.error || 'Failed to change plan.', 'error');
+      } finally {
+        setUpgradingPlanId(null);
+      }
+      return;
+    }
+
     setUpgradingPlanId(planId);
     try {
-      await api.billing.updateSubscription({ plan: planId });
-      await loadBilling();
-      showToast('Plan updated successfully.');
+      const returnUrl = `${window.location.origin}/billing?checkout=success`;
+      const res = await api.billing.createCheckoutSession({
+        plan: planId,
+        billing_interval: billingCycle === 'monthly' ? 'monthly' : 'yearly',
+        return_url: returnUrl,
+      });
+      if (res?.checkout_url) {
+        window.location.href = res.checkout_url;
+        return;
+      }
+      showToast('Checkout did not return a URL. Please try again or contact support.', 'error');
     } catch (err) {
-      showToast(err?.message || err?.error || 'Failed to change plan.', 'error');
+      showToast(err?.message || 'Could not start checkout. Please try again.', 'error');
     } finally {
       setUpgradingPlanId(null);
     }
   };
 
   const plans = plansFromApi.length > 0
-    ? plansFromApi.map((p) => ({
-        id: String(p.id),
-        slug: (p.slug || p.name || '').toLowerCase(),
-        name: p.name,
-        description: p.name === 'Starter' ? 'Perfect for small teams' : p.name === 'Enterprise' ? 'For large organizations' : 'Ideal for growing businesses',
-        price_monthly: Number(p.price_monthly) || 0,
-        price_yearly: Number(p.price_yearly) || 0,
-        max_teams: p.max_teams,
-        max_members: p.max_members,
-        popular: (p.slug || '') === 'pro',
-        icon: (p.slug || '') === 'enterprise' ? Crown : (p.slug || '') === 'pro' ? Zap : Users,
-      }))
+    ? plansFromApi
+        .filter((p) => !p.is_trial || (currentPlanSlug || '').includes('trial'))
+        .map((p) => ({
+          id: String(p.id),
+          slug: (p.slug || p.name || '').toLowerCase(),
+          name: p.name,
+          is_trial: Boolean(p.is_trial),
+          description: p.is_trial ? '14-day free trial. No credit card required.' : p.name === 'Starter' ? 'Perfect for small teams' : p.name === 'Enterprise' ? 'For large organizations' : 'Ideal for growing businesses',
+          price_monthly: Number(p.price_monthly) || 0,
+          price_yearly: Number(p.price_yearly) || 0,
+          max_teams: p.max_teams,
+          max_members: p.max_members,
+          popular: (p.slug || '') === 'pro',
+          icon: (p.slug || '') === 'enterprise' ? Crown : (p.slug || '') === 'pro' ? Zap : (p.slug || '') === 'trial' ? Users : Zap,
+          fromApi: true,
+        }))
     : [
-        { id: 'starter', slug: 'starter', name: 'Starter', price_monthly: 19, price_yearly: 190, max_teams: 5, max_members: 10, popular: false, icon: Users, description: 'Perfect for small teams' },
-        { id: 'pro', slug: 'pro', name: 'Pro', price_monthly: 49, price_yearly: 490, max_teams: 20, max_members: 50, popular: true, icon: Zap, description: 'Ideal for growing businesses' },
-        { id: 'enterprise', slug: 'enterprise', name: 'Enterprise', price_monthly: 99, price_yearly: 990, max_teams: 999, max_members: 999, popular: false, icon: Crown, description: 'For large organizations' },
+        { id: 'starter', slug: 'starter', name: 'Starter', price_monthly: 19, price_yearly: 190, max_teams: 5, max_members: 10, popular: false, icon: Users, description: 'Perfect for small teams', fromApi: false },
+        { id: 'pro', slug: 'pro', name: 'Pro', price_monthly: 49, price_yearly: 490, max_teams: 20, max_members: 50, popular: true, icon: Zap, description: 'Ideal for growing businesses', fromApi: false },
+        { id: 'enterprise', slug: 'enterprise', name: 'Enterprise', price_monthly: 99, price_yearly: 990, max_teams: 999, max_members: 999, popular: false, icon: Crown, description: 'For large organizations', fromApi: false },
       ];
+
+  const canCheckout = (planId) => isPlanUuid(planId) && plansFromApi.some((p) => String(p.id) === planId && !p.is_trial);
 
   const formatPrice = (price) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(price || 0);
@@ -116,8 +203,20 @@ const Billing = () => {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Billing & Plans</h1>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Manage your subscription and billing</p>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          Manage your subscription and billing. New subscriptions are completed securely via Dodo Payments checkout.
+        </p>
       </header>
+
+      {loadError && (
+        <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+          <p className="text-sm text-red-800 dark:text-red-200">{loadError}</p>
+          <Button variant="outline" size="sm" onClick={() => loadBilling()}>
+            <RefreshCw className="w-4 h-4 mr-1" />
+            Retry
+          </Button>
+        </div>
+      )}
 
       {usage && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -158,19 +257,24 @@ const Billing = () => {
             </div>
             <span className={cn(
               'inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium',
+              subscription?.status === 'trial' && 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/50',
               subscription?.status === 'active' && 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/50',
               subscription?.status === 'past_due' && 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50',
               (!subscription?.status || subscription?.status === 'canceled') && 'bg-gray-50 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
             )}>
               {subscription?.status === 'active' && <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 inline-block" />}
-              {(subscription?.status || 'No subscription').replace('_', ' ')}
+              {subscription?.status === 'trial' ? 'Free trial' : (subscription?.status || 'No subscription').replace('_', ' ')}
             </span>
           </div>
         </div>
         <div className="p-6">
-          <h3 className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">Recurring payment</h3>
+          <h3 className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">
+            {subscription?.status === 'trial' ? 'Trial status' : 'Recurring payment'}
+          </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            {nextBillingDate ? (
+            {subscription?.status === 'trial' && subscription?.trial_ends_at ? (
+              <>Your free trial ends on <strong className="text-gray-900 dark:text-white">{formatDate(subscription.trial_ends_at)}</strong>. Upgrade to a paid plan to continue with full access.</>
+            ) : nextBillingDate ? (
               <>Your subscription {subscription?.status === 'active' ? 'renews' : 'renewed'} on <strong className="text-gray-900 dark:text-white">{nextBillingDate}</strong>. {nextAmount != null && nextAmount > 0 && <>You will be charged <strong>{formatPrice(nextAmount)}</strong>.</>}</>
             ) : (
               'No upcoming billing date. Choose a plan below to subscribe.'
@@ -198,6 +302,8 @@ const Billing = () => {
           const price = billingCycle === 'monthly' ? plan.price_monthly : plan.price_yearly;
           const isCurrent = plan.id === currentPlanId || (currentPlanId == null && plan.slug === (currentPlanSlug || 'pro'));
           const isUpgrading = upgradingPlanId === plan.id;
+          const currentPrice = currentPlanDetail ? (billingCycle === 'yearly' ? currentPlanDetail.price_yearly : currentPlanDetail.price_monthly) : 0;
+          const isDowngrade = !isCurrent && price < currentPrice;
           return (
             <Card
               key={plan.id}
@@ -212,14 +318,21 @@ const Billing = () => {
                 <div className="w-12 h-12 bg-primary-600 rounded-lg flex items-center justify-center mx-auto mb-3"><Icon size={24} className="text-white" /></div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{plan.name}</h3>
                 <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">{plan.description}</p>
-                <div className="mt-4"><span className="text-3xl font-semibold text-gray-900 dark:text-white">{formatPrice(price)}</span><span className="text-sm text-gray-500 dark:text-gray-400">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span></div>
+                <div className="mt-4"><span className="text-3xl font-semibold text-gray-900 dark:text-white">{plan.is_trial ? 'Free' : formatPrice(price)}</span>{!plan.is_trial && <span className="text-sm text-gray-500 dark:text-gray-400">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span>}</div>
               </div>
               <ul className="space-y-2 mb-6 text-sm text-gray-600 dark:text-gray-400">
                 <li className="flex items-center gap-2"><Check size={14} className="text-green-600 shrink-0" /> Up to {plan.max_teams} teams</li>
                 <li className="flex items-center gap-2"><Check size={14} className="text-green-600 shrink-0" /> Up to {plan.max_members} members</li>
               </ul>
-              <Button variant={isCurrent ? 'outline' : 'primary'} size="md" className="w-full" disabled={isCurrent || isUpgrading} loading={isUpgrading} onClick={() => handleChangePlan(plan.id)}>
-                {isCurrent ? 'Current plan' : 'Upgrade'}
+              <Button
+                variant={isCurrent ? 'outline' : 'primary'}
+                size="md"
+                className="w-full"
+                disabled={isCurrent || isUpgrading || (plan.fromApi === false && !isCurrent)}
+                loading={isUpgrading}
+                onClick={() => handleChangePlan(plan.id)}
+              >
+                {isCurrent ? 'Current plan' : plan.fromApi === false ? 'Contact support to subscribe' : isDowngrade ? 'Downgrade' : 'Upgrade'}
               </Button>
             </Card>
           );
@@ -245,6 +358,7 @@ const Billing = () => {
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Date</th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Period</th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Amount</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Pricing Type</th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Status</th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide w-24">Receipt</th>
                 </tr>
@@ -259,6 +373,11 @@ const Billing = () => {
                         <td className="py-3 px-4 text-sm text-gray-900 dark:text-white">{formatDate(inv.created_at)}</td>
                         <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">{periodStr}</td>
                         <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white">{new Intl.NumberFormat('en-US', { style: 'currency', currency: inv.currency || 'USD' }).format(Number(inv.amount))}</td>
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800/50">
+                            {(inv.pricing_type || 'subscription').replace(/^\w/, (c) => c.toUpperCase())}
+                          </span>
+                        </td>
                         <td className="py-3 px-4"><span className={cn('capitalize text-sm', inv.status === 'paid' && 'text-green-600 dark:text-green-400', inv.status === 'open' && 'text-amber-600 dark:text-amber-400', (inv.status === 'void' || inv.status === 'draft') && 'text-gray-500 dark:text-gray-500')}>{inv.status}</span></td>
                         <td className="py-3 px-4">
                           <button type="button" onClick={() => setExpandedInvoiceId(isExpanded ? null : inv.id)} className="inline-flex items-center gap-1 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300">
@@ -269,16 +388,20 @@ const Billing = () => {
                       <AnimatePresence>
                         {isExpanded && (
                           <motion.tr initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-b border-gray-100 dark:border-gray-700/50">
-                            <td colSpan={5} className="p-4 bg-gray-50 dark:bg-gray-800/80">
+                            <td colSpan={6} className="p-4 bg-gray-50 dark:bg-gray-800/80">
                               <div className="flex flex-wrap items-center gap-6 text-sm">
                                 <div><span className="text-gray-500 dark:text-gray-400">Invoice ID</span><br /><span className="font-mono text-gray-900 dark:text-white text-xs">{String(inv.id).slice(0, 8)}…</span></div>
                                 <div><span className="text-gray-500 dark:text-gray-400">Period</span><br /><span className="text-gray-900 dark:text-white">{periodStr}</span></div>
                                 <div><span className="text-gray-500 dark:text-gray-400">Amount</span><br /><span className="text-gray-900 dark:text-white">{new Intl.NumberFormat('en-US', { style: 'currency', currency: inv.currency || 'USD' }).format(Number(inv.amount))}</span></div>
                                 <div><span className="text-gray-500 dark:text-gray-400">Status</span><br /><span className="capitalize text-gray-900 dark:text-white">{inv.status}</span></div>
                                 <div className="ml-auto">
-                                  <button type="button" onClick={() => showToast('PDF download coming soon.')} className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
-                                    <Download size={14} /> Download receipt
-                                  </button>
+                                  {inv.invoice_url ? (
+                                    <a href={inv.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                                      <Download size={14} /> Download receipt
+                                    </a>
+                                  ) : (
+                                    <span className="text-xs text-gray-500 dark:text-gray-500">Receipt not available</span>
+                                  )}
                                 </div>
                               </div>
                             </td>
@@ -294,22 +417,89 @@ const Billing = () => {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="p-6">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-              <CreditCard size={18} className="text-blue-600 dark:text-blue-400" />
-            </div>
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Payment Methods</h3>
+            <Mail className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Email Notifications</h3>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Payment methods are managed per subscription. Contact support to update billing details.</p>
-          <a href="mailto:support@resolvemeq.com" className="inline-flex items-center px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-white transition-colors">Contact billing support <ArrowRight size={14} className="ml-1" /></a>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Receive emails for invoices, receipts, and subscription updates.
+          </p>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={emailNotifications}
+              onChange={async (e) => {
+                const next = e.target.checked;
+                setEmailNotifications(next);
+                setEmailSaving(true);
+                try {
+                  await api.settings.updatePreferences({ email_notifications: next });
+                  showToast(next ? 'Email notifications enabled' : 'Email notifications disabled');
+                } catch {
+                  setEmailNotifications(!next);
+                  showToast('Failed to update. Try again.', 'error');
+                } finally {
+                  setEmailSaving(false);
+                }
+              }}
+              disabled={emailSaving}
+              className="sr-only peer"
+            />
+            <div className={cn(
+              'w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer-checked:bg-primary-600',
+              'after:content-[""] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full peer-checked:after:border-white',
+              emailSaving && 'opacity-50 pointer-events-none'
+            )} />
+            <span className="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+              {emailNotifications ? 'On' : 'Off'}
+            </span>
+          </label>
         </Card>
         <Card className="p-6">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
-              <Receipt size={18} className="text-green-600 dark:text-green-400" />
-            </div>
+            <CreditCard className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Payment Methods</h3>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            {subscription?.gateway_customer_id
+              ? 'Update your card, payment methods, and billing details in the secure Dodo portal.'
+              : 'Card and payment methods are collected on the Dodo checkout page when you subscribe.'}
+          </p>
+          {subscription?.gateway_customer_id ? (
+            <Button
+              variant="outline"
+              size="md"
+              loading={portalLoading}
+              disabled={portalLoading}
+              onClick={async () => {
+                setPortalLoading(true);
+                try {
+                  const res = await api.billing.openCustomerPortal();
+                  if (res?.url) {
+                    window.location.href = res.url;
+                    return;
+                  }
+                  showToast('Could not open billing portal. Please try again.', 'error');
+                } catch (err) {
+                  showToast(err?.message || 'Failed to open billing portal.', 'error');
+                } finally {
+                  setPortalLoading(false);
+                }
+              }}
+              className="inline-flex items-center gap-2"
+            >
+              <CreditCard size={16} />
+              Manage payment methods <ArrowRight size={14} />
+            </Button>
+          ) : (
+            <p className="text-sm text-gray-500 dark:text-gray-500">Subscribe to a plan to add and manage payment methods.</p>
+          )}
+        </Card>
+        <Card className="p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <Receipt className="w-5 h-5 text-gray-400 dark:text-gray-500" />
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">Need Help?</h3>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Questions about your bill or plan? Our team can help.</p>
@@ -318,7 +508,14 @@ const Billing = () => {
       </div>
 
       {toast && (
-        <div className={cn('fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-medium', toast.type === 'error' ? 'bg-red-50 dark:bg-red-900/80 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800' : 'bg-green-50 dark:bg-green-900/80 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800')}>
+        <div
+          className={cn(
+            'fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-medium',
+            toast.type === 'error' && 'bg-red-50 dark:bg-red-900/80 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800',
+            toast.type === 'info' && 'bg-blue-50 dark:bg-blue-900/80 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800',
+            (toast.type === 'success' || !toast.type) && 'bg-green-50 dark:bg-green-900/80 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800'
+          )}
+        >
           {toast.message}
         </div>
       )}

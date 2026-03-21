@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   Lock, 
   Eye, 
@@ -9,11 +10,20 @@ import {
   ArrowRight
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import CodeEntrySection from '../../components/auth/CodeEntrySection';
+import { api } from '../../services/api';
 
 /**
- * ResetPassword page with enterprise design
+ * ResetPassword page - user arrives via link (?token=...&email=...) or manually to enter 6-digit code
  */
-const ResetPassword = ({ onSubmit, onNavigateToLogin }) => {
+const ResetPassword = ({ onNavigateToLogin }) => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const tokenFromUrl = searchParams.get('token') || '';
+  const emailFromUrl = searchParams.get('email') || '';
+  const fromLink = Boolean(tokenFromUrl && emailFromUrl);
+  const [email, setEmail] = useState(emailFromUrl);
+  const [token, setToken] = useState(tokenFromUrl);
   const [formData, setFormData] = useState({
     password: '',
     confirmPassword: ''
@@ -59,16 +69,32 @@ const ResetPassword = ({ onSubmit, onNavigateToLogin }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    const effectiveEmail = fromLink ? emailFromUrl : email.trim();
+    const effectiveToken = fromLink ? tokenFromUrl : token.trim();
+    
     if (!validateForm()) return;
+    if (!effectiveToken || !effectiveEmail) {
+      setErrors({ general: fromLink
+        ? 'Invalid or expired reset link. Please request a new one from the forgot password page.'
+        : 'Please enter your email and the 6-digit code from your reset email.'
+      });
+      return;
+    }
     
     setLoading(true);
+    setErrors({});
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      onSubmit(formData);
+      await api.auth.resetPassword({
+        email: effectiveEmail,
+        token: effectiveToken,
+        new_password: formData.password,
+        confirm_password: formData.confirmPassword,
+      });
+      onNavigateToLogin();
     } catch (error) {
       console.error('Password reset error:', error);
-      setErrors({ general: 'Password reset failed. Please try again.' });
+      setErrors({ general: error?.message || 'Password reset failed. Please try again or request a new link.' });
     } finally {
       setLoading(false);
     }
@@ -109,11 +135,34 @@ const ResetPassword = ({ onSubmit, onNavigateToLogin }) => {
             </h1>
           </div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Reset password</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Enter your new password below</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {fromLink ? 'Enter your new password below' : 'Enter your email and the 6-digit code from your reset email, then choose a new password.'}
+          </p>
         </div>
 
         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
+            {!fromLink && (
+              <>
+                <CodeEntrySection
+                  email={email}
+                  onEmailChange={setEmail}
+                  code={token}
+                  onCodeChange={setToken}
+                  error={errors.general}
+                  onErrorClear={() => setErrors(prev => ({ ...prev, general: '' }))}
+                  label="Reset code"
+                  codePlaceholder="6-digit code from email"
+                  showResend={false}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Can&apos;t find the code?{' '}
+                  <button type="button" onClick={() => navigate('/forgot-password')} className="text-primary-600 dark:text-primary-400 hover:underline">
+                    Request a new one
+                  </button>
+                </p>
+              </>
+            )}
             <div>
               <label htmlFor="password" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">
                 New Password
@@ -223,7 +272,7 @@ const ResetPassword = ({ onSubmit, onNavigateToLogin }) => {
               </ul>
             </div>
 
-            {errors.general && (
+            {fromLink && errors.general && (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p>
               </div>
@@ -234,7 +283,7 @@ const ResetPassword = ({ onSubmit, onNavigateToLogin }) => {
               variant="primary"
               size="lg"
               className="w-full"
-              disabled={loading}
+              disabled={loading || (fromLink ? !tokenFromUrl || !emailFromUrl : !token.trim() || !email.trim())}
             >
               {loading ? (
                 <div className="flex items-center justify-center">

@@ -150,8 +150,33 @@ export const api = {
       TokenService.clearTokens();
     },
 
-    resetPassword: async (email) => {
+    /** Request password reset email (forgot password step 1) */
+    requestPasswordReset: async (email) => {
+      return apiFetch('/api/auth/forgot-password/', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      });
+    },
+
+    /** Reset password with token from email (forgot password step 2). Expects: email, token, new_password, confirm_password */
+    resetPassword: async ({ email, token, new_password, confirm_password }) => {
       return apiFetch('/api/auth/reset-password/', {
+        method: 'POST',
+        body: JSON.stringify({ email, token, new_password, confirm_password }),
+      });
+    },
+
+    /** Verify user email with token from signup email. Expects: token, email */
+    verifyUser: async ({ token, email }) => {
+      return apiFetch('/api/auth/verify-user/', {
+        method: 'POST',
+        body: JSON.stringify({ token, email }),
+      });
+    },
+
+    /** Resend verification code to email (for unverified users) */
+    resendVerificationCode: async (email) => {
+      return apiFetch('/api/auth/resend-verification-code/', {
         method: 'POST',
         body: JSON.stringify({ email }),
       });
@@ -442,6 +467,26 @@ export const api = {
     getInvoices: async () => {
       const data = await apiFetch('/api/billing/invoices/');
       return Array.isArray(data) ? data : (data?.results || []);
+    },
+    /** Dodo (or future gateway): server creates checkout session; redirect browser to checkout_url */
+    createCheckoutSession: async ({ plan, billing_interval, return_url }) => {
+      const body = { plan, billing_interval };
+      if (return_url) body.return_url = return_url;
+      return apiFetch('/api/billing/checkout/', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+    },
+    /** Change plan for existing Dodo subscribers (uses Dodo change-plan API) */
+    changePlan: async ({ plan, billing_interval }) => {
+      return apiFetch('/api/billing/change-plan/', {
+        method: 'POST',
+        body: JSON.stringify({ plan, billing_interval }),
+      });
+    },
+    /** Open Dodo customer portal (update payment methods, view invoices) */
+    openCustomerPortal: async () => {
+      return apiFetch('/api/billing/customer-portal/', { method: 'POST' });
     },
   },
 

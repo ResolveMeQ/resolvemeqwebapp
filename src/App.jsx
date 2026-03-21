@@ -13,6 +13,7 @@ import Login from './pages/auth/Login';
 import Signup from './pages/auth/Signup';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
+import Verify from './pages/auth/Verify';
 import './index.css';
 import { THEME_MODES } from './constants';
 import { TokenService, api } from './services/api';
@@ -63,6 +64,24 @@ function App() {
   }, []);
 
   // Load preferences, user's teams, and subscription (for header plan badge) when authenticated
+  const loadUserData = React.useCallback(async () => {
+    try {
+      const [prefs, teams, sub] = await Promise.all([
+        api.settings.getPreferences(),
+        api.teams.list().catch(() => []),
+        api.billing.getSubscription().catch(() => null),
+      ]);
+      setPreferences(prefs || null);
+      setUserTeams(Array.isArray(teams) ? teams : []);
+      const name = sub?.plan_detail?.name ?? sub?.plan?.name ?? null;
+      setPlanName(name || null);
+    } catch {
+      setPreferences(null);
+      setUserTeams([]);
+      setPlanName(null);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) {
       setPreferences(null);
@@ -70,25 +89,8 @@ function App() {
       setPlanName(null);
       return;
     }
-    const load = async () => {
-      try {
-        const [prefs, teams, sub] = await Promise.all([
-          api.settings.getPreferences(),
-          api.teams.list().catch(() => []),
-          api.billing.getSubscription().catch(() => null),
-        ]);
-        setPreferences(prefs || null);
-        setUserTeams(Array.isArray(teams) ? teams : []);
-        const name = sub?.plan_detail?.name ?? sub?.plan?.name ?? null;
-        setPlanName(name || null);
-      } catch {
-        setPreferences(null);
-        setUserTeams([]);
-        setPlanName(null);
-      }
-    };
-    load();
-  }, [isAuthenticated]);
+    loadUserData();
+  }, [isAuthenticated, loadUserData]);
 
   const handleActiveTeamChange = async (teamId) => {
     try {
@@ -227,21 +229,13 @@ function App() {
     navigate('/login');
   };
 
-  const handleForgotPassword = (email) => {
-    navigate('/reset-password');
-  };
-
-  const handleResetPassword = (passwordData) => {
-    setAuthPage('login');
-    navigate('/login');
-  };
-
   const renderAuthRoutes = () => (
     <Routes>
       <Route path="/login" element={<Login onLogin={handleLogin} onNavigateToSignup={() => navigate('/signup')} onNavigateToForgotPassword={() => navigate('/forgot-password')} />} />
       <Route path="/signup" element={<Signup onSignup={handleSignup} onNavigateToLogin={() => navigate('/login')} />} />
-      <Route path="/forgot-password" element={<ForgotPassword onSubmit={handleForgotPassword} onNavigateToLogin={() => navigate('/login')} />} />
-      <Route path="/reset-password" element={<ResetPassword onSubmit={handleResetPassword} onNavigateToLogin={() => navigate('/login')} />} />
+      <Route path="/verify" element={<Verify onNavigateToLogin={() => navigate('/login')} />} />
+      <Route path="/forgot-password" element={<ForgotPassword onNavigateToLogin={() => navigate('/login')} />} />
+      <Route path="/reset-password" element={<ResetPassword onNavigateToLogin={() => navigate('/login')} />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
@@ -262,6 +256,7 @@ function App() {
     activeTeamName: preferences?.active_team_name,
     userTeams,
     onActiveTeamChange: handleActiveTeamChange,
+    onRefreshUserData: loadUserData,
   };
 
   const renderMainRoutes = () => (
@@ -276,6 +271,7 @@ function App() {
       <Route path="/settings" element={<Layout {...layoutProps}><Settings /></Layout>} />
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/signup" element={<Navigate to="/" replace />} />
+      <Route path="/verify" element={<Navigate to="/" replace />} />
       <Route path="/forgot-password" element={<Navigate to="/" replace />} />
       <Route path="/reset-password" element={<Navigate to="/" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />

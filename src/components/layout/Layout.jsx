@@ -33,6 +33,7 @@ const Layout = ({
   activeTeamName,
   userTeams = [],
   onActiveTeamChange,
+  onRefreshUserData,
   planName,
   searchQuery,
   searchResults,
@@ -94,7 +95,11 @@ const Layout = ({
         {/* Page Content */}
         <main className="p-4 sm:p-6 pb-20 sm:pb-6">
           <div className="max-w-7xl mx-auto">
-            {children}
+            {React.Children.map(children, (child) =>
+              React.isValidElement(child) && onRefreshUserData
+                ? React.cloneElement(child, { onRefreshUserData })
+                : child
+            )}
           </div>
         </main>
       </div>
