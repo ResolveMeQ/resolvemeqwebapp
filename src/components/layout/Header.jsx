@@ -3,13 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
   Bell, 
-  User, 
   Settings, 
   LogOut, 
   ChevronDown,
   Sun,
   Moon,
-  Monitor
+  Monitor,
+  X
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { THEME_MODES } from '../../constants';
@@ -35,6 +35,7 @@ const Header = ({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   
   const themeMenuRef = useRef(null);
 
@@ -127,12 +128,18 @@ const Header = ({
 
   return (
     <header className={cn(
-      'sticky top-0 z-30 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800',
+      'sticky top-0 z-30 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 pt-[env(safe-area-inset-top)]',
       className
     )}>
-      <div className="flex items-center justify-between px-6 py-3">
-        {/* Search Bar */}
-        <div className="flex-1 max-w-xl">
+      {/* Mobile: left padding for hamburger; everything stays on one row */}
+      <div className="flex items-center gap-2 sm:gap-3 pl-16 lg:pl-6 pr-4 sm:pr-6 py-3 flex-nowrap">
+        {/* Spacer: only when search closed on mobile, pushes icons to the right */}
+        {!mobileSearchOpen && <div className="flex-1 min-w-0 md:hidden" />}
+        {/* Search: full bar on md+; on mobile inline when expanded so icons stay on same row */}
+        <div className={cn(
+          'flex-1 min-w-0',
+          mobileSearchOpen ? 'flex' : 'hidden md:block'
+        )}>
           <form onSubmit={handleSearch} className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
             <input
@@ -140,23 +147,37 @@ const Header = ({
               placeholder="Search tickets, users, knowledge base..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onBlur={() => setMobileSearchOpen(false)}
               className="w-full pl-10 pr-10 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-500 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100 text-sm transition-colors duration-150"
             />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                aria-label="Clear search"
-              >
-                <X size={14} />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => { setSearchQuery(''); setMobileSearchOpen(false); }}
+              className={cn(
+                'absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors',
+                searchQuery ? 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' : 'md:hidden text-gray-400'
+              )}
+              aria-label={searchQuery ? 'Clear search' : 'Close search'}
+            >
+              <X size={14} />
+            </button>
           </form>
         </div>
 
-        {/* Right Side Actions */}
-        <div className="flex items-center space-x-3">
+        {/* Mobile: search icon when bar is hidden */}
+        {!mobileSearchOpen && (
+          <button
+            type="button"
+            onClick={() => setMobileSearchOpen(true)}
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
+            aria-label="Open search"
+          >
+            <Search size={18} />
+          </button>
+        )}
+
+        {/* Right Side Actions - always on same row, shrink-0 so they stay visible */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {/* Billing Status */}
           {planName && (
             <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/50 rounded-lg">
@@ -190,7 +211,7 @@ const Header = ({
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 4 }}
-                  className="absolute right-0 mt-2 w-44 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50"
+                  className="absolute right-0 mt-2 w-44 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50"
                 >
                   <div className="p-1">
                     {themeOptions.map((option) => (
@@ -240,7 +261,7 @@ const Header = ({
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 4 }}
-                  className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50"
+                  className="absolute right-0 mt-2 w-80 max-w-[min(20rem,calc(100vw-2rem))] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50"
                 >
                   <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</h3>
@@ -342,7 +363,7 @@ const Header = ({
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 4 }}
-                  className="absolute right-0 mt-2 w-52 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50"
+                  className="absolute right-0 mt-2 w-52 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50"
                 >
                   <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{displayName}</p>

@@ -115,45 +115,47 @@ const Sidebar = ({
     }
   ];
 
-  const SidebarContent = () => (
+  const SidebarContent = ({ hideHeader = false }) => (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-800">
-        <AnimatePresence mode="wait">
-          {!collapsed ? (
-            <motion.div
-              key="logo"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex items-center space-x-2.5"
+      {/* Header - only for desktop sidebar; mobile has its own header */}
+      {!hideHeader && (
+        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-800">
+          <AnimatePresence mode="wait">
+            {!collapsed ? (
+              <motion.div
+                key="logo"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center space-x-2.5"
+              >
+                <img src="/logo.png" alt="ResolveMeQ" className="h-7 w-auto object-contain" />
+                <span className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">ResolveMeQ</span>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="logo-collapsed"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center justify-center w-full"
+              >
+                <img src="/logo.png" alt="ResolveMeQ" className="h-7 w-7 object-contain" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          {!collapsed && (
+            <button
+              onClick={onToggle}
+              className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400"
+              aria-label="Collapse sidebar"
             >
-              <img src="/logo.png" alt="ResolveMeQ" className="h-7 w-auto object-contain" />
-              <span className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">ResolveMeQ</span>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="logo-collapsed"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex items-center justify-center w-full"
-            >
-              <img src="/logo.png" alt="ResolveMeQ" className="h-7 w-7 object-contain" />
-            </motion.div>
+              <ChevronLeft size={18} />
+            </button>
           )}
-        </AnimatePresence>
-        
-        {!collapsed && (
-          <button
-            onClick={onToggle}
-            className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400"
-            aria-label="Collapse sidebar"
-          >
-            <ChevronLeft size={18} />
-          </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Navigation Groups */}
       <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
@@ -294,8 +296,8 @@ const Sidebar = ({
         </button>
       </div>
 
-      {/* Collapse button when collapsed */}
-      {collapsed && (
+      {/* Collapse button when collapsed - desktop only; mobile has its own close button */}
+      {collapsed && !hideHeader && (
         <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
           <button
             onClick={onToggle}
@@ -323,10 +325,11 @@ const Sidebar = ({
         <SidebarContent />
       </motion.aside>
 
-      {/* Mobile Menu Button */}
+      {/* Mobile Menu Button - account for safe area on notched devices */}
       <button
         onClick={() => setIsMobileOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white dark:bg-gray-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-800"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2.5 bg-white dark:bg-gray-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-800 touch-manipulation"
+        style={{ top: 'max(1rem, env(safe-area-inset-top))', left: 'max(1rem, env(safe-area-inset-left))' }}
         aria-label="Open menu"
       >
         <Menu size={20} />
@@ -353,7 +356,8 @@ const Sidebar = ({
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
-            className="lg:hidden fixed left-0 top-0 h-full w-72 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 shadow-xl z-50"
+            className="lg:hidden fixed left-0 top-0 h-full w-72 max-w-[85vw] bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 shadow-xl z-50"
+            style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
             <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-800">
               <div className="flex items-center space-x-2.5">
@@ -368,7 +372,7 @@ const Sidebar = ({
                 <X size={18} />
               </button>
             </div>
-            <SidebarContent />
+            <SidebarContent hideHeader />
           </motion.aside>
         )}
       </AnimatePresence>

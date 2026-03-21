@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles,
@@ -8,7 +9,6 @@ import {
   ThumbsDown,
   CheckCircle,
   AlertCircle,
-  ArrowLeft,
 } from 'lucide-react';
 import { api } from '../services/api';
 import ConfidenceBadge from './ui/ConfidenceBadge';
@@ -242,36 +242,26 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
 
   if (!isOpen || !ticketId) return null;
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ x: '100%' }}
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
       transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
-      className="fixed right-0 top-0 bottom-0 w-full max-w-2xl bg-white dark:bg-gray-950 shadow-2xl z-50 flex flex-col border-l border-gray-200 dark:border-gray-800"
+      style={{ top: 0, right: 0, bottom: 0, height: '100vh' }}
+      className="fixed w-full sm:max-w-2xl bg-white dark:bg-gray-950 shadow-2xl z-50 flex flex-col border-l border-gray-200 dark:border-gray-800 overflow-hidden"
     >
-      {/* Header with breadcrumb / back */}
-      <div className="flex-shrink-0 flex items-center justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+      {/* Header */}
+      <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
         <div className="min-w-0 flex items-center gap-3 flex-1">
-          <button
-            type="button"
-            onClick={onBackToTicket || onClose}
-            className="flex-shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200 transition-colors text-sm font-medium"
-            aria-label={onBackToTicket ? 'Back to ticket' : 'Back to tickets'}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            {onBackToTicket ? 'Back to ticket' : 'Back to tickets'}
-          </button>
-          <div className="min-w-0 flex items-center gap-3 flex-1">
-            <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex-shrink-0">
-              <Sparkles className="w-5 h-5 text-primary-600 dark:text-primary-400" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">AI Assistant</h2>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 truncate max-w-[200px]" title={ticket?.issue_type || ticket?.description || `Ticket #${ticketId}`}>
-                {ticket?.issue_type || ticket?.description || `Ticket #${ticketId}`}
-              </p>
-            </div>
+          <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex-shrink-0">
+            <Sparkles className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">AI Assistant</h2>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 truncate max-w-[200px]" title={ticket?.issue_type || ticket?.description || `Ticket #${ticketId}`}>
+              {ticket?.issue_type || ticket?.description || `Ticket #${ticketId}`}
+            </p>
           </div>
         </div>
         <button
@@ -285,7 +275,7 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
       </div>
 
       {/* Messages - Match app design */}
-      <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900/50 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50 dark:bg-gray-900/50 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-600 border-t-transparent" />
@@ -558,7 +548,8 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
           </Button>
         </div>
       </div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 };
 

@@ -141,7 +141,7 @@ const Dashboard = () => {
       </Card>
 
       <header>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Dashboard</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Dashboard</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Operational overview and ticket metrics</p>
       </header>
 
@@ -268,7 +268,8 @@ const Dashboard = () => {
       <button
         type="button"
         onClick={() => setShowDescribeModal(true)}
-        className="fixed bottom-8 right-8 z-40 flex items-center justify-center w-14 h-14 rounded-full bg-primary-600 hover:bg-primary-700 text-white shadow-lg hover:shadow-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+        className="fixed z-40 flex items-center justify-center w-14 h-14 rounded-full bg-primary-600 hover:bg-primary-700 text-white shadow-lg hover:shadow-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 touch-manipulation"
+        style={{ bottom: 'max(2rem, env(safe-area-inset-bottom))', right: 'max(2rem, env(safe-area-inset-right))' }}
         aria-label="Resolve an issue"
         title="Resolve an issue"
       >

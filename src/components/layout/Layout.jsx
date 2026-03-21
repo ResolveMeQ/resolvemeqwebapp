@@ -92,7 +92,7 @@ const Layout = ({
         />
 
         {/* Page Content */}
-        <main className="p-6">
+        <main className="p-4 sm:p-6 pb-20 sm:pb-6">
           <div className="max-w-7xl mx-auto">
             {children}
           </div>

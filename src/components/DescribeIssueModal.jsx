@@ -49,13 +49,13 @@ const DescribeIssueModal = ({ onReady, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         className="bg-white dark:bg-gray-950 rounded-xl shadow-xl w-full max-w-lg border border-gray-200 dark:border-gray-800"
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex items-center justify-between gap-4 px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Describe your issue</h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">We’ll open the AI assistant right after so you can get help in one place.</p>
@@ -71,7 +71,7 @@ const DescribeIssueModal = ({ onReady, onClose }) => {
             </button>
           )}
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               What do you need help with?

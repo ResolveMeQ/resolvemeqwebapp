@@ -18,7 +18,7 @@ const GlobalSearchPanel = ({
     (results?.users && results.users.length > 0);
 
   return (
-    <div className="px-6 pt-4 pb-2">
+    <div className="px-4 sm:px-6 pt-4 pb-2">
       <Card className="p-4 border border-blue-100 dark:border-blue-900/40 bg-white/90 dark:bg-gray-900/90 shadow-lg">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -44,7 +44,7 @@ const GlobalSearchPanel = ({
           </p>
         )}
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
           {/* Tickets */}
           <div>
             <div className="flex items-center justify-between mb-2">
