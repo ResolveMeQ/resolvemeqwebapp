@@ -13,14 +13,18 @@ const ResolutionFeedback = ({ ticketId, onFeedbackSubmitted, feedbackAlreadySubm
   const [feedback, setFeedback] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(feedbackAlreadySubmitted);
+  const [formError, setFormError] = useState('');
+  const [submitError, setSubmitError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitError('');
 
     if (resolved === null) {
-      alert('Please indicate if your issue was resolved');
+      setFormError('Please indicate if your issue was resolved.');
       return;
     }
+    setFormError('');
 
     try {
       setSubmitting(true);
@@ -36,7 +40,7 @@ const ResolutionFeedback = ({ ticketId, onFeedbackSubmitted, feedbackAlreadySubm
       }
     } catch (error) {
       console.error('Failed to submit feedback:', error);
-      alert(error?.message || 'Failed to submit feedback. Please try again.');
+      setSubmitError(error?.message || 'Failed to submit feedback. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -67,6 +71,16 @@ const ResolutionFeedback = ({ ticketId, onFeedbackSubmitted, feedbackAlreadySubm
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {formError && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200" role="alert">
+            {formError}
+          </div>
+        )}
+        {submitError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200" role="alert">
+            {submitError}
+          </div>
+        )}
         {/* Resolution confirmation */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -75,7 +89,7 @@ const ResolutionFeedback = ({ ticketId, onFeedbackSubmitted, feedbackAlreadySubm
           <div className="flex space-x-4">
             <button
               type="button"
-              onClick={() => setResolved(true)}
+              onClick={() => { setResolved(true); setFormError(''); }}
               className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-md border-2 transition-all ${
                 resolved === true
                   ? 'border-green-500 bg-green-50 text-green-700 dark:border-green-400 dark:bg-green-900/30 dark:text-green-300'
@@ -87,7 +101,7 @@ const ResolutionFeedback = ({ ticketId, onFeedbackSubmitted, feedbackAlreadySubm
             </button>
             <button
               type="button"
-              onClick={() => setResolved(false)}
+              onClick={() => { setResolved(false); setFormError(''); }}
               className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-md border-2 transition-all ${
                 resolved === false
                   ? 'border-red-500 bg-red-50 text-red-700 dark:border-red-400 dark:bg-red-900/30 dark:text-red-300'

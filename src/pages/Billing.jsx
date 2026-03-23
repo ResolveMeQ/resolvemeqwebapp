@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -15,11 +16,13 @@ import {
   ChevronUp,
   RefreshCw,
   Mail,
+  X,
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { api } from '../services/api';
+import { BillingPageSkeleton } from '../components/ui/Skeleton';
 
 const Billing = ({ onRefreshUserData }) => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -36,6 +39,11 @@ const Billing = ({ onRefreshUserData }) => {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [emailSaving, setEmailSaving] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [supportSubject, setSupportSubject] = useState('');
+  const [supportMessage, setSupportMessage] = useState('');
+  const [supportSubmitting, setSupportSubmitting] = useState(false);
+  const [supportFormError, setSupportFormError] = useState('');
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -192,11 +200,7 @@ const Billing = ({ onRefreshUserData }) => {
   const nextAmount = currentPlanDetail && (billingCycle === 'yearly' ? currentPlanDetail.price_yearly : currentPlanDetail.price_monthly);
 
   if (loading && !subscription && plansFromApi.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-2 border-blue-600 border-t-transparent" />
-      </div>
-    );
+    return <BillingPageSkeleton />;
   }
 
   return (
@@ -204,7 +208,7 @@ const Billing = ({ onRefreshUserData }) => {
       <header>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Billing & Plans</h1>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Manage your subscription and billing. New subscriptions are completed securely via Dodo Payments checkout.
+          Manage your subscription and billing. New subscriptions are completed securely via Payments checkout.
         </p>
       </header>
 
@@ -464,8 +468,8 @@ const Billing = ({ onRefreshUserData }) => {
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             {subscription?.gateway_customer_id
-              ? 'Update your card, payment methods, and billing details in the secure Dodo portal.'
-              : 'Card and payment methods are collected on the Dodo checkout page when you subscribe.'}
+              ? 'Update your card, payment methods, and billing details in the secure payments portal.'
+              : 'Card and payment methods are collected on the checkout page when you subscribe.'}
           </p>
           {subscription?.gateway_customer_id ? (
             <Button
@@ -502,8 +506,19 @@ const Billing = ({ onRefreshUserData }) => {
             <Receipt className="w-5 h-5 text-gray-400 dark:text-gray-500" />
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">Need Help?</h3>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Questions about your bill or plan? Our team can help.</p>
-          <a href="mailto:support@resolvemeq.com" className="inline-flex items-center px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-white transition-colors">Contact support <ArrowRight size={14} className="ml-1" /></a>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Questions about your bill or plan? Send us a message — we&apos;ll email you back.</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="inline-flex items-center gap-1"
+            onClick={() => {
+              setSupportFormError('');
+              setSupportOpen(true);
+            }}
+          >
+            Contact support <ArrowRight size={14} />
+          </Button>
         </Card>
       </div>
 
@@ -519,6 +534,112 @@ const Billing = ({ onRefreshUserData }) => {
           {toast.message}
         </div>
       )}
+
+      {supportOpen &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="billing-support-title">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/50 dark:bg-black/60"
+              aria-label="Close"
+              onClick={() => !supportSubmitting && setSupportOpen(false)}
+            />
+            <div className="relative w-full max-w-lg rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl p-6">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-primary-600 dark:text-primary-400 shrink-0" />
+                  <h2 id="billing-support-title" className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Contact support
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  onClick={() => !supportSubmitting && setSupportOpen(false)}
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Describe your question (billing, plan, or invoice). We&apos;ll reply to your account email.
+              </p>
+              {supportFormError && (
+                <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200" role="alert">
+                  {supportFormError}
+                </div>
+              )}
+              <form
+                className="space-y-4"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setSupportFormError('');
+                  const msg = supportMessage.trim();
+                  if (msg.length < 10) {
+                    setSupportFormError('Please enter at least 10 characters so we can help.');
+                    return;
+                  }
+                  setSupportSubmitting(true);
+                  try {
+                    await api.billing.submitSupportContact({
+                      message: msg,
+                      subject: supportSubject.trim(),
+                      page_context: 'billing',
+                    });
+                    showToast('Message sent. Our team will get back to you soon.', 'success');
+                    setSupportOpen(false);
+                    setSupportSubject('');
+                    setSupportMessage('');
+                  } catch (err) {
+                    const m = err?.message || 'Could not send message. Try again later.';
+                    setSupportFormError(m);
+                  } finally {
+                    setSupportSubmitting(false);
+                  }
+                }}
+              >
+                <div>
+                  <label htmlFor="support-subject" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Subject (optional)
+                  </label>
+                  <input
+                    id="support-subject"
+                    type="text"
+                    value={supportSubject}
+                    onChange={(e) => setSupportSubject(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    placeholder="e.g. Question about my invoice"
+                    maxLength={200}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="support-message" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Message
+                  </label>
+                  <textarea
+                    id="support-message"
+                    required
+                    rows={5}
+                    value={supportMessage}
+                    onChange={(e) => setSupportMessage(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    placeholder="How can we help?"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="outline" size="sm" disabled={supportSubmitting} onClick={() => setSupportOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" variant="primary" size="sm" loading={supportSubmitting} disabled={supportSubmitting}>
+                    Send message
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

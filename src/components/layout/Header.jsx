@@ -23,34 +23,60 @@ const Header = ({
   user,
   planName,
   onSearch,
+  /** Mirrors App search state so clearing/dismissing global search updates the input */
+  committedSearchQuery = '',
   onThemeChange,
   onLogout,
   onNavigate,
   theme = THEME_MODES.LIGHT,
   className
 }) => {
-  const displayName = user?.full_name || (user?.first_name || user?.last_name ? [user.first_name, user.last_name].filter(Boolean).join(' ') : null) || user?.email || user?.username || 'Account';
-  const displayRole = user?.is_staff ? 'Agent' : 'Member';
+  /** Backend profile uses user_email / user_full_name; normalizeSessionUser maps to email / full_name (see api.js). */
+  const emailTrimmed =
+    (user?.email && String(user.email).trim()) ||
+    (user?.user_email && String(user.user_email).trim()) ||
+    '';
+  const nameFromProfile =
+    (user?.full_name && String(user.full_name).trim()) ||
+    (user?.user_full_name && String(user.user_full_name).trim()) ||
+    ([user?.first_name, user?.last_name].filter(Boolean).join(' ') || '').trim() ||
+    '';
+
+  const accountMenuName =
+    nameFromProfile ||
+    (user?.username && String(user.username).trim()) ||
+    (emailTrimmed ? emailTrimmed.split('@')[0] : '') ||
+    'Account';
+  const accountMenuEmail = emailTrimmed || '—';
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => committedSearchQuery || '');
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  
-  const themeMenuRef = useRef(null);
 
-  // Handle clicking outside to close menus
+  useEffect(() => {
+    setSearchQuery(committedSearchQuery || '');
+  }, [committedSearchQuery]);
+
+  const themeMenuRef = useRef(null);
+  const notificationsMenuRef = useRef(null);
+  const userMenuRef = useRef(null);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (themeMenuRef.current && !themeMenuRef.current.contains(event.target)) {
         setIsThemeMenuOpen(false);
       }
+      if (notificationsMenuRef.current && !notificationsMenuRef.current.contains(event.target)) {
+        setIsNotificationsOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleSearch = (e) => {
@@ -135,49 +161,62 @@ const Header = ({
       <div className="flex items-center gap-2 sm:gap-3 pl-16 lg:pl-6 pr-4 sm:pr-6 py-3 flex-nowrap">
         {/* Spacer: only when search closed on mobile, pushes icons to the right */}
         {!mobileSearchOpen && <div className="flex-1 min-w-0 md:hidden" />}
-        {/* Search: full bar on md+; on mobile inline when expanded so icons stay on same row */}
-        <div className={cn(
-          'flex-1 min-w-0',
-          mobileSearchOpen ? 'flex' : 'hidden md:block'
-        )}>
-          <form onSubmit={handleSearch} className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
-            <input
-              type="text"
-              placeholder="Search tickets, users, knowledge base..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onBlur={() => setMobileSearchOpen(false)}
-              className="w-full pl-10 pr-10 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-500 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100 text-sm transition-colors duration-150"
-            />
+        {/* Search: tour anchor includes mobile icon + field so spotlight works on all breakpoints */}
+        <div
+          data-tour="global-search"
+          className="flex flex-1 min-w-0 items-center gap-2"
+        >
+          <div
+            className={cn(
+              'min-w-0 flex-1',
+              mobileSearchOpen ? 'flex' : 'hidden md:block'
+            )}
+          >
+            <form data-global-search-field onSubmit={handleSearch} className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
+              <input
+                type="text"
+                placeholder="Search tickets, users, knowledge base..."
+                value={searchQuery}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSearchQuery(v);
+                  if (!v.trim()) onSearch?.('');
+                }}
+                onBlur={() => setMobileSearchOpen(false)}
+                className="w-full pl-10 pr-10 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-500 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100 text-sm transition-colors duration-150"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  onSearch?.('');
+                  setMobileSearchOpen(false);
+                }}
+                className={cn(
+                  'absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors',
+                  searchQuery ? 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' : 'md:hidden text-gray-400'
+                )}
+                aria-label={searchQuery ? 'Clear search' : 'Close search'}
+              >
+                <X size={14} />
+              </button>
+            </form>
+          </div>
+          {!mobileSearchOpen && (
             <button
               type="button"
-              onClick={() => { setSearchQuery(''); setMobileSearchOpen(false); }}
-              className={cn(
-                'absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors',
-                searchQuery ? 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' : 'md:hidden text-gray-400'
-              )}
-              aria-label={searchQuery ? 'Clear search' : 'Close search'}
+              onClick={() => setMobileSearchOpen(true)}
+              className="md:hidden shrink-0 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
+              aria-label="Open search"
             >
-              <X size={14} />
+              <Search size={18} />
             </button>
-          </form>
+          )}
         </div>
 
-        {/* Mobile: search icon when bar is hidden */}
-        {!mobileSearchOpen && (
-          <button
-            type="button"
-            onClick={() => setMobileSearchOpen(true)}
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
-            aria-label="Open search"
-          >
-            <Search size={18} />
-          </button>
-        )}
-
         {/* Right Side Actions - always on same row, shrink-0 so they stay visible */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        <div data-tour="header-account" className="flex items-center gap-1 sm:gap-2 shrink-0">
           {/* Billing Status */}
           {planName && (
             <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/50 rounded-lg">
@@ -239,7 +278,7 @@ const Header = ({
           </div>
 
           {/* Notifications */}
-          <div className="relative">
+          <div className="relative" ref={notificationsMenuRef}>
             <button
               onClick={() => {
                 setIsNotificationsOpen(!isNotificationsOpen);
@@ -331,7 +370,7 @@ const Header = ({
           </div>
 
           {/* User Menu */}
-          <div className="relative">
+          <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => {
                 setIsUserMenuOpen(!isUserMenuOpen);
@@ -343,16 +382,18 @@ const Header = ({
             >
               <div className="w-7 h-7 bg-gradient-to-br from-primary-600 to-primary-700 rounded-full flex items-center justify-center">
                 {user?.avatar || user?.profile_image_url ? (
-                  <img src={user.avatar || user.profile_image_url} alt={displayName} className="w-full h-full rounded-full object-cover" />
+                  <img src={user.avatar || user.profile_image_url} alt={accountMenuName} className="w-full h-full rounded-full object-cover" />
                 ) : (
                   <span className="text-white font-semibold text-xs">
-                    {String(displayName).charAt(0).toUpperCase()}
+                    {String(accountMenuName).charAt(0).toUpperCase()}
                   </span>
                 )}
               </div>
-              <div className="hidden md:block text-left">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[120px]">{displayName}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-500">{displayRole}</p>
+              <div className="hidden md:block text-left min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[200px]">{accountMenuName}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 truncate max-w-[200px]" title={emailTrimmed || undefined}>
+                  {accountMenuEmail}
+                </p>
               </div>
               <ChevronDown size={14} className="text-gray-400 dark:text-gray-500 hidden md:block" />
             </button>
@@ -366,8 +407,8 @@ const Header = ({
                   className="absolute right-0 mt-2 w-52 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50"
                 >
                   <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{displayName}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 truncate mt-0.5">{user?.email ?? '—'}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{accountMenuName}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 truncate mt-0.5">{accountMenuEmail}</p>
                   </div>
                   <div className="p-1">
                     <button

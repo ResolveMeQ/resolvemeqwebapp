@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Brain, TrendingUp, AlertCircle, CheckCircle, Clock, Zap, ExternalLink, X } from 'lucide-react';
 import { api } from '../services/api';
 import Card from './ui/Card';
+import { AIRecommendationsPanelSkeleton } from './ui/Skeleton';
 
 const AIRecommendationsPanel = () => {
   const navigate = useNavigate();
@@ -86,13 +87,7 @@ const AIRecommendationsPanel = () => {
   };
 
   if (loading) {
-    return (
-      <Card className="p-6">
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-600 border-t-transparent"></div>
-        </div>
-      </Card>
-    );
+    return <AIRecommendationsPanelSkeleton />;
   }
 
   if (error) {
@@ -127,30 +122,40 @@ const AIRecommendationsPanel = () => {
         </div>
 
         {analytics && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Processing</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                {analytics.agent_processing_rate}%
-              </p>
-            </div>
-            <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Success</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                {analytics.resolution_success_rate}%
-              </p>
-            </div>
-            <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Confidence</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                {(analytics.average_confidence_score * 100).toFixed(0)}%
-              </p>
-            </div>
-            <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Autonomous</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                {analytics.autonomous_solutions}
-              </p>
+          <div className="space-y-2">
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+              First three metrics are for <span className="font-medium">your visible tickets</span>. Platform row is overall product KB / automation.
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Processing</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
+                  {analytics.agent_processing_rate}%
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Success</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
+                  {analytics.resolution_success_rate}%
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Confidence</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
+                  {(analytics.average_confidence_score * 100).toFixed(0)}%
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Platform solutions</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
+                  {analytics.platform?.high_confidence_autonomous_solutions ?? analytics.autonomous_solutions ?? '—'}
+                </p>
+                {analytics.platform?.knowledge_base?.total_articles != null && (
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                    KB articles: {analytics.platform.knowledge_base.total_articles}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}

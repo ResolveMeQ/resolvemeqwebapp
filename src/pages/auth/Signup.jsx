@@ -11,12 +11,14 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import GoogleSignInButton from '../../components/auth/GoogleSignInButton';
+import { isGoogleAuthEnabled } from '../../utils/googleAuth';
 import { api } from '../../services/api';
 
 /**
  * Signup page with enterprise design
  */
-const Signup = ({ onSignup, onNavigateToLogin }) => {
+const Signup = ({ onSignup, onNavigateToLogin, onGoogleSignedIn }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: '',
@@ -415,6 +417,28 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
               )}
             </Button>
           </form>
+
+          {isGoogleAuthEnabled() && (
+            <>
+              <div className="mt-6">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-200 dark:border-gray-800"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="px-2 bg-white dark:bg-gray-900 text-gray-500">Or continue with</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6">
+                <GoogleSignInButton
+                  disabled={loading}
+                  onSignedIn={(data) => onGoogleSignedIn?.({ user: data.user })}
+                  onError={(err) => setErrors({ general: err?.message || 'Google sign-in failed.' })}
+                />
+              </div>
+            </>
+          )}
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">

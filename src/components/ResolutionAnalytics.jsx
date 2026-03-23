@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CheckCircle, XCircle, BarChart3 } from 'lucide-react';
 import Card from './ui/Card';
 import Button from './ui/Button';
+import { Skeleton } from './ui/Skeleton';
 import { api } from '../services/api';
 
 /**
@@ -31,8 +32,23 @@ const ResolutionAnalytics = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary-600 border-t-transparent" />
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-8 w-20 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <div className="p-6 space-y-3">
+                <Skeleton className="h-5 w-5 rounded" />
+                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </Card>
+          ))}
+        </div>
+        <Skeleton className="h-40 w-full rounded-lg" />
       </div>
     );
   }

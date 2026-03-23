@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -17,9 +18,11 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { api } from '../services/api';
 import { cn } from '../utils/cn';
+import { KnowledgeBaseArticlesSkeleton } from '../components/ui/Skeleton';
 import { renderMarkdown } from '../utils/markdown';
 
 const KnowledgeBase = () => {
+  const [searchParams] = useSearchParams();
   const [articles, setArticles] = useState([]);
   const [filteredArticles, setFilteredArticles] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,6 +53,11 @@ const KnowledgeBase = () => {
   useEffect(() => {
     loadArticles();
   }, []);
+
+  useEffect(() => {
+    const q = (searchParams.get('q') || '').trim();
+    if (q) setSearchQuery(q);
+  }, [searchParams]);
 
   useEffect(() => {
     filterArticles();
@@ -295,9 +303,7 @@ const KnowledgeBase = () => {
 
       {/* Articles grid */}
       {loading && articles.length === 0 ? (
-        <div className="flex items-center justify-center min-h-64">
-          <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary-600 border-t-transparent" />
-        </div>
+        <KnowledgeBaseArticlesSkeleton />
       ) : filteredArticles.length === 0 ? (
         <Card className="p-12 text-center">
           <BookOpen className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />

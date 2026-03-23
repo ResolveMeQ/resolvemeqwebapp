@@ -6,12 +6,13 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import AIRecommendationsPanel from '../components/AIRecommendationsPanel';
 import AIChatPanel from '../components/AIChatPanel';
-import { api, TokenService } from '../services/api';
+import { api } from '../services/api';
+import { DashboardPageSkeleton } from '../components/ui/Skeleton';
 
 /**
  * Dashboard page component - Real-time analytics and ticket overview
  */
-const Dashboard = () => {
+const Dashboard = ({ activeTeamId }) => {
   const navigate = useNavigate();
   const [analytics, setAnalytics] = useState(null);
   const [recentTickets, setRecentTickets] = useState([]);
@@ -21,20 +22,13 @@ const Dashboard = () => {
   const [showAIChatPanel, setShowAIChatPanel] = useState(false);
   const [escalatedTickets, setEscalatedTickets] = useState([]);
   const [escalatedLoading, setEscalatedLoading] = useState(false);
-  const isStaff = TokenService.getUser()?.is_staff === true;
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
-
-  useEffect(() => {
-    if (isStaff) {
-      loadEscalationQueue();
-    }
-  }, [isStaff]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when workspace (active team) changes
+  }, [activeTeamId]);
 
   const loadEscalationQueue = async () => {
-    if (!TokenService.getUser()?.is_staff) return;
     setEscalatedLoading(true);
     try {
       const data = await api.tickets.getEscalationQueue({ limit: 10 });
@@ -49,13 +43,15 @@ const Dashboard = () => {
   const loadDashboardData = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [analyticsData, ticketsData] = await Promise.all([
+      const [analyticsData, ticketsData, escData] = await Promise.all([
         api.analytics.getTicketAnalytics(),
-        api.tickets.list({ limit: 5 })
+        api.tickets.list({ limit: 5 }),
+        api.tickets.getEscalationQueue({ limit: 10 }).catch(() => ({ tickets: [] })),
       ]);
       
       setAnalytics(analyticsData);
       setRecentTickets(Array.isArray(ticketsData) ? ticketsData.slice(0, 5) : []);
+      setEscalatedTickets(Array.isArray(escData?.tickets) ? escData.tickets : []);
     } catch (err) {
       console.error('Error loading dashboard:', err);
       if (!silent) {
@@ -71,7 +67,6 @@ const Dashboard = () => {
     } finally {
       if (!silent) setLoading(false);
     }
-    if (isStaff) loadEscalationQueue();
   };
 
   const formatTime = (seconds) => {
@@ -97,14 +92,7 @@ const Dashboard = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+    return <DashboardPageSkeleton />;
   }
 
   const getStatusBadge = (status) => {
@@ -165,7 +153,7 @@ const Dashboard = () => {
 
       <header>
         <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Dashboard</h1>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Operational overview and ticket metrics</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Your tickets and personal metrics</p>
       </header>
 
       {/* Metrics Grid */}
@@ -229,51 +217,56 @@ const Dashboard = () => {
 
       <AIRecommendationsPanel />
 
-      {/* Escalation queue – staff only */}
-      {isStaff && (
-        <Card className="p-6 border-l-4 border-l-amber-500 dark:border-l-amber-600">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              Escalation Queue
-              {escalatedTickets.length > 0 && (
-                <Badge variant="error" className="ml-1">{escalatedTickets.length}</Badge>
-              )}
-            </h2>
-            <Button variant="ghost" size="sm" onClick={loadEscalationQueue} disabled={escalatedLoading}>
-              Refresh
-            </Button>
+      <Card className="p-6 border-l-4 border-l-amber-500 dark:border-l-amber-600">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            Your escalated tickets
+            {escalatedTickets.length > 0 && (
+              <Badge variant="error" className="ml-1">{escalatedTickets.length}</Badge>
+            )}
+          </h2>
+          <Button variant="ghost" size="sm" onClick={loadEscalationQueue} disabled={escalatedLoading}>
+            Refresh
+          </Button>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Tickets you created or that are assigned to you, marked escalated.
+        </p>
+        {escalatedLoading && escalatedTickets.length === 0 ? (
+          <div className="space-y-3 py-2">
+            {[0, 1].map((k) => (
+              <div
+                key={k}
+                className="h-[3.25rem] w-full rounded-lg animate-pulse bg-gray-200/90 dark:bg-gray-700/70"
+              />
+            ))}
           </div>
-          {escalatedLoading && escalatedTickets.length === 0 ? (
-            <div className="py-8 text-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-2 border-amber-500 border-t-transparent mx-auto" />
-            </div>
-          ) : escalatedTickets.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400 py-4">No escalated tickets. All clear.</p>
-          ) : (
-            <div className="space-y-3">
-              {escalatedTickets.map((t) => (
-                <button
-                  key={t.ticket_id ?? t.id}
-                  type="button"
-                  onClick={() => navigate('/tickets', { state: { openTicketId: t.ticket_id ?? t.id } })}
-                  className="w-full flex items-center justify-between gap-4 p-3 rounded-lg bg-amber-50/50 dark:bg-amber-900/10 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors text-left group"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                      #{t.ticket_id ?? t.id}: {t.issue_type || t.description || 'No title'}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {t.category || '—'} · {formatTicketTime(t.created_at)}
-                    </p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-primary-500 shrink-0" />
-                </button>
-              ))}
-            </div>
-          )}
-        </Card>
-      )}
+        ) : escalatedTickets.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400 py-4">None escalated right now.</p>
+        ) : (
+          <div className="space-y-3">
+            {escalatedTickets.map((t) => (
+              <button
+                key={t.ticket_id ?? t.id}
+                type="button"
+                onClick={() => navigate('/tickets', { state: { openTicketId: t.ticket_id ?? t.id } })}
+                className="w-full flex items-center justify-between gap-4 p-3 rounded-lg bg-amber-50/50 dark:bg-amber-900/10 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors text-left group"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                    #{t.ticket_id ?? t.id}: {t.issue_type || t.description || 'No title'}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {t.category || '—'} · {formatTicketTime(t.created_at)}
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-primary-500 shrink-0" />
+              </button>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* Recent tickets */}
       <Card className="p-6">

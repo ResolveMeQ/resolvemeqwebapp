@@ -5,6 +5,23 @@
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+/**
+ * GET /api/auth/profile/ returns UserProfileSerializer: user_email, user_full_name, user_id.
+ * Map to the flat shape the UI expects (email, full_name, id).
+ */
+export function normalizeSessionUser(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  const email = String(raw.email ?? raw.user_email ?? '').trim();
+  const fullName = String(raw.full_name ?? raw.user_full_name ?? '').trim();
+  const id = raw.id ?? raw.user_id;
+  return {
+    ...raw,
+    id,
+    email: email || undefined,
+    full_name: fullName || undefined,
+  };
+}
+
 // Token management
 export const TokenService = {
   getAccessToken: () => localStorage.getItem('access_token'),
@@ -21,11 +38,20 @@ export const TokenService = {
     localStorage.removeItem('user');
   },
   getUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    const raw = localStorage.getItem('user');
+    if (!raw) return null;
+    try {
+      return normalizeSessionUser(JSON.parse(raw));
+    } catch {
+      return null;
+    }
   },
   setUser: (user) => {
-    localStorage.setItem('user', JSON.stringify(user));
+    if (user == null) {
+      localStorage.removeItem('user');
+      return;
+    }
+    localStorage.setItem('user', JSON.stringify(normalizeSessionUser(user)));
   }
 };
 
@@ -138,7 +164,21 @@ export const api = {
       }
       return response;
     },
-    
+
+    /** Sign in with Google ID token (credential JWT from @react-oauth/google). */
+    googleLogin: async (credential) => {
+      const response = await apiFetch('/api/auth/google/', {
+        method: 'POST',
+        body: JSON.stringify({ credential }),
+      });
+      const access = response.access ?? response.access_token;
+      const refresh = response.refresh ?? response.refresh_token;
+      if (access && refresh) {
+        TokenService.setTokens(access, refresh);
+      }
+      return response;
+    },
+
     register: async (userData) => {
       return apiFetch('/api/auth/register/', {
         method: 'POST',
@@ -183,7 +223,8 @@ export const api = {
     },
 
     getCurrentUser: async () => {
-      return apiFetch('/api/auth/profile/');
+      const data = await apiFetch('/api/auth/profile/');
+      return normalizeSessionUser(data);
     },
   },
 
@@ -194,7 +235,10 @@ export const api = {
       return apiFetch(`/api/tickets/list/${queryString ? '?' + queryString : ''}`);
     },
 
-    /** Staff only: escalation queue - tickets needing human attention */
+    /** GET — category value/label pairs from Ticket model choices (authoritative). */
+    getCategories: async () => apiFetch('/api/tickets/categories/'),
+
+    /** Escalated tickets visible to the current user (created by or assigned to them) */
     getEscalationQueue: async (params = {}) => {
       const qs = new URLSearchParams(params).toString();
       return apiFetch(`/api/tickets/escalated/${qs ? '?' + qs : ''}`);
@@ -224,6 +268,7 @@ export const api = {
       });
     },
 
+    /** Returns { my_tickets, community_resolved } (legacy array responses are normalized in App). */
     search: async (params) => {
       const queryString = new URLSearchParams(params).toString();
       return apiFetch(`/api/tickets/search/?${queryString}`);
@@ -434,6 +479,19 @@ export const api = {
       return apiFetch(`/api/teams/invitations/${invitationId}/decline/`, { method: 'POST' });
     },
 
+    /** Pending invitations you sent as team owner */
+    sentInvitations: async (teamId) => {
+      return apiFetch(`/api/teams/${teamId}/invitations/sent/`);
+    },
+
+    resendInvitation: async (invitationId) => {
+      return apiFetch(`/api/teams/invitations/${invitationId}/resend/`, { method: 'POST' });
+    },
+
+    cancelInvitation: async (invitationId) => {
+      return apiFetch(`/api/teams/invitations/${invitationId}/cancel/`, { method: 'POST' });
+    },
+
     leave: async (teamId) => {
       return apiFetch(`/api/teams/${teamId}/leave/`, { method: 'POST' });
     },
@@ -487,6 +545,17 @@ export const api = {
     /** Open Dodo customer portal (update payment methods, view invoices) */
     openCustomerPortal: async () => {
       return apiFetch('/api/billing/customer-portal/', { method: 'POST' });
+    },
+    /** Logged-in user message to support; stored and emailed to SUPPORT_CONTACT_NOTIFY_EMAILS / SUPPORT_EMAIL */
+    submitSupportContact: async ({ message, subject, page_context }) => {
+      return apiFetch('/api/billing/support-contact/', {
+        method: 'POST',
+        body: JSON.stringify({
+          message,
+          subject: subject || '',
+          page_context: page_context || 'billing',
+        }),
+      });
     },
   },
 

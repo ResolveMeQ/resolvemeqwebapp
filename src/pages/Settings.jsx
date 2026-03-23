@@ -11,12 +11,14 @@ import {
   Edit,
   ExternalLink,
   Clock,
+  Sparkles,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
-import { api } from '../services/api';
+import { api, TokenService } from '../services/api';
 import { cn } from '../utils/cn';
+import { SettingsPageSkeleton } from '../components/ui/Skeleton';
 
 /**
  * Settings page component with comprehensive configuration options
@@ -47,9 +49,11 @@ const Settings = () => {
       setProfile(data);
       if (data) {
         setProfileSettings({
+          first_name: data.first_name ?? '',
+          last_name: data.last_name ?? '',
           bio: data.bio ?? '',
           location: data.location ?? '',
-          city: data.city ?? ''
+          city: data.city ?? '',
         });
       }
     } catch (error) {
@@ -121,12 +125,21 @@ const Settings = () => {
       await api.settings.updatePreferences(preferencesData);
 
       const profilePayload = {
+        first_name: profileSettings.first_name ?? '',
+        last_name: profileSettings.last_name ?? '',
         bio: profileSettings.bio ?? '',
         location: profileSettings.location ?? '',
-        city: profileSettings.city ?? ''
+        city: profileSettings.city ?? '',
       };
       await api.settings.updateProfile(profilePayload);
-      setProfile(prev => (prev ? { ...prev, ...profilePayload } : null));
+      setProfile((prev) => (prev ? { ...prev, ...profilePayload } : null));
+
+      try {
+        const me = await api.auth.getCurrentUser();
+        TokenService.setUser(me);
+      } catch {
+        /* header name updates on next navigation if profile fetch fails */
+      }
 
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -171,6 +184,30 @@ const Settings = () => {
           <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Profile</h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Update your personal information</p>
           <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>First name</label>
+                <input
+                  type="text"
+                  value={profileSettings.first_name}
+                  onChange={(e) => setProfileSettings((prev) => ({ ...prev, first_name: e.target.value }))}
+                  className={inputClass}
+                  placeholder="Jane"
+                  autoComplete="given-name"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Last name</label>
+                <input
+                  type="text"
+                  value={profileSettings.last_name}
+                  onChange={(e) => setProfileSettings((prev) => ({ ...prev, last_name: e.target.value }))}
+                  className={inputClass}
+                  placeholder="Doe"
+                  autoComplete="family-name"
+                />
+              </div>
+            </div>
             <div>
               <label className={labelClass}>Bio</label>
               <textarea
@@ -343,6 +380,27 @@ const Settings = () => {
           </div>
         </div>
       </Card>
+
+      <Card>
+        <div className="p-6">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Product tour</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Replay the guided introduction to navigation, search, and account controls.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('resolvemeq:start-tour'));
+              showToast('Starting product tour…', 'success');
+            }}
+          >
+            <Sparkles size={16} className="mr-2" />
+            Replay product tour
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 
@@ -438,6 +496,10 @@ const Settings = () => {
         return renderGeneralSettings();
     }
   };
+
+  if (loading && preferences === null) {
+    return <SettingsPageSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

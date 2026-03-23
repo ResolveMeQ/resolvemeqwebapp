@@ -158,7 +158,7 @@ const Sidebar = ({
       )}
 
       {/* Navigation Groups */}
-      <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
+      <nav data-tour="sidebar-nav" className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
         {navigationGroups.map((group) => (
           <div key={group.label}>
             {!collapsed && (
@@ -211,7 +211,11 @@ const Sidebar = ({
 
       {/* Active team switcher */}
       {(userTeams.length > 0 || activeTeamId) && (
-        <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800" ref={teamDropdownRef}>
+        <div
+          data-tour="team-switcher"
+          className="px-3 py-3 border-t border-gray-200 dark:border-gray-800"
+          ref={teamDropdownRef}
+        >
           <div className="relative">
             <button
               type="button"

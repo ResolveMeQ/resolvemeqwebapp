@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import GlobalSearchPanel from '../GlobalSearchPanel';
+import AppTour from '../AppTour';
 import { cn } from '../../utils/cn';
 
 const PATH_TO_PAGE_ID = {
@@ -39,17 +40,43 @@ const Layout = ({
   searchResults,
   searchLoading,
   searchError,
+  tourRun,
+  setTourRun,
+  tourNonce = 0,
 }) => {
   const location = useLocation();
   const activeItem = PATH_TO_PAGE_ID[location.pathname] ?? 'dashboard';
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const hasTeamSwitcher = userTeams.length > 0 || !!activeTeamId;
 
   const handleToggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
+  useEffect(() => {
+    if (!searchQuery?.trim()) return;
+    const handleMouseDown = (e) => {
+      const t = e.target;
+      if (
+        typeof t.closest === 'function' &&
+        (t.closest('[data-global-search-field]') || t.closest('[data-global-search-panel]'))
+      ) {
+        return;
+      }
+      onSearch?.('');
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [searchQuery, onSearch]);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <AppTour
+        key={tourNonce}
+        run={tourRun}
+        setRun={setTourRun}
+        hasTeamSwitcher={hasTeamSwitcher}
+      />
       {/* Sidebar */}
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -77,6 +104,7 @@ const Layout = ({
           user={user}
           planName={planName}
           onSearch={onSearch}
+          committedSearchQuery={searchQuery}
           onThemeChange={onThemeChange}
           onLogout={onLogout}
           onNavigate={onNavigate}
@@ -90,6 +118,7 @@ const Layout = ({
           loading={searchLoading}
           error={searchError}
           onNavigate={onNavigate}
+          onClose={() => onSearch?.('')}
         />
 
         {/* Page Content */}
@@ -97,8 +126,10 @@ const Layout = ({
           <div className="max-w-7xl mx-auto">
             {React.Children.map(children, (child) =>
               React.isValidElement(child) && onRefreshUserData
-                ? React.cloneElement(child, { onRefreshUserData })
-                : child
+                ? React.cloneElement(child, { onRefreshUserData, activeTeamId })
+                : React.isValidElement(child)
+                  ? React.cloneElement(child, { activeTeamId })
+                  : child
             )}
           </div>
         </main>

@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Edit, Trash2, Eye, Users, X, Mail, MapPin, UserPlus } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Users, X, Mail, UserPlus, RefreshCw } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import ConfirmModal from '../components/ui/ConfirmModal';
 import { api } from '../services/api';
+import { TeamsPageSkeleton } from '../components/ui/Skeleton';
 
 const defaultForm = {
   name: '',
@@ -29,13 +32,20 @@ const Teams = () => {
   const [invitingTeamId, setInvitingTeamId] = useState(null);
   const [acceptLoadingId, setAcceptLoadingId] = useState(null);
   const [declineLoadingId, setDeclineLoadingId] = useState(null);
+  const [sentInvitations, setSentInvitations] = useState([]);
+  const [resendLoadingId, setResendLoadingId] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+  const toastSeq = useRef(0);
   const [formData, setFormData] = useState({ ...defaultForm });
 
   const showToast = useCallback((message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
+    const id = ++toastSeq.current;
+    setToast({ id, message, type });
+    setTimeout(() => {
+      setToast((t) => (t && t.id === id ? null : t));
+    }, 4000);
   }, []);
 
   const [activeTeamContext, setActiveTeamContext] = useState(null);
@@ -61,6 +71,27 @@ const Teams = () => {
       setInvitations([]);
     }
   };
+
+  const loadSentInvitations = useCallback(async (teamId) => {
+    if (!teamId) {
+      setSentInvitations([]);
+      return;
+    }
+    try {
+      const data = await api.teams.sentInvitations(teamId);
+      setSentInvitations(Array.isArray(data) ? data : []);
+    } catch {
+      setSentInvitations([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedTeam?.is_owner && selectedTeam?.id) {
+      loadSentInvitations(selectedTeam.id);
+    } else {
+      setSentInvitations([]);
+    }
+  }, [selectedTeam?.id, selectedTeam?.is_owner, loadSentInvitations]);
 
   const loadLimits = async () => {
     try {
@@ -218,20 +249,25 @@ const Teams = () => {
     }
   };
 
-  const handleDeleteTeam = async (teamId) => {
-    if (!window.confirm('Delete this team? This cannot be undone.')) return;
-    try {
-      setLoading(true);
-      await api.teams.delete(teamId);
-      setTeams(prev => prev.filter(t => t.id !== teamId));
-      setFilteredTeams(prev => prev.filter(t => t.id !== teamId));
-      if (selectedTeam?.id === teamId) closePanel();
-      showToast('Team deleted.');
-    } catch (error) {
-      showToast(error?.message || 'Failed to delete team.', 'error');
-    } finally {
-      setLoading(false);
-    }
+  const confirmDeleteTeam = (teamId) => {
+    setConfirmModal({
+      title: 'Delete this team?',
+      description: 'This cannot be undone. Pending invitations for this team will no longer be valid.',
+      variant: 'danger',
+      confirmLabel: 'Delete team',
+      onConfirm: async () => {
+        try {
+          await api.teams.delete(teamId);
+          setTeams((prev) => prev.filter((t) => t.id !== teamId));
+          setFilteredTeams((prev) => prev.filter((t) => t.id !== teamId));
+          if (selectedTeam?.id === teamId) closePanel();
+          showToast('Team deleted.');
+        } catch (error) {
+          showToast(error?.message || 'Failed to delete team.', 'error');
+          throw error;
+        }
+      },
+    });
   };
 
   const handleInvite = async (teamId) => {
@@ -244,12 +280,44 @@ const Teams = () => {
       setInvitingTeamId(teamId);
       await api.teams.invite(teamId, email);
       setInviteEmail(prev => ({ ...prev, [teamId]: '' }));
-      showToast(`Invitation sent to ${email}`);
+      showToast(`Invitation sent to ${email}. They will get an email and can accept under Teams.`);
+      await loadSentInvitations(teamId);
     } catch (error) {
       showToast(error?.message || error?.error || 'Failed to send invitation.', 'error');
     } finally {
       setInvitingTeamId(null);
     }
+  };
+
+  const handleResendInvitation = async (invitationId) => {
+    setResendLoadingId(invitationId);
+    try {
+      await api.teams.resendInvitation(invitationId);
+      showToast('Invitation email sent again.');
+    } catch (error) {
+      showToast(error?.message || 'Could not resend invitation.', 'error');
+    } finally {
+      setResendLoadingId(null);
+    }
+  };
+
+  const confirmCancelInvitation = (invitationId, teamId) => {
+    setConfirmModal({
+      title: 'Remove invitation?',
+      description: 'They will no longer be able to accept this invite.',
+      variant: 'danger',
+      confirmLabel: 'Remove',
+      onConfirm: async () => {
+        try {
+          await api.teams.cancelInvitation(invitationId);
+          showToast('Invitation removed.');
+          await loadSentInvitations(teamId);
+        } catch (error) {
+          showToast(error?.message || 'Could not remove invitation.', 'error');
+          throw error;
+        }
+      },
+    });
   };
 
   const handleAcceptInvitation = async (invitationId) => {
@@ -279,63 +347,91 @@ const Teams = () => {
     }
   };
 
-  const handleLeaveTeam = async (teamId) => {
-    if (!window.confirm('Leave this team? You can rejoin only if invited again.')) return;
-    try {
-      setLoading(true);
-      await api.teams.leave(teamId);
-      setTeams(prev => prev.filter(t => t.id !== teamId));
-      setFilteredTeams(prev => prev.filter(t => t.id !== teamId));
-      if (selectedTeam?.id === teamId) closePanel();
-      showToast('You left the team.');
-    } catch (error) {
-      showToast(error?.message || 'Failed to leave team.', 'error');
-    } finally {
-      setLoading(false);
-    }
+  const confirmLeaveTeam = (teamId) => {
+    setConfirmModal({
+      title: 'Leave this team?',
+      description: 'You can rejoin only if you are invited again.',
+      variant: 'danger',
+      confirmLabel: 'Leave team',
+      onConfirm: async () => {
+        try {
+          await api.teams.leave(teamId);
+          setTeams((prev) => prev.filter((t) => t.id !== teamId));
+          setFilteredTeams((prev) => prev.filter((t) => t.id !== teamId));
+          if (selectedTeam?.id === teamId) closePanel();
+          showToast('You left the team.');
+        } catch (error) {
+          showToast(error?.message || 'Failed to leave team.', 'error');
+          throw error;
+        }
+      },
+    });
   };
 
-  const handleRemoveMember = async (teamId, userId) => {
-    if (!window.confirm('Remove this member from the team?')) return;
-    try {
-      await api.teams.removeMember(teamId, userId);
-      const updated = await api.teams.get(teamId);
-      const mapped = mapTeamFromApi(updated);
-      setTeams(prev => prev.map(t => (t.id === teamId ? mapped : t)));
-      setFilteredTeams(prev => prev.map(t => (t.id === teamId ? mapped : t)));
-      if (selectedTeam?.id === teamId) setSelectedTeam(mapped);
-      showToast('Member removed.');
-    } catch (error) {
-      showToast(error?.message || 'Failed to remove member.', 'error');
-    }
+  const confirmRemoveMember = (teamId, userId) => {
+    setConfirmModal({
+      title: 'Remove this member?',
+      description: 'They will lose access to this team until someone invites them again.',
+      variant: 'danger',
+      confirmLabel: 'Remove',
+      onConfirm: async () => {
+        try {
+          await api.teams.removeMember(teamId, userId);
+          const updated = await api.teams.get(teamId);
+          const mapped = mapTeamFromApi(updated);
+          setTeams((prev) => prev.map((t) => (t.id === teamId ? mapped : t)));
+          setFilteredTeams((prev) => prev.map((t) => (t.id === teamId ? mapped : t)));
+          if (selectedTeam?.id === teamId) setSelectedTeam(mapped);
+          showToast('Member removed.');
+        } catch (error) {
+          showToast(error?.message || 'Failed to remove member.', 'error');
+          throw error;
+        }
+      },
+    });
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <TeamsPageSkeleton />;
   }
+
+  const toastNode =
+    toast &&
+    typeof document !== 'undefined' &&
+    createPortal(
+      <AnimatePresence>
+        <motion.div
+          key={toast.id}
+          role="status"
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -16 }}
+          transition={{ duration: 0.2 }}
+          className={`fixed left-1/2 -translate-x-1/2 top-[5.5rem] max-w-[min(90vw,28rem)] px-4 py-3 rounded-xl shadow-xl border text-sm font-medium z-[10000] pointer-events-auto ${
+            toast.type === 'error'
+              ? 'bg-red-50 dark:bg-red-950/90 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100'
+              : 'bg-emerald-50 dark:bg-emerald-950/90 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100'
+          }`}
+        >
+          {toast.message}
+        </motion.div>
+      </AnimatePresence>,
+      document.body
+    );
 
   return (
     <div className="space-y-6 p-6">
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-medium ${
-              toast.type === 'error'
-                ? 'bg-red-100 dark:bg-red-900/80 text-red-800 dark:text-red-200'
-                : 'bg-green-100 dark:bg-green-900/80 text-green-800 dark:text-green-200'
-            }`}
-          >
-            {toast.message}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {toastNode}
+      <ConfirmModal
+        open={!!confirmModal}
+        onClose={() => setConfirmModal(null)}
+        title={confirmModal?.title}
+        description={confirmModal?.description}
+        variant={confirmModal?.variant}
+        confirmLabel={confirmModal?.confirmLabel}
+        cancelLabel={confirmModal?.cancelLabel}
+        onConfirm={confirmModal?.onConfirm}
+      />
 
       <header className="flex items-center justify-between">
         <div>
@@ -607,7 +703,7 @@ const Teams = () => {
                               </div>
                             </div>
                             {selectedTeam.is_owner && member?.id && String(member.id) !== String(selectedTeam.owner) && (
-                              <Button variant="ghost" size="sm" className="text-red-600 dark:text-red-400 shrink-0" onClick={() => handleRemoveMember(selectedTeam.id, member.id)}>
+                              <Button variant="ghost" size="sm" className="text-red-600 dark:text-red-400 shrink-0" onClick={() => confirmRemoveMember(selectedTeam.id, member.id)}>
                                 Remove
                               </Button>
                             )}
@@ -625,17 +721,69 @@ const Teams = () => {
                             <UserPlus className="w-4 h-4" />
                             Invite by email
                           </h3>
-                          <div className="flex gap-2 mb-4">
+                          <form
+                            className="flex flex-col sm:flex-row gap-2 mb-4"
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              handleInvite(selectedTeam.id);
+                            }}
+                          >
                             <input
                               type="email"
                               value={inviteEmail[selectedTeam.id] || ''}
                               onChange={(e) => setInviteEmail(prev => ({ ...prev, [selectedTeam.id]: e.target.value }))}
                               placeholder="colleague@example.com"
-                              className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                              className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
                             />
-                            <Button variant="primary" size="sm" onClick={() => handleInvite(selectedTeam.id)} disabled={invitingTeamId === selectedTeam.id} loading={invitingTeamId === selectedTeam.id}>
-                              Invite
+                            <Button type="submit" variant="primary" size="sm" disabled={invitingTeamId === selectedTeam.id} loading={invitingTeamId === selectedTeam.id}>
+                              Send invite
                             </Button>
+                          </form>
+                          <div className="mb-4">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+                              Pending invitations
+                            </h4>
+                            {sentInvitations.length === 0 ? (
+                              <p className="text-sm text-gray-500 dark:text-gray-400 py-1">No pending invites. People you invite appear here until they accept or you remove the invite.</p>
+                            ) : (
+                              <ul className="space-y-2">
+                                {sentInvitations.map((row) => (
+                                  <li
+                                    key={row.id}
+                                    className="flex flex-wrap items-center justify-between gap-2 py-2 px-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{row.email}</p>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400">Invited {row.created_at ? new Date(row.created_at).toLocaleString() : '—'}</p>
+                                    </div>
+                                    <div className="flex gap-1.5 shrink-0">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleResendInvitation(row.id)}
+                                        loading={resendLoadingId === row.id}
+                                        disabled={resendLoadingId !== null}
+                                        title="Resend email"
+                                      >
+                                        <RefreshCw className="w-3.5 h-3.5 sm:mr-1" />
+                                        <span className="hidden sm:inline">Resend</span>
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-red-600 dark:text-red-400"
+                                        onClick={() => confirmCancelInvitation(row.id, selectedTeam.id)}
+                                        disabled={resendLoadingId !== null}
+                                      >
+                                        Remove
+                                      </Button>
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                           </div>
                         </>
                       )}
@@ -646,14 +794,14 @@ const Teams = () => {
                               <Edit className="w-4 h-4 mr-1" />
                               Edit team
                             </Button>
-                            <Button variant="outline" size="sm" className="text-red-600 dark:text-red-400" onClick={() => handleDeleteTeam(selectedTeam.id)}>
+                            <Button variant="outline" size="sm" className="text-red-600 dark:text-red-400" onClick={() => confirmDeleteTeam(selectedTeam.id)}>
                               <Trash2 className="w-4 h-4 mr-1" />
                               Delete
                             </Button>
                           </>
                         )}
                         {!selectedTeam.is_owner && (
-                          <Button variant="outline" size="sm" className="text-amber-600 dark:text-amber-400" onClick={() => handleLeaveTeam(selectedTeam.id)}>
+                          <Button variant="outline" size="sm" className="text-amber-600 dark:text-amber-400" onClick={() => confirmLeaveTeam(selectedTeam.id)}>
                             Leave team
                           </Button>
                         )}

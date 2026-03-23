@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { TOUR_STORAGE_KEY } from './components/AppTour';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
@@ -25,6 +26,7 @@ function App() {
   const [searchError, setSearchError] = useState(null);
   const [searchResults, setSearchResults] = useState({
     tickets: [],
+    communityResolvedTickets: [],
     knowledgeBase: [],
     users: [],
   });
@@ -36,6 +38,8 @@ function App() {
   const [preferences, setPreferences] = useState(null);
   const [userTeams, setUserTeams] = useState([]);
   const [planName, setPlanName] = useState(null);
+  const [tourRun, setTourRun] = useState(false);
+  const [tourNonce, setTourNonce] = useState(0);
 
   // Check for existing authentication on mount
   useEffect(() => {
@@ -91,6 +95,26 @@ function App() {
     }
     loadUserData();
   }, [isAuthenticated, loadUserData]);
+
+  useEffect(() => {
+    if (!isAuthenticated || loading) return;
+    try {
+      if (localStorage.getItem(TOUR_STORAGE_KEY)) return;
+    } catch {
+      return;
+    }
+    const t = window.setTimeout(() => setTourRun(true), 900);
+    return () => clearTimeout(t);
+  }, [isAuthenticated, loading]);
+
+  useEffect(() => {
+    const onStartTour = () => {
+      setTourNonce((n) => n + 1);
+      setTourRun(true);
+    };
+    window.addEventListener('resolvemeq:start-tour', onStartTour);
+    return () => window.removeEventListener('resolvemeq:start-tour', onStartTour);
+  }, []);
 
   const handleActiveTeamChange = async (teamId) => {
     try {
@@ -170,7 +194,7 @@ function App() {
     setSearchQuery(trimmed);
 
     if (!trimmed) {
-      setSearchResults({ tickets: [], knowledgeBase: [], users: [] });
+      setSearchResults({ tickets: [], communityResolvedTickets: [], knowledgeBase: [], users: [] });
       setSearchError(null);
       setSearchLoading(false);
       return;
@@ -180,8 +204,8 @@ function App() {
     setSearchError(null);
 
     try {
-      const [tickets, kbArticles, teamMembers] = await Promise.all([
-        api.tickets.search({ q: trimmed }).catch(() => []),
+      const [ticketSearch, kbArticles, teamMembers] = await Promise.all([
+        api.tickets.search({ q: trimmed }).catch(() => ({})),
         api.knowledgeBase.search(trimmed).catch(() => []),
         api.users.listTeamMembers().catch(() => []),
       ]);
@@ -196,15 +220,25 @@ function App() {
         );
       });
 
+      const mine = Array.isArray(ticketSearch?.my_tickets)
+        ? ticketSearch.my_tickets
+        : Array.isArray(ticketSearch)
+          ? ticketSearch
+          : [];
+      const community = Array.isArray(ticketSearch?.community_resolved)
+        ? ticketSearch.community_resolved
+        : [];
+
       setSearchResults({
-        tickets: Array.isArray(tickets) ? tickets : [],
+        tickets: mine,
+        communityResolvedTickets: community,
         knowledgeBase: Array.isArray(kbArticles) ? kbArticles : [],
         users: usersFiltered,
       });
     } catch (err) {
       console.error('Global search failed:', err);
       setSearchError(err?.message || 'Search failed. Please try again.');
-      setSearchResults({ tickets: [], knowledgeBase: [], users: [] });
+      setSearchResults({ tickets: [], communityResolvedTickets: [], knowledgeBase: [], users: [] });
     } finally {
       setSearchLoading(false);
     }
@@ -214,6 +248,7 @@ function App() {
     api.auth.logout();
     setIsAuthenticated(false);
     setUser(null);
+    setTourRun(false);
     navigate('/login');
   };
 
@@ -232,7 +267,7 @@ function App() {
   const renderAuthRoutes = () => (
     <Routes>
       <Route path="/login" element={<Login onLogin={handleLogin} onNavigateToSignup={() => navigate('/signup')} onNavigateToForgotPassword={() => navigate('/forgot-password')} />} />
-      <Route path="/signup" element={<Signup onSignup={handleSignup} onNavigateToLogin={() => navigate('/login')} />} />
+      <Route path="/signup" element={<Signup onSignup={handleSignup} onNavigateToLogin={() => navigate('/login')} onGoogleSignedIn={handleLogin} />} />
       <Route path="/verify" element={<Verify onNavigateToLogin={() => navigate('/login')} />} />
       <Route path="/forgot-password" element={<ForgotPassword onNavigateToLogin={() => navigate('/login')} />} />
       <Route path="/reset-password" element={<ResetPassword onNavigateToLogin={() => navigate('/login')} />} />
@@ -257,6 +292,9 @@ function App() {
     userTeams,
     onActiveTeamChange: handleActiveTeamChange,
     onRefreshUserData: loadUserData,
+    tourRun,
+    setTourRun,
+    tourNonce,
   };
 
   const renderMainRoutes = () => (

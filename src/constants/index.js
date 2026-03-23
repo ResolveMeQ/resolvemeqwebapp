@@ -308,6 +308,29 @@ export const SUCCESS_MESSAGES = {
   SETTINGS_SAVED: 'Settings saved successfully.',
 };
 
+/**
+ * Mirrors Django `tickets.models.Ticket.CATEGORY_CHOICES`.
+ * Primary source for the UI is GET /api/tickets/categories/; this is the offline fallback.
+ */
+export const TICKET_CATEGORY_FALLBACK = [
+  { value: 'wifi', label: 'Wi-Fi' },
+  { value: 'laptop', label: 'Laptop' },
+  { value: 'vpn', label: 'VPN' },
+  { value: 'printer', label: 'Printer' },
+  { value: 'email', label: 'Email' },
+  { value: 'software', label: 'Software' },
+  { value: 'hardware', label: 'Hardware' },
+  { value: 'network', label: 'Network' },
+  { value: 'account', label: 'Account' },
+  { value: 'access', label: 'Access' },
+  { value: 'phone', label: 'Phone' },
+  { value: 'server', label: 'Server' },
+  { value: 'security', label: 'Security' },
+  { value: 'cloud', label: 'Cloud' },
+  { value: 'storage', label: 'Storage' },
+  { value: 'other', label: 'Other' },
+];
+
 // Theme Modes
 export const THEME_MODES = {
   LIGHT: 'light',

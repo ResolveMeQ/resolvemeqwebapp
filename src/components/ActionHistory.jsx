@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertCircle, CheckCircle, RotateCcw, Clock, XCircle } from 'lucide-react';
 import { api } from '../services/api';
 import Button from './ui/Button';
@@ -14,6 +15,8 @@ const ActionHistory = ({ ticketId }) => {
   const [selectedAction, setSelectedAction] = useState(null);
   const [showRollbackModal, setShowRollbackModal] = useState(false);
   const [rollbackLoading, setRollbackLoading] = useState(false);
+  const [rollbackError, setRollbackError] = useState('');
+  const [rollbackNotice, setRollbackNotice] = useState('');
 
   useEffect(() => {
     if (ticketId) {
@@ -35,8 +38,9 @@ const ActionHistory = ({ ticketId }) => {
   };
 
   const handleRollback = async () => {
+    setRollbackError('');
     if (!selectedAction || !rollbackReason.trim()) {
-      alert('Please provide a reason for rollback');
+      setRollbackError('Please provide a reason for rollback.');
       return;
     }
 
@@ -48,11 +52,11 @@ const ActionHistory = ({ ticketId }) => {
       setShowRollbackModal(false);
       setRollbackReason('');
       setSelectedAction(null);
-
-      alert('Action rolled back successfully');
+      setRollbackNotice('Action rolled back successfully.');
+      setTimeout(() => setRollbackNotice(''), 5000);
     } catch (error) {
       console.error('Rollback failed:', error);
-      alert(error?.message || 'Rollback failed');
+      setRollbackError(error?.message || 'Rollback failed. Please try again.');
     } finally {
       setRollbackLoading(false);
     }
@@ -140,6 +144,7 @@ const ActionHistory = ({ ticketId }) => {
                 <button
                   onClick={() => {
                     setSelectedAction(action);
+                    setRollbackError('');
                     setShowRollbackModal(true);
                   }}
                   className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors dark:text-red-400 dark:hover:bg-red-900/20"
@@ -154,59 +159,91 @@ const ActionHistory = ({ ticketId }) => {
         ))}
       </div>
 
-      {/* Rollback Modal */}
-      {showRollbackModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              Confirm Rollback
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Are you sure you want to rollback this action: <strong>{getActionLabel(selectedAction?.action_type)}</strong>?
-              This will revert the ticket to its previous state.
-            </p>
-            
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Reason for rollback:
-            </label>
-            <textarea
-              value={rollbackReason}
-              onChange={(e) => setRollbackReason(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
-              rows="3"
-              placeholder="Explain why this action needs to be reversed..."
-              required
-            />
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowRollbackModal(false);
-                  setRollbackReason('');
-                  setSelectedAction(null);
-                }}
-                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleRollback}
-                disabled={!rollbackReason.trim() || rollbackLoading}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {rollbackLoading ? (
-                  <span className="inline-flex items-center gap-2">
-                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                    Rolling back…
-                  </span>
-                ) : (
-                  'Confirm Rollback'
-                )}
-              </button>
-            </div>
-          </div>
+      {rollbackNotice && (
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-200" role="status">
+          {rollbackNotice}
         </div>
       )}
+
+      {/* Rollback Modal */}
+      {showRollbackModal &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="rollback-modal-title">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/50 dark:bg-black/60"
+              aria-label="Close"
+              onClick={() => {
+                if (rollbackLoading) return;
+                setShowRollbackModal(false);
+                setRollbackReason('');
+                setRollbackError('');
+                setSelectedAction(null);
+              }}
+            />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl p-6 max-w-md w-full">
+              <h3 id="rollback-modal-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                Confirm rollback
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
+                Roll back <strong>{getActionLabel(selectedAction?.action_type)}</strong>? This will revert the ticket to its previous state.
+              </p>
+
+              {rollbackError && (
+                <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200" role="alert">
+                  {rollbackError}
+                </div>
+              )}
+
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Reason for rollback
+              </label>
+              <textarea
+                value={rollbackReason}
+                onChange={(e) => {
+                  setRollbackReason(e.target.value);
+                  if (rollbackError) setRollbackError('');
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                rows={3}
+                placeholder="Explain why this action needs to be reversed…"
+              />
+
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRollbackModal(false);
+                    setRollbackReason('');
+                    setRollbackError('');
+                    setSelectedAction(null);
+                  }}
+                  disabled={rollbackLoading}
+                  className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRollback}
+                  disabled={!rollbackReason.trim() || rollbackLoading}
+                  className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {rollbackLoading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                      Rolling back…
+                    </span>
+                  ) : (
+                    'Confirm rollback'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

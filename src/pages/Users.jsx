@@ -1,12 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, X, Edit, Users as UsersIcon } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import ConfirmModal from '../components/ui/ConfirmModal';
 import { USER_ROLES } from '../constants';
 import { api } from '../services/api';
+import { UsersPageSkeleton } from '../components/ui/Skeleton';
 
-const Users = () => {
+const Users = ({ activeTeamId }) => {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,16 +26,21 @@ const Users = () => {
   const [inviting, setInviting] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(null);
   const [toast, setToast] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(null);
+  const toastSeq = useRef(0);
 
   const showToast = useCallback((message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
+    const id = ++toastSeq.current;
+    setToast({ id, message, type });
+    setTimeout(() => setToast((t) => (t && t.id === id ? null : t)), 4000);
   }, []);
 
   useEffect(() => {
+    setSelectedUser(null);
     loadUsers();
     loadMyTeamsAsOwner();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when workspace (active team) changes
+  }, [activeTeamId]);
 
   const loadMyTeamsAsOwner = async () => {
     try {
@@ -52,7 +60,7 @@ const Users = () => {
             ...u,
             name: u.full_name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username,
             status: u.is_active ? 'active' : 'inactive',
-            role: u.is_staff ? USER_ROLES.AGENT : USER_ROLES.USER,
+            role: USER_ROLES.USER,
             location: u.profile_location || '',
             department: u.profile_city || '',
             joinDate: u.date_joined,
@@ -159,32 +167,46 @@ const Users = () => {
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm('Remove this user? This cannot be undone.')) return;
-    setDeleteLoading(userId);
-    try {
-      await api.users.delete(userId);
-      setUsers((prev) => prev.filter((u) => u.id !== userId));
-      setFilteredUsers((prev) => prev.filter((u) => u.id !== userId));
-      if (selectedUser?.id === userId) closePanel();
-      showToast('User removed.');
-    } catch (err) {
-      showToast(err?.message || 'Failed to delete user.', 'error');
-    } finally {
-      setDeleteLoading(null);
-    }
+  const confirmDeleteUser = (userId) => {
+    setConfirmModal({
+      title: 'Remove this user?',
+      description: 'This cannot be undone. They will lose access according to your account settings.',
+      variant: 'danger',
+      confirmLabel: 'Remove user',
+      onConfirm: async () => {
+        setDeleteLoading(userId);
+        try {
+          await api.users.delete(userId);
+          setUsers((prev) => prev.filter((u) => u.id !== userId));
+          setFilteredUsers((prev) => prev.filter((u) => u.id !== userId));
+          if (selectedUser?.id === userId) closePanel();
+          showToast('User removed.');
+        } catch (err) {
+          showToast(err?.message || 'Failed to delete user.', 'error');
+          throw err;
+        } finally {
+          setDeleteLoading(null);
+        }
+      },
+    });
   };
 
-  if (loading && users.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-64">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-600 border-t-transparent" />
-      </div>
-    );
+  if (loading) {
+    return <UsersPageSkeleton />;
   }
 
   return (
     <div className="space-y-6 p-6">
+      <ConfirmModal
+        open={!!confirmModal}
+        onClose={() => setConfirmModal(null)}
+        title={confirmModal?.title}
+        description={confirmModal?.description}
+        variant={confirmModal?.variant}
+        confirmLabel={confirmModal?.confirmLabel}
+        cancelLabel={confirmModal?.cancelLabel}
+        onConfirm={confirmModal?.onConfirm}
+      />
       <header>
         <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">Users</h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">People in your teams — invite new members from a team you own.</p>
@@ -310,7 +332,7 @@ const Users = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDeleteUser(user.id)}
+                        onClick={() => confirmDeleteUser(user.id)}
                         disabled={deleteLoading === user.id}
                         className="text-sm text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
                       >
@@ -433,7 +455,7 @@ const Users = () => {
                   variant="outline"
                   size="sm"
                   className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
-                  onClick={() => handleDeleteUser(selectedUser.id)}
+                  onClick={() => confirmDeleteUser(selectedUser.id)}
                   loading={deleteLoading === selectedUser.id}
                   disabled={deleteLoading !== null}
                 >
@@ -445,17 +467,21 @@ const Users = () => {
         </Card>
       )}
 
-      {toast && (
-        <div
-          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-medium ${
-            toast.type === 'error'
-              ? 'bg-red-100 dark:bg-red-900/80 text-red-800 dark:text-red-200'
-              : 'bg-green-100 dark:bg-green-900/80 text-green-800 dark:text-green-200'
-          }`}
-        >
-          {toast.message}
-        </div>
-      )}
+      {toast &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            role="status"
+            className={`fixed left-1/2 -translate-x-1/2 top-[5.5rem] max-w-[min(90vw,28rem)] px-4 py-3 rounded-xl shadow-xl border text-sm font-medium z-[10000] ${
+              toast.type === 'error'
+                ? 'bg-red-50 dark:bg-red-950/90 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100'
+                : 'bg-emerald-50 dark:bg-emerald-950/90 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100'
+            }`}
+          >
+            {toast.message}
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

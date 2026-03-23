@@ -16,11 +16,12 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import ResolutionAnalytics from '../components/ResolutionAnalytics';
 import { api } from '../services/api';
+import { AnalyticsPageSkeleton } from '../components/ui/Skeleton';
 
 /**
  * Analytics page with clean data visualization
  */
-const Analytics = () => {
+const Analytics = ({ activeTeamId }) => {
   const [loading, setLoading] = useState(true);
   const [refreshLoading, setRefreshLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -60,7 +61,8 @@ const Analytics = () => {
 
   useEffect(() => {
     loadAnalytics();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when workspace (active team) changes
+  }, [activeTeamId]);
 
   const formatResolutionTime = (seconds) => {
     if (seconds == null || seconds === 0) return 'N/A';
@@ -102,7 +104,7 @@ const Analytics = () => {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Analytics</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Performance insights and metrics</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Metrics for your workspace (active team and tickets you can access)</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => loadAnalytics(true)} loading={refreshLoading}>
@@ -128,9 +130,7 @@ const Analytics = () => {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary-600 border-t-transparent"></div>
-        </div>
+        <AnalyticsPageSkeleton />
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

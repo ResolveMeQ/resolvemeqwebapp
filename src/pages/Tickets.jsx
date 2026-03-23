@@ -8,6 +8,7 @@ import {
   Zap,
   Sparkles,
   X,
+  Lightbulb,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -17,7 +18,9 @@ import ActionHistory from '../components/ActionHistory';
 import ResolutionFeedback from '../components/ResolutionFeedback';
 import AIChatPanel from '../components/AIChatPanel';
 import { api, TokenService } from '../services/api';
+import { TICKET_CATEGORY_FALLBACK } from '../constants';
 import { cn } from '../utils/cn';
+import { TicketsPageSkeleton, TicketDetailPanelSkeleton, Skeleton } from '../components/ui/Skeleton';
 
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
@@ -28,7 +31,16 @@ const STATUS_OPTIONS = [
   { value: 'resolved', label: 'Resolved' },
 ];
 
-const Tickets = () => {
+function categoryOptionsForSelect(categories, currentValue) {
+  const known = new Set((categories || []).map((c) => c.value));
+  const orphan =
+    currentValue && !known.has(currentValue)
+      ? [{ value: currentValue, label: `${currentValue} (legacy)` }]
+      : [];
+  return [...(categories || []), ...orphan];
+}
+
+const Tickets = ({ activeTeamId }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTickets, setActiveTickets] = useState([]);
@@ -37,6 +49,8 @@ const Tickets = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [communityHints, setCommunityHints] = useState([]);
+  const [communityLoading, setCommunityLoading] = useState(false);
   const [detailTicket, setDetailTicket] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(null);
@@ -52,10 +66,51 @@ const Tickets = () => {
   const [deleteLoading, setDeleteLoading] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createForm, setCreateForm] = useState({ issue_type: '', description: '', category: 'other' });
+  const [ticketCategories, setTicketCategories] = useState(TICKET_CATEGORY_FALLBACK);
 
   useEffect(() => {
-    loadTickets();
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.tickets.getCategories();
+        const list = Array.isArray(res?.categories) ? res.categories : [];
+        if (!cancelled && list.length > 0) setTicketCategories(list);
+      } catch {
+        if (!cancelled) setTicketCategories(TICKET_CATEGORY_FALLBACK);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    setDetailTicket(null);
+    setCurrentTicket(null);
+    setShowAIAgent(false);
+    loadTickets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when workspace (active team) changes
+  }, [activeTeamId]);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setCommunityHints([]);
+      return undefined;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setCommunityLoading(true);
+        const res = await api.tickets.search({ q });
+        setCommunityHints(Array.isArray(res?.community_resolved) ? res.community_resolved : []);
+      } catch {
+        setCommunityHints([]);
+      } finally {
+        setCommunityLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery, activeTeamId]);
 
   useEffect(() => {
     const openId = location.state?.openTicketId;
@@ -317,14 +372,7 @@ const Tickets = () => {
   });
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary-600 border-t-transparent mx-auto mb-4" />
-          <p className="text-sm text-gray-600 dark:text-gray-400">Loading tickets...</p>
-        </div>
-      </div>
-    );
+    return <TicketsPageSkeleton />;
   }
 
   return (
@@ -332,7 +380,9 @@ const Tickets = () => {
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Tickets</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Get instant AI help or manage existing tickets</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Your active team&apos;s queue plus your personal tickets — search also surfaces similar resolved examples.
+          </p>
         </div>
         <Button onClick={() => setShowCreateForm(true)} variant="primary" size="md" className="font-semibold">
           <Plus className="w-5 h-5 mr-2" />
@@ -400,11 +450,11 @@ const Tickets = () => {
                       onChange={(e) => setCreateForm((p) => ({ ...p, category: e.target.value }))}
                       className="input-enterprise"
                     >
-                      <option value="hardware">Hardware</option>
-                      <option value="software">Software</option>
-                      <option value="network">Network</option>
-                      <option value="access">Access</option>
-                      <option value="other">Other</option>
+                      {categoryOptionsForSelect(ticketCategories, createForm.category).map((c) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div className="flex gap-2 pt-2">
@@ -473,6 +523,58 @@ const Tickets = () => {
             />
           </div>
         </div>
+
+        {(communityLoading || communityHints.length > 0) && (
+          <div className="px-4 sm:px-6 py-3 border-b border-amber-100 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-950/20">
+            <div className="flex items-center gap-2 text-xs font-semibold text-amber-900 dark:text-amber-200 uppercase tracking-wide">
+              <Lightbulb className="w-4 h-4 shrink-0" />
+              Similar resolved (from others)
+            </div>
+            <p className="text-[11px] text-gray-600 dark:text-gray-400 mt-1 mb-2">
+              Same search as the header bar — examples only; open Knowledge base for more.
+            </p>
+            {communityLoading && communityHints.length === 0 ? (
+              <ul className="space-y-2">
+                {[0, 1].map((k) => (
+                  <li
+                    key={k}
+                    className="rounded-md border border-amber-100 dark:border-amber-900/40 bg-white/60 dark:bg-gray-900/40 px-2.5 py-2 space-y-2"
+                  >
+                    <Skeleton className="h-3.5 w-[72%] max-w-sm" />
+                    <Skeleton className="h-3 w-full max-w-md" />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ul className="space-y-2">
+                {communityHints.slice(0, 4).map((h) => (
+                  <li
+                    key={`hint-${h.ticket_id}`}
+                    className="text-xs rounded-md border border-amber-100 dark:border-amber-900/40 bg-white/60 dark:bg-gray-900/40 px-2.5 py-2"
+                  >
+                    <p className="font-medium text-gray-900 dark:text-white line-clamp-1">
+                      {h.issue_type || h.description_preview || 'Resolved example'}
+                    </p>
+                    {h.solution_preview && (
+                      <p className="text-[11px] text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">{h.solution_preview}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {searchQuery.trim().length >= 2 && (
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(`/knowledge-base?q=${encodeURIComponent(searchQuery.trim())}`)
+                }
+                className="mt-2 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+              >
+                Open knowledge base with this search
+              </button>
+            )}
+          </div>
+        )}
 
         {error && (
           <div className="px-4 sm:px-6 py-4 text-center text-red-600 dark:text-red-400 text-sm border-b border-gray-200 dark:border-gray-800">{error}</div>
@@ -743,11 +845,11 @@ const Tickets = () => {
                         onChange={(e) => setEditForm((p) => ({ ...p, category: e.target.value }))}
                         className="input-enterprise"
                       >
-                        <option value="hardware">Hardware</option>
-                        <option value="software">Software</option>
-                        <option value="network">Network</option>
-                        <option value="access">Access</option>
-                        <option value="other">Other</option>
+                        {categoryOptionsForSelect(ticketCategories, editForm.category).map((c) => (
+                          <option key={c.value} value={c.value}>
+                            {c.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -770,9 +872,7 @@ const Tickets = () => {
                 ) : (
                   <div className="space-y-6">
                     {detailLoading ? (
-                      <div className="py-12 text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-600 border-t-transparent mx-auto" />
-                      </div>
+                      <TicketDetailPanelSkeleton />
                     ) : (
                       <>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
