@@ -4,6 +4,11 @@ import { Sparkles, Send, Loader, CheckCircle, X } from 'lucide-react';
 import { api, TokenService } from '../services/api';
 import Button from './ui/Button';
 import ConfidenceBadge from './ui/ConfidenceBadge';
+import {
+  normalizeSuggestedActionsList,
+  suggestedActionsFromAgentResponse,
+  quickRepliesFromAgentResponse,
+} from '../utils/chatUi';
 
 /**
  * SimpleTicketCreation - Dead simple ticket creation with IMMEDIATE AI response
@@ -57,15 +62,21 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
       if (historyData.conversation && historyData.conversation.messages.length > 0) {
         // Use existing conversation
         setConversationId(historyData.conversation.id);
-        setConversation(historyData.conversation.messages.map(msg => ({
-          type: msg.sender_type,
-          text: msg.text,
-          confidence: msg.confidence,
-          metadata: msg.metadata,
-          messageType: msg.message_type,
-          wasHelpful: msg.was_helpful,
-          timestamp: msg.created_at,
-        })));
+        setConversation(historyData.conversation.messages.map((msg) => {
+          const meta = msg.metadata || {};
+          return {
+            type: msg.sender_type,
+            text: msg.text,
+            confidence: msg.confidence,
+            metadata: {
+              ...meta,
+              suggested_actions: normalizeSuggestedActionsList(meta.suggested_actions),
+            },
+            messageType: msg.message_type,
+            wasHelpful: msg.was_helpful,
+            timestamp: msg.created_at,
+          };
+        }));
       } else {
         // Get AI response for the new ticket
         const agentStatus = await api.agent.getTicketAgentStatus(newTicket.id || newTicket.ticket_id);
@@ -86,6 +97,13 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
               analysis: aiResponse.analysis,
               solution: aiResponse.solution,
               timestamp: new Date().toISOString(),
+              metadata: {
+                steps: aiResponse.solution?.steps || [],
+                estimated_time: aiResponse.solution?.estimated_time,
+                success_probability: aiResponse.solution?.success_probability,
+                suggested_actions: suggestedActionsFromAgentResponse(aiResponse),
+                quick_replies: quickRepliesFromAgentResponse(aiResponse),
+              },
             },
           ]);
         } else {
@@ -147,13 +165,17 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
       }
 
       const aiMsg = data.ai_message;
-      setConversation(prev => [
+      const meta = aiMsg.metadata || {};
+      setConversation((prev) => [
         ...prev,
         {
           type: 'ai',
           text: aiMsg.text,
           confidence: aiMsg.confidence,
-          metadata: aiMsg.metadata,
+          metadata: {
+            ...meta,
+            suggested_actions: normalizeSuggestedActionsList(meta.suggested_actions),
+          },
           messageType: aiMsg.message_type,
           timestamp: aiMsg.created_at,
         },
@@ -209,23 +231,68 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
     return message;
   };
 
-  /** Trigger backend actions from AI suggested_actions (e.g. Auto Resolve, Escalate) */
-  const handleSuggestedAction = async (actionLabel) => {
+  /** Trigger backend actions from AI suggested_actions ({ intent }) or legacy labels */
+  const handleSuggestedAction = async (action) => {
     const tid = ticket?.id || ticket?.ticket_id;
     if (!tid || actionInProgress) return;
-    const action = String(actionLabel).toLowerCase();
-    setActionInProgress(actionLabel);
+
+    if (action && typeof action === 'object' && action.label) {
+      const { intent, message, label } = action;
+      setActionInProgress(label);
+      try {
+        if (intent === 'auto_resolve') {
+          await api.tickets.updateStatus(tid, 'resolved');
+          window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
+          setConversation((prev) => [...prev, {
+            type: 'system',
+            text: 'Ticket marked as resolved.',
+            timestamp: new Date().toISOString(),
+          }]);
+          setTimeout(() => onClose?.(), 1500);
+        } else if (intent === 'escalate') {
+          const summary = conversation
+            .filter((m) => m.type === 'user' || m.type === 'ai')
+            .slice(-8)
+            .map((m) => (m.type === 'user' ? `User: ${(m.text || '').slice(0, 150)}` : `AI: ${(m.text || '').slice(0, 150)}`))
+            .join(' | ');
+          await api.tickets.escalate(tid, summary ? { conversation_summary: summary } : {});
+          window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
+          setConversation((prev) => [...prev, {
+            type: 'system',
+            text: 'Ticket escalated to support.',
+            timestamp: new Date().toISOString(),
+          }]);
+        } else if (intent === 'request_clarification') {
+          sendMessage(message || 'Could you provide more details about the issue?');
+        } else {
+          sendMessage(message || label);
+        }
+      } catch (err) {
+        console.error('Suggested action failed:', err);
+        setConversation((prev) => [...prev, {
+          type: 'system',
+          text: 'Action could not be completed. Please try again.',
+          timestamp: new Date().toISOString(),
+        }]);
+      } finally {
+        setActionInProgress(null);
+      }
+      return;
+    }
+
+    const actionStr = String(action).toLowerCase();
+    setActionInProgress(action);
     try {
-      if (action.includes('resolve') && (action.includes('auto') || action.includes('mark'))) {
+      if (actionStr.includes('resolve') && (actionStr.includes('auto') || actionStr.includes('mark'))) {
         await api.tickets.updateStatus(tid, 'resolved');
         window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
-        setConversation(prev => [...prev, {
+        setConversation((prev) => [...prev, {
           type: 'system',
           text: 'Ticket marked as resolved.',
           timestamp: new Date().toISOString(),
         }]);
         setTimeout(() => onClose?.(), 1500);
-      } else if (action.includes('escalate')) {
+      } else if (actionStr.includes('escalate')) {
         const summary = conversation
           .filter((m) => m.type === 'user' || m.type === 'ai')
           .slice(-8)
@@ -233,19 +300,19 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
           .join(' | ');
         await api.tickets.escalate(tid, summary ? { conversation_summary: summary } : {});
         window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
-        setConversation(prev => [...prev, {
+        setConversation((prev) => [...prev, {
           type: 'system',
           text: 'Ticket escalated to support.',
           timestamp: new Date().toISOString(),
         }]);
-      } else if (action.includes('clarification')) {
+      } else if (actionStr.includes('clarification')) {
         sendMessage('Could you provide more details about the issue?');
       } else {
-        sendMessage(actionLabel);
+        sendMessage(String(action));
       }
     } catch (err) {
       console.error('Suggested action failed:', err);
-      setConversation(prev => [...prev, {
+      setConversation((prev) => [...prev, {
         type: 'system',
         text: 'Action could not be completed. Please try again.',
         timestamp: new Date().toISOString(),
@@ -402,19 +469,19 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
                             )}
 
                             {/* Suggested actions: trigger backend (Auto Resolve, Escalate, etc.) */}
-                            {msg.metadata?.suggested_actions?.length > 0 && (
+                            {normalizeSuggestedActionsList(msg.metadata?.suggested_actions).length > 0 && (
                               <div className="mt-3">
                                 <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Suggested actions:</p>
                                 <div className="flex flex-wrap gap-2">
-                                  {msg.metadata.suggested_actions.map((action, aIdx) => (
+                                  {normalizeSuggestedActionsList(msg.metadata.suggested_actions).map((act, aIdx) => (
                                     <button
                                       key={aIdx}
                                       type="button"
-                                      onClick={() => handleSuggestedAction(action)}
+                                      onClick={() => handleSuggestedAction(act)}
                                       disabled={!!actionInProgress}
                                       className="px-3 py-1.5 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800 rounded-full text-xs font-medium hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors disabled:opacity-50"
                                     >
-                                      {action}
+                                      {actionInProgress === act.label ? 'Working…' : act.label}
                                     </button>
                                   ))}
                                 </div>

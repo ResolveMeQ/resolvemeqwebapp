@@ -14,6 +14,11 @@ import { api } from '../services/api';
 import ConfidenceBadge from './ui/ConfidenceBadge';
 import Button from './ui/Button';
 import { cn } from '../utils/cn';
+import {
+  normalizeSuggestedActionsList,
+  suggestedActionsFromAgentResponse,
+  quickRepliesFromAgentResponse,
+} from '../utils/chatUi';
 
 /**
  * AIChatPanel - Real AI chat interface with backend integration
@@ -93,9 +98,6 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
       aiText = reasoning || "I've analyzed your issue and I'm here to help. Can you provide more details?";
     }
     const userText = ticketData.description || ticketData.issue_type || 'My issue';
-    const suggestedActions = [];
-    const ra = (ar.recommended_action || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-    if (ra) suggestedActions.push(ra);
     return [
       { id: `injected-user-${Date.now()}`, type: 'user', text: userText, createdAt: new Date().toISOString() },
       {
@@ -105,14 +107,10 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
         confidence,
         metadata: {
           steps: Array.isArray(steps) ? steps : [],
-          suggested_actions: suggestedActions,
+          suggested_actions: suggestedActionsFromAgentResponse(ar),
           estimated_time: solution.estimated_time,
           success_probability: solution.success_probability,
-          quick_replies: [
-            { label: 'Explain step 1', value: 'Can you explain step 1 in more detail?' },
-            { label: "That didn't work", value: "I tried that but it didn't work. What else can I try?" },
-            { label: 'Talk to a human', value: "I'd like to speak with a human agent" },
-          ],
+          quick_replies: quickRepliesFromAgentResponse(ar),
         },
         messageType: steps.length > 1 ? 'steps' : 'text',
         wasHelpful: null,
@@ -132,16 +130,24 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
       
       if (convId) setConversationId(convId);
       if (msgList.length > 0) {
-        setMessages(msgList.map((msg) => ({
-          id: msg.id,
-          type: msg.sender_type || msg.type,
-          text: msg.text,
-          confidence: msg.confidence,
-          metadata: msg.metadata || {},
-          messageType: msg.message_type,
-          wasHelpful: msg.was_helpful,
-          createdAt: msg.created_at,
-        })));
+        setMessages(
+          msgList.map((msg) => {
+            const meta = msg.metadata || {};
+            return {
+              id: msg.id,
+              type: msg.sender_type || msg.type,
+              text: msg.text,
+              confidence: msg.confidence,
+              metadata: {
+                ...meta,
+                suggested_actions: normalizeSuggestedActionsList(meta.suggested_actions),
+              },
+              messageType: msg.message_type,
+              wasHelpful: msg.was_helpful,
+              createdAt: msg.created_at,
+            };
+          })
+        );
       } else {
         // No messages: try to inject from ticket.agent_response (from process/Describe flow)
         let injected = false;
@@ -230,6 +236,7 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
 
       // Add AI response to UI
       const aiMsg = data.ai_message;
+      const meta = aiMsg.metadata || {};
       setMessages((prev) => [
         ...prev,
         {
@@ -237,7 +244,10 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
           type: aiMsg.sender_type,
           text: aiMsg.text,
           confidence: aiMsg.confidence,
-          metadata: aiMsg.metadata || {},
+          metadata: {
+            ...meta,
+            suggested_actions: normalizeSuggestedActionsList(meta.suggested_actions),
+          },
           messageType: aiMsg.message_type,
           wasHelpful: null,
           createdAt: aiMsg.created_at,
@@ -295,13 +305,61 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
       .join(' | ');
   };
 
-  /** Trigger backend actions from AI suggested_actions (e.g. Auto Resolve, Escalate) */
-  const handleSuggestedAction = async (actionLabel) => {
+  /** Trigger backend actions from AI suggested_actions ({ intent }) or legacy label strings */
+  const handleSuggestedAction = async (action) => {
     if (!ticketId || actionInProgress) return;
-    const action = String(actionLabel).toLowerCase();
-    setActionInProgress(actionLabel);
+
+    if (action && typeof action === 'object' && action.label) {
+      const { intent, message, label } = action;
+      const progressKey = label;
+      setActionInProgress(progressKey);
+      try {
+        if (intent === 'auto_resolve') {
+          const res = await api.tickets.updateStatus(ticketId, 'resolved');
+          onTicketUpdate?.(res?.ticket);
+          setMessages((prev) => [...prev, {
+            id: `sys-${Date.now()}`,
+            type: 'system',
+            text: 'Ticket marked as resolved.',
+            createdAt: new Date().toISOString(),
+          }]);
+          window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
+          onActionComplete?.();
+        } else if (intent === 'escalate') {
+          const summary = buildConversationSummary();
+          const res = await api.tickets.escalate(ticketId, summary ? { conversation_summary: summary } : {});
+          onTicketUpdate?.(res?.ticket);
+          setMessages((prev) => [...prev, {
+            id: `sys-${Date.now()}`,
+            type: 'system',
+            text: 'Ticket escalated to support.',
+            createdAt: new Date().toISOString(),
+          }]);
+          window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
+          onActionComplete?.();
+        } else if (intent === 'request_clarification') {
+          sendMessage(message || 'I need more information to proceed. Could you provide more details?');
+        } else {
+          sendMessage(message || label);
+        }
+      } catch (err) {
+        console.error('Suggested action failed:', err);
+        setMessages((prev) => [...prev, {
+          id: `err-${Date.now()}`,
+          type: 'system',
+          text: 'Action could not be completed. Please try again or get human help below.',
+          createdAt: new Date().toISOString(),
+        }]);
+      } finally {
+        setActionInProgress(null);
+      }
+      return;
+    }
+
+    const actionStr = String(action).toLowerCase();
+    setActionInProgress(action);
     try {
-      if (action.includes('resolve') && (action.includes('auto') || action.includes('mark'))) {
+      if (actionStr.includes('resolve') && (actionStr.includes('auto') || actionStr.includes('mark'))) {
         const res = await api.tickets.updateStatus(ticketId, 'resolved');
         onTicketUpdate?.(res?.ticket);
         setMessages((prev) => [...prev, {
@@ -312,7 +370,7 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
         }]);
         window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
         onActionComplete?.();
-      } else if (action.includes('escalate')) {
+      } else if (actionStr.includes('escalate')) {
         const summary = buildConversationSummary();
         const res = await api.tickets.escalate(ticketId, summary ? { conversation_summary: summary } : {});
         onTicketUpdate?.(res?.ticket);
@@ -324,10 +382,10 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
         }]);
         window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
         onActionComplete?.();
-      } else if (action.includes('clarification')) {
+      } else if (actionStr.includes('clarification')) {
         sendMessage('I need more information to proceed. Could you provide more details?');
       } else {
-        sendMessage(actionLabel);
+        sendMessage(String(action));
       }
     } catch (err) {
       console.error('Suggested action failed:', err);
@@ -456,21 +514,21 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
                         })()}
 
                         {/* Actions: click to resolve, escalate, or request clarification — not steps */}
-                        {msg.metadata.suggested_actions?.length > 0 && (
+                        {normalizeSuggestedActionsList(msg.metadata.suggested_actions).length > 0 && (
                           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                             <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">
                               What would you like to do?
                             </p>
                             <div className="flex flex-wrap gap-2">
-                              {msg.metadata.suggested_actions.map((action, aIdx) => (
+                              {normalizeSuggestedActionsList(msg.metadata.suggested_actions).map((act, aIdx) => (
                                 <button
                                   key={aIdx}
                                   type="button"
-                                  onClick={() => handleSuggestedAction(action)}
+                                  onClick={() => handleSuggestedAction(act)}
                                   disabled={actionInProgress !== null}
                                   className="px-4 py-2 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800 rounded-lg text-sm font-medium hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  {action}
+                                  {actionInProgress === act.label ? 'Working…' : act.label}
                                 </button>
                               ))}
                             </div>
