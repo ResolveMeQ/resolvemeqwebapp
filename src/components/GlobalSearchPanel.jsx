@@ -32,6 +32,39 @@ const GlobalSearchPanel = ({
     } else {
       onNavigate?.('knowledge-base');
     }
+    onClose?.();
+  };
+
+  /** Prefer a specific phrase (e.g. similar-resolved title) over the global search box. */
+  const openKnowledgeBaseWithHint = (hint) => {
+    const q = (hint || query || '').trim();
+    if (q) {
+      navigate(`/knowledge-base?q=${encodeURIComponent(q)}`);
+    } else {
+      onNavigate?.('knowledge-base');
+    }
+    onClose?.();
+  };
+
+  const openYourTicket = (ticketId) => {
+    const n = Number(ticketId);
+    if (Number.isNaN(n)) return;
+    navigate('/tickets', { state: { openTicketId: n } });
+    onClose?.();
+  };
+
+  const openKbArticle = (article) => {
+    const kbId = article?.kb_id ?? article?.id;
+    if (kbId == null) {
+      openKnowledgeBaseWithQuery();
+      return;
+    }
+    const q = (query || '').trim();
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    params.set('kb', String(kbId));
+    navigate(`/knowledge-base?${params.toString()}`);
+    onClose?.();
   };
 
   const hasAnyResults =
@@ -111,8 +144,8 @@ const GlobalSearchPanel = ({
                         role="button"
                         tabIndex={0}
                         className="rounded-md px-2.5 py-1.5 bg-gray-50 dark:bg-gray-800/70 border border-gray-100 dark:border-gray-700 flex items-center justify-between gap-2 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                        onClick={() => onNavigate?.('tickets')}
-                        onKeyDown={(e) => e.key === 'Enter' && onNavigate?.('tickets')}
+                        onClick={() => openYourTicket(id)}
+                        onKeyDown={(e) => e.key === 'Enter' && openYourTicket(id)}
                       >
                         <div className="min-w-0">
                           <p className="font-medium text-gray-900 dark:text-white truncate">
@@ -157,7 +190,7 @@ const GlobalSearchPanel = ({
                   </p>
                 </div>
                 <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-1.5 leading-snug">
-                  How others fixed similar issues — open the knowledge base or start a ticket; you can&apos;t open these directly.
+                  How others fixed similar issues — click a row to search the knowledge base with that topic (other people&apos;s tickets stay private).
                 </p>
                 <div className="space-y-1.5">
                   {(results?.communityResolvedTickets || []).slice(0, 5).map((h) => {
@@ -169,9 +202,18 @@ const GlobalSearchPanel = ({
                         role="button"
                         tabIndex={0}
                         className="rounded-md px-2.5 py-1.5 bg-amber-50/80 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 text-xs cursor-pointer hover:bg-amber-100/80 dark:hover:bg-amber-950/35"
-                        onClick={openKnowledgeBaseWithQuery}
-                        onKeyDown={(e) => e.key === 'Enter' && openKnowledgeBaseWithQuery()}
-                        title="Open knowledge base with this search"
+                        onClick={() =>
+                          openKnowledgeBaseWithHint(
+                            h.issue_type || h.description_preview || query
+                          )
+                        }
+                        onKeyDown={(e) =>
+                          e.key === 'Enter' &&
+                          openKnowledgeBaseWithHint(
+                            h.issue_type || h.description_preview || query
+                          )
+                        }
+                        title="Search knowledge base for this topic"
                       >
                         <p className="font-medium text-gray-900 dark:text-white line-clamp-2">
                           {title}
@@ -219,9 +261,12 @@ const GlobalSearchPanel = ({
             <div className="space-y-1.5">
               {(results?.knowledgeBase || []).slice(0, 5).map((a) => (
                 <div
-                  key={a.id}
+                  key={a.kb_id ?? a.id}
+                  role="button"
+                  tabIndex={0}
                   className="rounded-md px-2.5 py-1.5 bg-gray-50 dark:bg-gray-800/70 border border-gray-100 dark:border-gray-700 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                  onClick={() => onNavigate?.('knowledge-base')}
+                  onClick={() => openKbArticle(a)}
+                  onKeyDown={(e) => e.key === 'Enter' && openKbArticle(a)}
                 >
                   <p className="font-medium text-gray-900 dark:text-white truncate">
                     {a.title}

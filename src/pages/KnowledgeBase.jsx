@@ -59,6 +59,25 @@ const KnowledgeBase = () => {
     if (q) setSearchQuery(q);
   }, [searchParams]);
 
+  const kbOpenParam = searchParams.get('kb');
+
+  useEffect(() => {
+    const id = (kbOpenParam || '').trim();
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const article = await api.knowledgeBase.get(id);
+        if (!cancelled && article) setSelectedArticle(article);
+      } catch {
+        /* deleted or unknown id */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [kbOpenParam]);
+
   useEffect(() => {
     filterArticles();
   }, [searchQuery, selectedTags, articles, sortBy]);

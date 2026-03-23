@@ -114,11 +114,12 @@ const Tickets = ({ activeTeamId }) => {
 
   useEffect(() => {
     const openId = location.state?.openTicketId;
-    if (!openId || activeTickets.length === 0) return;
-    const ticket = activeTickets.find((t) => (t.ticket_id ?? t.id) === openId);
+    if (openId == null || activeTickets.length === 0) return;
+    const want = Number(openId);
+    const ticket = activeTickets.find((t) => Number(t.ticket_id ?? t.id) === want);
     if (ticket) {
       setDetailTicket(ticket);
-      loadTicketDetail(openId);
+      loadTicketDetail(want);
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state?.openTicketId, activeTickets, location.pathname, navigate]);

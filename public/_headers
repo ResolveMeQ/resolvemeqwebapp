@@ -1,3 +1,7 @@
+# Google Sign-In / FedCM: allow popup ↔ opener communication (avoids console COOP errors).
+/*
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+
 # Force correct MIME type for JavaScript (fixes blank page / module script error)
 /*.js
   Content-Type: application/javascript; charset=utf-8
