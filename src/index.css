@@ -70,6 +70,13 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     letter-spacing: -0.011em;
   }
+
+  /* Avoid horizontal scroll from full-bleed mobile sections (e.g. global search) */
+  @media (max-width: 639px) {
+    body {
+      overflow-x: hidden;
+    }
+  }
   
   html {
     scroll-behavior: smooth;

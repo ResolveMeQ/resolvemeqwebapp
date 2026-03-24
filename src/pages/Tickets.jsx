@@ -796,10 +796,10 @@ const Tickets = ({ activeTeamId }) => {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
-            style={{ top: 0, right: 0, bottom: 0, height: '100vh' }}
+            style={{ top: 0, right: 0, bottom: 0, height: '100dvh', maxHeight: '100dvh' }}
             className="fixed w-full sm:max-w-2xl bg-white dark:bg-gray-950 shadow-2xl z-50 flex flex-col overflow-hidden"
           >
-              <div className="flex-shrink-0 flex items-center justify-between gap-4 px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex-shrink-0 flex items-center justify-between gap-4 px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] pb-4 border-b border-gray-200 dark:border-gray-800">
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                     Ticket #{detailTicket?.ticket_id ?? detailTicket?.id ?? '—'}

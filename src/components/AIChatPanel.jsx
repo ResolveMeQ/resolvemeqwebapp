@@ -415,11 +415,11 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
       transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
-      style={{ top: 0, right: 0, bottom: 0, height: '100vh' }}
+      style={{ top: 0, right: 0, bottom: 0, height: '100dvh', maxHeight: '100dvh' }}
       className="fixed w-full sm:max-w-2xl bg-white dark:bg-gray-950 shadow-2xl z-50 flex flex-col border-l border-gray-200 dark:border-gray-800 overflow-hidden"
     >
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+      <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 pt-[max(1rem,env(safe-area-inset-top))] pb-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
         <div className="min-w-0 flex items-center gap-3 flex-1">
           <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex-shrink-0">
             <Sparkles className="w-5 h-5 text-primary-600 dark:text-primary-400" />
@@ -682,7 +682,7 @@ const AIChatPanel = ({ ticket, isOpen, onClose, onBackToTicket, onActionComplete
       </div>
 
       {/* Input and contextual suggestions for easiest path to resolution */}
-      <div className="border-t border-gray-200 dark:border-gray-800 p-4 bg-white dark:bg-gray-950">
+      <div className="border-t border-gray-200 dark:border-gray-800 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white dark:bg-gray-950">
         {suggestions.length > 0 && messages.length <= 1 && (
           <div className="mb-3">
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Quick options:</p>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -21,8 +22,114 @@ import { cn } from '../utils/cn';
 import { KnowledgeBaseArticlesSkeleton } from '../components/ui/Skeleton';
 import { renderMarkdown } from '../utils/markdown';
 
+/** Shared article body for desktop side panel and mobile full-height sheet */
+function ArticleDetailPanelContent({
+  article,
+  onClose,
+  formatDate,
+  getHelpfulnessScore,
+  handleRate,
+  ratingArticleId,
+  sheetMode,
+}) {
+  if (!article) return null;
+  const id = article.kb_id ?? article.id;
+  return (
+    <div className="w-full min-w-0 h-full flex flex-col overflow-hidden max-w-[420px] lg:max-w-none">
+      <div
+        className={cn(
+          'px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between shrink-0',
+          sheetMode && 'pt-[max(0.75rem,env(safe-area-inset-top))]'
+        )}
+      >
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white truncate pr-2">
+          {article.title}
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+          aria-label="Close panel"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div
+        className={cn(
+          'flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent',
+          sheetMode && 'pb-[max(1rem,env(safe-area-inset-bottom))]'
+        )}
+      >
+        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+          <span className="flex items-center gap-1">
+            <Calendar className="w-3.5 h-3.5" />
+            {formatDate(article.created_at)}
+          </span>
+          <span>·</span>
+          <span className="flex items-center gap-1">
+            <Eye className="w-3.5 h-3.5" />
+            {article.views ?? 0} views
+          </span>
+          <span>·</span>
+          <span>{getHelpfulnessScore(article)}% helpful</span>
+        </div>
+
+        {article.tags?.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {article.tags.map((t) => (
+              <span
+                key={t}
+                className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800/50 rounded-md text-xs font-medium"
+              >
+                <Tag className="w-3 h-3" />
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div>
+          <div
+            className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-gray-50 dark:bg-gray-900"
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content) }}
+          />
+        </div>
+
+        <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+          <p className="text-sm font-medium text-gray-900 dark:text-white mb-3">Was this helpful?</p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              loading={ratingArticleId === id}
+              disabled={ratingArticleId === id}
+              onClick={() => handleRate(id, true)}
+            >
+              <ThumbsUp className="w-4 h-4 mr-1.5" />
+              Yes
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              loading={ratingArticleId === id}
+              disabled={ratingArticleId === id}
+              onClick={() => handleRate(id, false)}
+            >
+              <ThumbsDown className="w-4 h-4 mr-1.5" />
+              No
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const KnowledgeBase = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [articles, setArticles] = useState([]);
   const [filteredArticles, setFilteredArticles] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,14 +142,15 @@ const KnowledgeBase = () => {
   const [ratingArticleId, setRatingArticleId] = useState(null);
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const TAGS_VISIBLE_COLLAPSED = 12;
-  const [panelWidth, setPanelWidth] = useState(420);
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : true
+  );
 
   useEffect(() => {
-    const updatePanelWidth = () =>
-      setPanelWidth(window.innerWidth < 640 ? window.innerWidth : 420);
-    updatePanelWidth();
-    window.addEventListener('resize', updatePanelWidth);
-    return () => window.removeEventListener('resize', updatePanelWidth);
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = () => setIsDesktop(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
   }, []);
 
   const showToast = useCallback((message, type = 'success') => {
@@ -149,10 +257,29 @@ const KnowledgeBase = () => {
 
   const openArticle = (article) => {
     setSelectedArticle(article);
+    const id = article.kb_id ?? article.id;
+    if (id != null && id !== '') {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('kb', String(id));
+          return next;
+        },
+        { replace: true }
+      );
+    }
   };
 
   const closeArticle = () => {
     setSelectedArticle(null);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('kb');
+        return next;
+      },
+      { replace: true }
+    );
   };
 
   const getHelpfulnessScore = (article) => {
@@ -391,105 +518,69 @@ const KnowledgeBase = () => {
       )}
       </div>
 
-      {/* Right-side panel: article detail */}
+      {/* Desktop (lg+): article detail beside the list */}
       <AnimatePresence mode="wait">
-        {selectedArticle && (
+        {selectedArticle && isDesktop && (
           <motion.div
             key="article-panel"
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: panelWidth, opacity: 1 }}
+            animate={{ width: 420, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
-            className="shrink-0 overflow-hidden border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex flex-col max-w-[100vw]"
+            className="flex shrink-0 overflow-hidden border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex-col max-w-[100vw]"
             style={{ minHeight: 'inherit' }}
           >
-            <div className="w-full min-w-[280px] max-w-[420px] h-full flex flex-col overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between shrink-0">
-                <h2 className="text-base font-semibold text-gray-900 dark:text-white truncate pr-2">
-                  {selectedArticle.title}
-                </h2>
-                <button
-                  type="button"
-                  onClick={closeArticle}
-                  className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0 transition-colors"
-                  aria-label="Close panel"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-6 space-y-5 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
-                <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {formatDate(selectedArticle.created_at)}
-                  </span>
-                  <span>·</span>
-                  <span className="flex items-center gap-1">
-                    <Eye className="w-3.5 h-3.5" />
-                    {selectedArticle.views ?? 0} views
-                  </span>
-                  <span>·</span>
-                  <span>
-                    {getHelpfulnessScore(selectedArticle)}% helpful
-                  </span>
-                </div>
-
-                {selectedArticle.tags?.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {selectedArticle.tags.map((t) => (
-                      <span
-                        key={t}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800/50 rounded-md text-xs font-medium"
-                      >
-                        <Tag className="w-3 h-3" />
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <div>
-                  <div 
-                    className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-gray-50 dark:bg-gray-900"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedArticle.content) }}
-                  />
-                </div>
-
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                    Was this helpful?
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      loading={ratingArticleId === (selectedArticle?.kb_id ?? selectedArticle?.id)}
-                      disabled={ratingArticleId === (selectedArticle?.kb_id ?? selectedArticle?.id)}
-                      onClick={() => handleRate(selectedArticle?.kb_id ?? selectedArticle?.id, true)}
-                    >
-                      <ThumbsUp className="w-4 h-4 mr-1.5" />
-                      Yes
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      loading={ratingArticleId === (selectedArticle?.kb_id ?? selectedArticle?.id)}
-                      disabled={ratingArticleId === (selectedArticle?.kb_id ?? selectedArticle?.id)}
-                      onClick={() => handleRate(selectedArticle?.kb_id ?? selectedArticle?.id, false)}
-                    >
-                      <ThumbsDown className="w-4 h-4 mr-1.5" />
-                      No
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ArticleDetailPanelContent
+              article={selectedArticle}
+              onClose={closeArticle}
+              formatDate={formatDate}
+              getHelpfulnessScore={getHelpfulnessScore}
+              handleRate={handleRate}
+              ratingArticleId={ratingArticleId}
+              sheetMode={false}
+            />
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Mobile / tablet: full-height sheet from the right (portal stays mounted so exit animations run) */}
+      {!isDesktop &&
+        createPortal(
+          <AnimatePresence mode="sync">
+            {selectedArticle && (
+              <>
+                <motion.div
+                  key="kb-backdrop"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-40 bg-black/40 dark:bg-black/60"
+                  onClick={closeArticle}
+                  aria-hidden
+                />
+                <motion.aside
+                  key="kb-sheet"
+                  initial={{ x: '100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '100%' }}
+                  transition={{ type: 'tween', duration: 0.25, ease: 'easeOut' }}
+                  className="fixed top-0 right-0 z-50 flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow-2xl"
+                >
+                  <ArticleDetailPanelContent
+                    article={selectedArticle}
+                    onClose={closeArticle}
+                    formatDate={formatDate}
+                    getHelpfulnessScore={getHelpfulnessScore}
+                    handleRate={handleRate}
+                    ratingArticleId={ratingArticleId}
+                    sheetMode
+                  />
+                </motion.aside>
+              </>
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
 
       {toast && (
         <div

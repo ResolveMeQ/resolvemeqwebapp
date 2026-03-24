@@ -115,13 +115,16 @@ const Sidebar = ({
     }
   ];
 
-  const SidebarContent = ({ hideHeader = false }) => (
-    <div className="flex flex-col h-full">
+  const SidebarContent = ({ hideHeader = false }) => {
+    /** Mobile drawer always shows full labels; desktop rail can stay collapsed */
+    const effectiveCollapsed = hideHeader ? false : collapsed;
+    return (
+    <div className="flex flex-col h-full min-h-0">
       {/* Header - only for desktop sidebar; mobile has its own header */}
       {!hideHeader && (
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-800">
           <AnimatePresence mode="wait">
-            {!collapsed ? (
+            {!effectiveCollapsed ? (
               <motion.div
                 key="logo"
                 initial={{ opacity: 0 }}
@@ -145,7 +148,7 @@ const Sidebar = ({
             )}
           </AnimatePresence>
           
-          {!collapsed && (
+          {!effectiveCollapsed && (
             <button
               onClick={onToggle}
               className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400"
@@ -161,7 +164,7 @@ const Sidebar = ({
       <nav data-tour="sidebar-nav" className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
         {navigationGroups.map((group) => (
           <div key={group.label}>
-            {!collapsed && (
+            {!effectiveCollapsed && (
               <div className="px-3 mb-2">
                 <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   {group.label}
@@ -183,7 +186,7 @@ const Sidebar = ({
                         ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                     )}
-                    title={collapsed ? item.label : undefined}
+                    title={effectiveCollapsed ? item.label : undefined}
                   >
                     <div className={cn(
                       'flex-shrink-0 w-5 h-5 flex items-center justify-center',
@@ -192,13 +195,13 @@ const Sidebar = ({
                       <Icon size={18} />
                     </div>
                     
-                    {!collapsed && (
+                    {!effectiveCollapsed && (
                       <span className={cn('ml-3 text-sm font-medium', isActive && 'font-semibold')}>
                         {item.label}
                       </span>
                     )}
                     
-                    {isActive && !collapsed && (
+                    {isActive && !effectiveCollapsed && (
                       <div className="ml-auto w-1 h-1 rounded-full bg-primary-600 dark:bg-primary-400" />
                     )}
                   </button>
@@ -224,19 +227,19 @@ const Sidebar = ({
                 'w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors duration-150 text-left',
                 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
               )}
-              title={collapsed ? (activeTeamName || 'Select team') : undefined}
+              title={effectiveCollapsed ? (activeTeamName || 'Select team') : undefined}
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-500 dark:text-gray-400">
                   <Users size={18} />
                 </div>
-                {!collapsed && (
+                {!effectiveCollapsed && (
                   <span className="font-medium truncate text-sm">
                     {activeTeamName || 'Select team'}
                   </span>
                 )}
               </div>
-              {!collapsed && <ChevronDown size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />}
+              {!effectiveCollapsed && <ChevronDown size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />}
             </button>
             <AnimatePresence>
               {teamDropdownOpen && (
@@ -246,7 +249,7 @@ const Sidebar = ({
                   exit={{ opacity: 0, y: -4 }}
                   className={cn(
                     'absolute py-1 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 z-50 max-h-48 overflow-y-auto',
-                    collapsed
+                    effectiveCollapsed
                       ? 'left-full ml-2 top-0 min-w-[180px]'
                       : 'left-0 right-0 bottom-full mb-2'
                   )}
@@ -286,13 +289,13 @@ const Sidebar = ({
         <button
           onClick={handleThemeChange}
           className="w-full flex items-center px-3 py-2 rounded-lg transition-colors duration-150 text-left group hover:bg-gray-100 dark:hover:bg-gray-800"
-          title={collapsed ? `${theme.charAt(0).toUpperCase() + theme.slice(1)} Mode` : undefined}
+          title={effectiveCollapsed ? `${theme.charAt(0).toUpperCase() + theme.slice(1)} Mode` : undefined}
         >
           <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-500 dark:text-gray-400">
             {React.createElement(themeIcons[theme], { size: 18 })}
           </div>
           
-          {!collapsed && (
+          {!effectiveCollapsed && (
             <span className="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">
               {theme.charAt(0).toUpperCase() + theme.slice(1)}
             </span>
@@ -313,7 +316,8 @@ const Sidebar = ({
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <>
@@ -332,7 +336,7 @@ const Sidebar = ({
       {/* Mobile Menu Button - account for safe area on notched devices */}
       <button
         onClick={() => setIsMobileOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2.5 bg-white dark:bg-gray-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-800 touch-manipulation"
+        className="lg:hidden fixed top-4 left-4 z-50 min-w-[44px] min-h-[44px] p-2.5 flex items-center justify-center bg-white dark:bg-gray-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-800 touch-manipulation"
         style={{ top: 'max(1rem, env(safe-area-inset-top))', left: 'max(1rem, env(safe-area-inset-left))' }}
         aria-label="Open menu"
       >
@@ -360,23 +364,25 @@ const Sidebar = ({
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
-            className="lg:hidden fixed left-0 top-0 h-full w-72 max-w-[85vw] bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 shadow-xl z-50"
+            className="lg:hidden fixed left-0 top-0 h-[100dvh] max-h-[100dvh] w-[min(18rem,85vw)] bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 shadow-xl z-50 flex flex-col"
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
-            <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-800">
-              <div className="flex items-center space-x-2.5">
-                <img src="/logo.png" alt="ResolveMeQ" className="h-7 w-auto object-contain" />
-                <span className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">ResolveMeQ</span>
+            <div className="flex-shrink-0 flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <img src="/logo.png" alt="ResolveMeQ" className="h-7 w-auto object-contain shrink-0" />
+                <span className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight truncate">ResolveMeQ</span>
               </div>
               <button
                 onClick={() => setIsMobileOpen(false)}
-                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400"
+                className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400 touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center"
                 aria-label="Close menu"
               >
                 <X size={18} />
               </button>
             </div>
-            <SidebarContent hideHeader />
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+              <SidebarContent hideHeader />
+            </div>
           </motion.aside>
         )}
       </AnimatePresence>

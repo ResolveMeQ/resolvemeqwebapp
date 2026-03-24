@@ -58,9 +58,16 @@ const Header = ({
     setSearchQuery(committedSearchQuery || '');
   }, [committedSearchQuery]);
 
+  useEffect(() => {
+    if (mobileSearchOpen && mobileSearchInputRef.current) {
+      mobileSearchInputRef.current.focus();
+    }
+  }, [mobileSearchOpen]);
+
   const themeMenuRef = useRef(null);
   const notificationsMenuRef = useRef(null);
   const userMenuRef = useRef(null);
+  const mobileSearchInputRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -157,72 +164,75 @@ const Header = ({
       'sticky top-0 z-30 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 pt-[env(safe-area-inset-top)]',
       className
     )}>
-      {/* Mobile: left padding for hamburger; everything stays on one row */}
-      <div className="flex items-center gap-2 sm:gap-3 pl-16 lg:pl-6 pr-4 sm:pr-6 py-3 flex-nowrap">
-        {/* Spacer: only when search closed on mobile, pushes icons to the right */}
-        {!mobileSearchOpen && <div className="flex-1 min-w-0 md:hidden" />}
-        {/* Search: tour anchor includes mobile icon + field so spotlight works on all breakpoints */}
+      {/* Mobile: search icon groups with theme/notifications (not centered). Desktop: search field flexes. */}
+      <div className="flex items-center gap-2 sm:gap-3 pl-16 lg:pl-6 pr-4 sm:pr-6 py-3 flex-nowrap w-full min-w-0">
         <div
           data-tour="global-search"
-          className="flex flex-1 min-w-0 items-center gap-2"
+          className={cn(
+            'min-w-0 flex items-center',
+            mobileSearchOpen ? 'flex-1' : 'hidden md:flex md:flex-1'
+          )}
         >
-          <div
-            className={cn(
-              'min-w-0 flex-1',
-              mobileSearchOpen ? 'flex' : 'hidden md:block'
-            )}
-          >
-            <form data-global-search-field onSubmit={handleSearch} className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
-              <input
-                type="text"
-                placeholder="Search tickets, users, knowledge base..."
-                value={searchQuery}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setSearchQuery(v);
-                  if (!v.trim()) onSearch?.('');
-                }}
-                onBlur={() => setMobileSearchOpen(false)}
-                className="w-full pl-10 pr-10 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-500 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100 text-sm transition-colors duration-150"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchQuery('');
-                  onSearch?.('');
-                  setMobileSearchOpen(false);
-                }}
-                className={cn(
-                  'absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors',
-                  searchQuery ? 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' : 'md:hidden text-gray-400'
-                )}
-                aria-label={searchQuery ? 'Clear search' : 'Close search'}
-              >
-                <X size={14} />
-              </button>
-            </form>
-          </div>
+          <form data-global-search-field onSubmit={handleSearch} className="relative w-full">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
+            <input
+              ref={mobileSearchInputRef}
+              type="text"
+              placeholder="Search tickets, users, knowledge base..."
+              value={searchQuery}
+              onChange={(e) => {
+                const v = e.target.value;
+                setSearchQuery(v);
+                if (!v.trim()) onSearch?.('');
+              }}
+              onBlur={() => setMobileSearchOpen(false)}
+              className="w-full pl-10 pr-10 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-500 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100 text-sm transition-colors duration-150"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                onSearch?.('');
+                setMobileSearchOpen(false);
+              }}
+              className={cn(
+                'absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors',
+                searchQuery ? 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300' : 'md:hidden text-gray-400'
+              )}
+              aria-label={searchQuery ? 'Clear search' : 'Close search'}
+            >
+              <X size={14} />
+            </button>
+          </form>
+        </div>
+
+        <div data-tour="header-account" className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
           {!mobileSearchOpen && (
             <button
               type="button"
               onClick={() => setMobileSearchOpen(true)}
-              className="md:hidden shrink-0 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
+              className="md:hidden p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
               aria-label="Open search"
             >
               <Search size={18} />
             </button>
           )}
-        </div>
-
-        {/* Right Side Actions - always on same row, shrink-0 so they stay visible */}
-        <div data-tour="header-account" className="flex items-center gap-1 sm:gap-2 shrink-0">
-          {/* Billing Status */}
+          {/* Billing Status — compact on small screens */}
           {planName && (
-            <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/50 rounded-lg">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-              <span className="text-xs font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wide">{planName}</span>
-            </div>
+            <>
+              <div
+                className="md:hidden max-w-[6.5rem] min-[380px]:max-w-[8rem] px-2 py-1 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/50 rounded-lg"
+                title={planName}
+              >
+                <span className="block text-[10px] font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wide truncate">
+                  {planName}
+                </span>
+              </div>
+              <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/50 rounded-lg">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                <span className="text-xs font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wide">{planName}</span>
+              </div>
+            </>
           )}
 
           {/* Theme Toggle */}
@@ -233,7 +243,7 @@ const Header = ({
                 setIsNotificationsOpen(false);
                 setIsUserMenuOpen(false);
               }}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
+              className="p-2 min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
               aria-label="Theme options"
             >
               {themeOptions.find(option => option.value === theme)?.icon && 
@@ -285,7 +295,7 @@ const Header = ({
                 setIsUserMenuOpen(false);
                 setIsThemeMenuOpen(false);
               }}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 relative"
+              className="p-2 min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 relative"
               aria-label="Notifications"
             >
               <Bell size={18} className="text-gray-600 dark:text-gray-400" />
@@ -377,7 +387,7 @@ const Header = ({
                 setIsNotificationsOpen(false);
                 setIsThemeMenuOpen(false);
               }}
-              className="flex items-center space-x-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
+              className="flex items-center space-x-2.5 px-1.5 sm:px-2 py-1.5 min-h-[40px] sm:min-h-0 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
               aria-label="User menu"
             >
               <div className="w-7 h-7 bg-gradient-to-br from-primary-600 to-primary-700 rounded-full flex items-center justify-center">

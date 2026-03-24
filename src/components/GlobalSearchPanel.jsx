@@ -74,7 +74,7 @@ const GlobalSearchPanel = ({
     (results?.users && results.users.length > 0);
 
   return (
-    <div data-global-search-panel className="px-4 sm:px-6 pt-4 pb-2">
+    <div data-global-search-panel className="-mx-4 px-4 sm:mx-0 sm:px-6 pt-4 pb-2 max-w-[100vw] sm:max-w-none">
       <Card className="p-4 border border-blue-100 dark:border-blue-900/40 bg-white/90 dark:bg-gray-900/90 shadow-lg">
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 min-w-0">
