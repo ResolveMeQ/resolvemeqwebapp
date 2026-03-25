@@ -319,6 +319,14 @@ const Dashboard = ({ activeTeamId }) => {
             loadDashboardData(true);
           }}
           onActionComplete={() => loadDashboardData(true)}
+          onFocusComments={() => {
+            const id = chatTicket?.ticket_id ?? chatTicket?.id;
+            setShowAIChatPanel(false);
+            setChatTicket(null);
+            if (id != null) {
+              navigate('/tickets', { state: { openTicketId: id, focusComments: true } });
+            }
+          }}
         />
       )}
 

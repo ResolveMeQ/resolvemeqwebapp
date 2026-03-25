@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Search, Brain, BookOpen, TrendingUp, Sparkles } from 'lucide-react';
-import { api } from '../services/api';
+import { api, AgentQuotaExceededError, isAgentQuotaError } from '../services/api';
 
 const Card = ({ children, className }) => (
   <div className={`bg-white rounded-lg shadow ${className}`}>{children}</div>
@@ -10,6 +11,7 @@ const EnhancedKBSearch = ({ onSelectArticle }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [quotaError, setQuotaError] = useState(null);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -17,10 +19,19 @@ const EnhancedKBSearch = ({ onSelectArticle }) => {
 
     try {
       setLoading(true);
+      setQuotaError(null);
       const data = await api.agent.searchKnowledgeBase(query, { limit: 10 });
       setResults(data);
     } catch (error) {
       console.error('Error searching knowledge base:', error);
+      if (error instanceof AgentQuotaExceededError || isAgentQuotaError(error)) {
+        setQuotaError(
+          error.detail ||
+            error.message ||
+            'Your monthly AI agent limit has been reached. Upgrade to continue searching with AI.'
+        );
+        setResults(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -40,6 +51,20 @@ const EnhancedKBSearch = ({ onSelectArticle }) => {
 
   return (
     <div className="space-y-4">
+      {quotaError && (
+        <div
+          className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-800 dark:text-red-200"
+          role="alert"
+        >
+          <p>{quotaError}</p>
+          <Link
+            to="/billing"
+            className="inline-block mt-2 font-semibold text-red-900 dark:text-red-100 underline underline-offset-2"
+          >
+            Billing &amp; plans
+          </Link>
+        </div>
+      )}
       {/* Search Form */}
       <Card className="p-4 bg-gradient-to-br from-purple-50 to-blue-50">
         <form onSubmit={handleSearch} className="flex gap-3">

@@ -242,6 +242,24 @@ const Billing = ({ onRefreshUserData }) => {
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">{usage.members_used}</p>
             </Card>
           )}
+          {usage.agent_operations_unlimited ? (
+            <Card className="p-5">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">AI agent usage</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">Unlimited</p>
+            </Card>
+          ) : usage.agent_operations_limit != null && usage.agent_operations_used != null ? (
+            <Card className="p-5">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">AI agent usage (this period)</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {usage.agent_operations_used} / {usage.agent_operations_limit}
+              </p>
+              {usage.agent_period_ends_at && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Resets {new Date(usage.agent_period_ends_at).toLocaleDateString()}
+                </p>
+              )}
+            </Card>
+          ) : null}
         </div>
       )}
 

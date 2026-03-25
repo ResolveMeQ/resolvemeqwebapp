@@ -127,10 +127,34 @@ const apiFetch = async (endpoint, options = {}) => {
   }
 };
 
+/** Monthly AI agent quota exhausted (HTTP 429 from Django). */
+export class AgentQuotaExceededError extends Error {
+  constructor(message, payload = {}) {
+    super(message || 'Your monthly AI agent limit has been reached.');
+    this.name = 'AgentQuotaExceededError';
+    this.code = 'agent_quota_exceeded';
+    this.agent_operations_used = payload.agent_operations_used;
+    this.agent_operations_limit = payload.agent_operations_limit;
+    this.detail = payload.detail;
+  }
+}
+
+export function isAgentQuotaError(error) {
+  return error instanceof AgentQuotaExceededError || error?.code === 'agent_quota_exceeded';
+}
+
 const handleResponse = async (response) => {
   const contentType = response.headers.get('content-type');
   const isJson = contentType && contentType.includes('application/json');
   const data = isJson ? await response.json() : await response.text();
+
+  if (response.status === 429 && data && typeof data === 'object' && data.error === 'agent_quota_exceeded') {
+    throw new AgentQuotaExceededError(data.detail, {
+      agent_operations_used: data.agent_operations_used,
+      agent_operations_limit: data.agent_operations_limit,
+      detail: data.detail,
+    });
+  }
 
   if (!response.ok) {
     // Prefer explicit message/error/detail; then first field error from DRF serializer.errors
@@ -768,13 +792,31 @@ export const api = {
     },
 
     submitChatFeedback: async (ticketId, messageId, helpful, comment = null) => {
+      const body = {
+        rating: helpful ? 'helpful' : 'not_helpful',
+      };
+      // Omit comment when unset — JSON null becomes Python None and broke NOT NULL feedback_comment before server fix.
+      if (comment != null && String(comment).length > 0) {
+        body.comment = comment;
+      }
       return apiFetch(`/api/tickets/${ticketId}/chat/${messageId}/feedback/`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+    },
+
+    /** Thumbs on synthetic first message from ticket.agent_response (no chat row). */
+    submitInitialSolutionFeedback: async (ticketId, helpful) => {
+      return apiFetch(`/api/tickets/${ticketId}/chat/initial-solution-feedback/`, {
         method: 'POST',
         body: JSON.stringify({
           rating: helpful ? 'helpful' : 'not_helpful',
-          comment,
         }),
       });
+    },
+
+    getFeedbackPrompts: async (ticketId) => {
+      return apiFetch(`/api/tickets/${ticketId}/feedback-prompts/`);
     },
 
     getChatSuggestions: async (ticketId) => {

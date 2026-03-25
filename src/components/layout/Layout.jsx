@@ -5,6 +5,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import GlobalSearchPanel from '../GlobalSearchPanel';
 import AppTour from '../AppTour';
+import AgentQuotaBanner from '../AgentQuotaBanner';
 import { cn } from '../../utils/cn';
 
 const PATH_TO_PAGE_ID = {
@@ -110,6 +111,8 @@ const Layout = ({
           onNavigate={onNavigate}
           theme={theme}
         />
+
+        <AgentQuotaBanner user={user} />
 
         {/* Global Search Results */}
         <GlobalSearchPanel

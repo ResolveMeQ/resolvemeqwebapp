@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -17,10 +17,16 @@ import AgentInsights from '../components/AgentInsights';
 import ActionHistory from '../components/ActionHistory';
 import ResolutionFeedback from '../components/ResolutionFeedback';
 import AIChatPanel from '../components/AIChatPanel';
-import { api, TokenService } from '../services/api';
+import { api, TokenService, AgentQuotaExceededError, isAgentQuotaError } from '../services/api';
 import { TICKET_CATEGORY_FALLBACK } from '../constants';
 import { cn } from '../utils/cn';
+import { getTicketNextStep } from '../utils/ticketUx';
 import { TicketsPageSkeleton, TicketDetailPanelSkeleton, Skeleton } from '../components/ui/Skeleton';
+import {
+  IllustrationTicketsEmpty,
+  IllustrationTicketsError,
+  IllustrationQuota,
+} from '../components/ui/ChatStateIllustrations';
 
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
@@ -65,8 +71,18 @@ const Tickets = ({ activeTeamId }) => {
   const [escalateLoading, setEscalateLoading] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createAgentQuotaNotice, setCreateAgentQuotaNotice] = useState(null);
   const [createForm, setCreateForm] = useState({ issue_type: '', description: '', category: 'other' });
   const [ticketCategories, setTicketCategories] = useState(TICKET_CATEGORY_FALLBACK);
+  const [toast, setToast] = useState(null);
+  const toastSeq = useRef(0);
+  const pendingScrollToCommentsRef = useRef(null);
+
+  const showToast = useCallback((message, type = 'success') => {
+    const id = ++toastSeq.current;
+    setToast({ id, message, type });
+    setTimeout(() => setToast((t) => (t && t.id === id ? null : t)), 4500);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,15 +130,31 @@ const Tickets = ({ activeTeamId }) => {
 
   useEffect(() => {
     const openId = location.state?.openTicketId;
+    const focusComments = location.state?.focusComments;
     if (openId == null || activeTickets.length === 0) return;
     const want = Number(openId);
     const ticket = activeTickets.find((t) => Number(t.ticket_id ?? t.id) === want);
     if (ticket) {
       setDetailTicket(ticket);
       loadTicketDetail(want);
+      if (focusComments) {
+        pendingScrollToCommentsRef.current = want;
+      }
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state?.openTicketId, activeTickets, location.pathname, navigate]);
+  }, [location.state?.openTicketId, location.state?.focusComments, activeTickets, location.pathname, navigate]);
+
+  useEffect(() => {
+    const wantId = pendingScrollToCommentsRef.current;
+    if (wantId == null || !detailTicket || detailLoading) return;
+    if (Number(detailTicket.ticket_id ?? detailTicket.id) !== Number(wantId)) return;
+    pendingScrollToCommentsRef.current = null;
+    const t = setTimeout(() => {
+      document.getElementById('ticket-comments-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelector('#ticket-comments-section input[type="text"]')?.focus();
+    }, 150);
+    return () => clearTimeout(t);
+  }, [detailLoading, detailTicket]);
 
   useEffect(() => {
     if (location.state?.openCreateForm) {
@@ -172,6 +204,10 @@ const Tickets = ({ activeTeamId }) => {
 
   const handleUpdateStatus = async (ticketId, newStatus) => {
     setUpdatingStatus(ticketId);
+    const previousStatus =
+      detailTicket && (detailTicket.ticket_id ?? detailTicket.id) === ticketId
+        ? detailTicket.status
+        : activeTickets.find((t) => (t.ticket_id ?? t.id) === ticketId)?.status;
     try {
       const res = await api.tickets.updateStatus(ticketId, newStatus);
       const canonicalStatus = res?.ticket?.status ?? newStatus;
@@ -185,6 +221,15 @@ const Tickets = ({ activeTeamId }) => {
       }
       if (canonicalStatus === 'resolved' || canonicalStatus === 'escalated') {
         window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
+      }
+      if (previousStatus !== canonicalStatus) {
+        if (canonicalStatus === 'resolved') {
+          showToast('Ticket marked resolved.', 'success');
+        } else if (canonicalStatus === 'escalated') {
+          showToast('Ticket escalated. Support will review it — updates appear here and by email.', 'info');
+        } else {
+          showToast(`Status updated to ${canonicalStatus.replace(/_/g, ' ')}.`, 'info');
+        }
       }
     } catch (err) {
       console.error('Error updating status:', err);
@@ -206,6 +251,10 @@ const Tickets = ({ activeTeamId }) => {
         setDetailTicket((prev) => (prev ? { ...prev, status: 'escalated' } : null));
       }
       window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
+      showToast(
+        'Escalated. A human will review your ticket — you’ll get updates in the app and by email.',
+        'info'
+      );
     } catch (err) {
       console.error('Error escalating:', err);
     } finally {
@@ -305,6 +354,7 @@ const Tickets = ({ activeTeamId }) => {
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
     setCreateLoading(true);
+    setCreateAgentQuotaNotice(null);
     try {
       const user = TokenService.getUser();
       const newTicket = await api.tickets.create({
@@ -322,7 +372,19 @@ const Tickets = ({ activeTeamId }) => {
       setDetailTicket(null);
       loadTickets(true);
       window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
-      await api.agent.processTicket(ticketId, { force: true });
+      try {
+        await api.agent.processTicket(ticketId, { force: true });
+      } catch (procErr) {
+        if (procErr instanceof AgentQuotaExceededError || isAgentQuotaError(procErr)) {
+          setCreateAgentQuotaNotice(
+            procErr.detail ||
+              procErr.message ||
+              'Your monthly AI agent limit has been reached. Upgrade to continue using AI analysis.'
+          );
+        } else {
+          console.error('Agent process after create:', procErr);
+        }
+      }
     } catch (err) {
       console.error('Error creating ticket:', err);
     } finally {
@@ -377,7 +439,23 @@ const Tickets = ({ activeTeamId }) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {toast && (
+        <div
+          className={cn(
+            'fixed bottom-4 left-1/2 z-[60] max-w-md w-[calc(100%-2rem)] -translate-x-1/2 rounded-lg px-4 py-3 text-sm shadow-lg border',
+            toast.type === 'error' &&
+              'bg-red-50 dark:bg-red-950/90 text-red-900 dark:text-red-100 border-red-200 dark:border-red-800',
+            toast.type === 'info' &&
+              'bg-blue-50 dark:bg-blue-950/90 text-blue-900 dark:text-blue-100 border-blue-200 dark:border-blue-800',
+            (toast.type === 'success' || !toast.type) &&
+              'bg-green-50 dark:bg-green-950/90 text-green-900 dark:text-green-100 border-green-200 dark:border-green-800'
+          )}
+          role="status"
+        >
+          {toast.message}
+        </div>
+      )}
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Tickets</h1>
@@ -385,11 +463,38 @@ const Tickets = ({ activeTeamId }) => {
             Your active team&apos;s queue plus your personal tickets — search also surfaces similar resolved examples.
           </p>
         </div>
-        <Button onClick={() => setShowCreateForm(true)} variant="primary" size="md" className="font-semibold">
+        <Button
+          onClick={() => {
+            setCreateAgentQuotaNotice(null);
+            setShowCreateForm(true);
+          }}
+          variant="primary"
+          size="md"
+          className="font-semibold"
+        >
           <Plus className="w-5 h-5 mr-2" />
           New Ticket
         </Button>
       </header>
+
+      {createAgentQuotaNotice && (
+        <div
+          className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-4 text-sm text-amber-950 dark:text-amber-100 flex flex-col sm:flex-row gap-4 items-center sm:items-start"
+          role="status"
+        >
+          <IllustrationQuota className="max-w-[96px] shrink-0 text-amber-700 dark:text-amber-300" />
+          <div className="min-w-0 text-center sm:text-left">
+            <p className="font-semibold text-amber-950 dark:text-amber-50">Can&apos;t start AI on this ticket yet</p>
+            <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">{createAgentQuotaNotice}</p>
+            <p className="mt-2 text-xs text-amber-800/80 dark:text-amber-200/80">
+              Upgrade your plan or wait until your next billing period to run more AI agent operations.
+            </p>
+            <Link to="/billing" className="inline-block mt-3 font-semibold underline underline-offset-2">
+              Billing &amp; plans
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Create Ticket Modal - structured form, then AI chat opens */}
       <AnimatePresence>
@@ -505,6 +610,16 @@ const Tickets = ({ activeTeamId }) => {
                 loadTicketDetail(detailTicket?.ticket_id ?? detailTicket?.id, { silent: true });
               }
             }}
+            onAppToast={showToast}
+            onFocusComments={() => {
+              const t = currentTicket;
+              if (!t) return;
+              const id = Number(t.ticket_id ?? t.id);
+              setShowAIAgent(false);
+              setDetailTicket(t);
+              pendingScrollToCommentsRef.current = id;
+              loadTicketDetail(id, { silent: true });
+            }}
           />
         )}
       </AnimatePresence>
@@ -578,21 +693,40 @@ const Tickets = ({ activeTeamId }) => {
         )}
 
         {error && (
-          <div className="px-4 sm:px-6 py-4 text-center text-red-600 dark:text-red-400 text-sm border-b border-gray-200 dark:border-gray-800">{error}</div>
+          <div className="px-4 sm:px-6 py-10 border-b border-gray-200 dark:border-gray-800 flex flex-col items-center text-center gap-3">
+            <IllustrationTicketsError className="max-w-[140px]" />
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">We couldn&apos;t load your tickets</p>
+              <p className="text-sm text-red-600 dark:text-red-400 mt-1 max-w-md mx-auto">{error}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Check your connection and try refreshing the page.</p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => loadTickets(false)}>
+              Try again
+            </Button>
+          </div>
         )}
 
         {filteredTickets.length === 0 ? (
-          <div className="px-4 sm:px-6 py-16 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              {activeTickets.length === 0
-                ? "You don't have any tickets yet. Get started in one step:"
-                : "No tickets match your search. Try a different filter or create one."}
-            </p>
-            {activeTickets.length === 0 && (
-              <Button onClick={() => setShowCreateForm(true)} variant="primary" size="md">
-                <Plus className="w-4 h-4 mr-2" />
-                New Ticket
-              </Button>
+          <div className="px-4 sm:px-6 py-14 text-center flex flex-col items-center">
+            <IllustrationTicketsEmpty className="max-w-[200px] mb-4 opacity-90" />
+            {activeTickets.length === 0 ? (
+              <>
+                <p className="text-base font-semibold text-gray-900 dark:text-white">No tickets yet</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 max-w-sm">
+                  When something breaks or you need help, open a ticket — our AI assistant will walk through fixes with you.
+                </p>
+                <Button onClick={() => setShowCreateForm(true)} variant="primary" size="md" className="mt-6">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create your first ticket
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-base font-semibold text-gray-900 dark:text-white">No matches</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 max-w-sm">
+                  Nothing in your list matches that search. Try another keyword or clear the search box.
+                </p>
+              </>
             )}
           </div>
         ) : (
@@ -891,6 +1025,31 @@ const Tickets = ({ activeTeamId }) => {
                           </div>
                         </div>
 
+                        {(() => {
+                          const next = getTicketNextStep(detailTicket);
+                          if (!next) return null;
+                          const toneBar =
+                            next.tone === 'success'
+                              ? 'border-green-200 bg-green-50/90 dark:bg-green-950/25 dark:border-green-900/50'
+                              : next.tone === 'warning'
+                                ? 'border-amber-200 bg-amber-50/90 dark:bg-amber-950/30 dark:border-amber-900/50'
+                                : 'border-primary-200 bg-primary-50/80 dark:bg-primary-950/20 dark:border-primary-900/40';
+                          return (
+                            <div
+                              className={cn(
+                                'rounded-lg border px-4 py-3 text-sm',
+                                toneBar
+                              )}
+                              role="status"
+                            >
+                              <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                                {next.title}
+                              </p>
+                              <p className="text-gray-800 dark:text-gray-200 leading-snug">{next.body}</p>
+                            </div>
+                          );
+                        })()}
+
                         <div className="flex flex-wrap items-center gap-2 border-t border-gray-200 dark:border-gray-800 pt-4">
                           <Button variant="ghost" size="sm" onClick={() => { setEditTicket(detailTicket); setEditForm({ issue_type: detailTicket?.issue_type || '', description: detailTicket?.description || '', category: detailTicket?.category || 'other', status: detailTicket?.status || 'new' }); setDetailEditing(true); }}>
                             Edit
@@ -938,7 +1097,7 @@ const Tickets = ({ activeTeamId }) => {
                           />
                         </div>
 
-                        <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
+                        <div id="ticket-comments-section" className="pt-6 border-t border-gray-200 dark:border-gray-800">
                           <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">Comments {(detailTicket?.comments?.length ?? 0) ? `(${detailTicket.comments.length})` : ''}</p>
                           {(detailTicket?.comments?.length ?? 0) > 0 && (
                             <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
@@ -971,7 +1130,7 @@ const Tickets = ({ activeTeamId }) => {
                           <ActionHistory ticketId={detailTicket?.ticket_id ?? detailTicket?.id} />
                         </div>
 
-                        <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
+                        <div id="resolution-feedback-section" className="pt-6 border-t border-gray-200 dark:border-gray-800">
                           <ResolutionFeedback
                             ticketId={detailTicket?.ticket_id ?? detailTicket?.id}
                             onFeedbackSubmitted={() => setDetailTicket((prev) => (prev ? { ...prev, resolution_feedback_submitted: true } : null))}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Brain, CheckCircle, AlertCircle, TrendingUp, Clock, Users, Lightbulb, RefreshCw } from 'lucide-react';
-import { api } from '../services/api';
+import { Link } from 'react-router-dom';
+import { api, AgentQuotaExceededError, isAgentQuotaError } from '../services/api';
 import Button from './ui/Button';
 
 const Card = ({ children, className }) => (
@@ -13,6 +14,7 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket })
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [applyingSolution, setApplyingSolution] = useState(false);
+  const [quotaError, setQuotaError] = useState(null);
 
   useEffect(() => {
     if (ticketId) {
@@ -38,6 +40,7 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket })
 
   const handleProcessWithAgent = async () => {
     try {
+      setQuotaError(null);
       setProcessing(true);
       // Use force parameter to allow re-processing already-processed tickets
       await api.agent.processTicket(ticketId, { force: true });
@@ -49,6 +52,13 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket })
     } catch (error) {
       console.error('Error processing ticket:', error);
       setProcessing(false);
+      if (error instanceof AgentQuotaExceededError || isAgentQuotaError(error)) {
+        setQuotaError(
+          error.detail ||
+            error.message ||
+            'Your monthly AI agent limit has been reached. Upgrade your plan to continue.'
+        );
+      }
     }
   };
 
@@ -107,6 +117,20 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket })
 
   return (
     <div className="space-y-4">
+      {quotaError && (
+        <div
+          className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-800 dark:text-red-200"
+          role="alert"
+        >
+          <p>{quotaError}</p>
+          <Link
+            to="/billing"
+            className="inline-block mt-2 font-semibold text-red-900 dark:text-red-100 underline underline-offset-2"
+          >
+            Billing &amp; plans
+          </Link>
+        </div>
+      )}
       {/* Agent Status Header */}
       <Card className="p-6 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/30 dark:to-blue-900/30 dark:border-gray-700">
         <div className="flex items-center justify-between flex-wrap gap-3">

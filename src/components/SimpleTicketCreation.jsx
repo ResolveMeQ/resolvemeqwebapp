@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Send, Loader, CheckCircle, X } from 'lucide-react';
-import { api, TokenService } from '../services/api';
+import { api, TokenService, AgentQuotaExceededError, isAgentQuotaError } from '../services/api';
 import Button from './ui/Button';
 import ConfidenceBadge from './ui/ConfidenceBadge';
 import {
@@ -36,11 +37,12 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
 
     setStep('analyzing');
 
+    let newTicket = null;
     try {
       const user = TokenService.getUser();
-      
+
       // Create ticket
-      const newTicket = await api.tickets.create({
+      newTicket = await api.tickets.create({
         user: user?.id ?? user?.user_id,
         issue_type: issueDescription.substring(0, 100),
         description: issueDescription,
@@ -128,6 +130,29 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
 
     } catch (error) {
       console.error('Error creating ticket:', error);
+      if (
+        newTicket &&
+        (error instanceof AgentQuotaExceededError || isAgentQuotaError(error))
+      ) {
+        setConversation([
+          {
+            type: 'user',
+            text: issueDescription,
+            timestamp: new Date().toISOString(),
+          },
+          {
+            type: 'system',
+            quotaExceeded: true,
+            text:
+              error.detail ||
+              'Your monthly AI agent limit has been reached. Upgrade your plan to run analysis.',
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+        setStep('conversation');
+        onTicketCreated?.(newTicket);
+        return;
+      }
       setConversation([
         {
           type: 'system',
@@ -183,14 +208,28 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
 
     } catch (error) {
       console.error('Chat error:', error);
-      setConversation(prev => [
-        ...prev,
-        {
-          type: 'system',
-          text: 'Sorry, I had trouble processing that. Please try again.',
-          timestamp: new Date().toISOString(),
-        },
-      ]);
+      if (error instanceof AgentQuotaExceededError || isAgentQuotaError(error)) {
+        setConversation((prev) => [
+          ...prev,
+          {
+            type: 'system',
+            quotaExceeded: true,
+            text:
+              error.detail ||
+              'Your monthly AI agent limit has been reached. Upgrade to continue chatting.',
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      } else {
+        setConversation((prev) => [
+          ...prev,
+          {
+            type: 'system',
+            text: 'Sorry, I had trouble processing that. Please try again.',
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }
     } finally {
       setIsAIThinking(false);
     }
@@ -511,12 +550,24 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
                       </div>
                     ) : msg.type === 'system' ? (
                       <div className="flex justify-center">
-                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3 flex items-center gap-2">
-                          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-                          <p className="text-sm text-green-700 dark:text-green-300 font-medium">
-                            {msg.text}
-                          </p>
-                        </div>
+                        {msg.quotaExceeded ? (
+                          <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3 max-w-lg">
+                            <p className="text-sm text-red-800 dark:text-red-200 font-medium">{msg.text}</p>
+                            <Link
+                              to="/billing"
+                              className="inline-block mt-2 text-sm font-semibold text-red-900 dark:text-red-100 underline underline-offset-2"
+                            >
+                              Billing &amp; plans
+                            </Link>
+                          </div>
+                        ) : (
+                          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3 flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                            <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+                              {msg.text}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="flex justify-end">
