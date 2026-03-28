@@ -27,6 +27,13 @@ import {
   IllustrationQuota,
 } from './ui/ChatStateIllustrations';
 
+/** Agent response_style values that use prose UI (no numbered repair steps / fake fix metrics). */
+const PROSE_RESPONSE_STYLES = new Set([
+  'informational',
+  'clarification_only',
+  'escalation_focus',
+]);
+
 /**
  * AIChatPanel - Real AI chat interface with backend integration
  * Features: Real-time chat, confidence scores, feedback, conversation history
@@ -161,11 +168,14 @@ const AIChatPanel = ({
     const ar = ticketData?.agent_response;
     if (!ticketData?.agent_processed || !ar || typeof ar !== 'object') return null;
     const solution = ar.solution || {};
+    const responseStyle = ar.response_style || 'guided_steps';
     const steps = solution.steps || solution.immediate_actions || [];
     const confidence = ar.confidence ?? 0.5;
     const reasoning = ar.reasoning || '';
     let aiText = '';
-    if (Array.isArray(steps) && steps.length > 0) {
+    if (PROSE_RESPONSE_STYLES.has(responseStyle)) {
+      aiText = reasoning || (Array.isArray(steps) && steps[0]) || '';
+    } else if (Array.isArray(steps) && steps.length > 0) {
       if (steps.length === 1) {
         aiText = steps[0];
       } else if (steps.length <= 3) {
@@ -186,13 +196,15 @@ const AIChatPanel = ({
         text: aiText,
         confidence,
         metadata: {
-          steps: Array.isArray(steps) ? steps : [],
+          response_style: responseStyle,
+          steps: PROSE_RESPONSE_STYLES.has(responseStyle) ? [] : (Array.isArray(steps) ? steps : []),
           suggested_actions: suggestedActionsFromAgentResponse(ar),
-          estimated_time: solution.estimated_time,
-          success_probability: solution.success_probability,
+          estimated_time: PROSE_RESPONSE_STYLES.has(responseStyle) ? undefined : solution.estimated_time,
+          success_probability: PROSE_RESPONSE_STYLES.has(responseStyle) ? undefined : solution.success_probability,
           quick_replies: quickRepliesFromAgentResponse(ar),
         },
-        messageType: steps.length > 1 ? 'steps' : 'text',
+        messageType:
+          PROSE_RESPONSE_STYLES.has(responseStyle) ? 'text' : steps.length > 1 ? 'steps' : 'text',
         wasHelpful: initialRated != null ? initialRated : null,
         showFeedbackPrompt: initialRated == null,
         createdAt: new Date().toISOString(),
@@ -788,9 +800,29 @@ const AIChatPanel = ({
                         </div>
                       )}
                       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 shadow-sm">
-                        <p className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap">
-                          {msg.text}
-                        </p>
+                        {/*
+                          Avoid duplicating content: Django/chat inject the same steps into `text` and metadata.steps.
+                          When we render the numbered "Steps to follow" block below, skip the blob that repeats those steps.
+                        */}
+                        {(() => {
+                          const stepList = msg.metadata?.steps ?? msg.metadata?.full_solution?.steps;
+                          const dupSteps =
+                            msg.messageType === 'steps' &&
+                            Array.isArray(stepList) &&
+                            stepList.length > 1;
+                          if (dupSteps) {
+                            return (
+                              <p className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed">
+                                Here are the steps to try. Expand below if there are more.
+                              </p>
+                            );
+                          }
+                          return (
+                            <p className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap">
+                              {msg.text}
+                            </p>
+                          );
+                        })()}
 
                         {/* Confidence badge + low-confidence hint for easier resolution path */}
                         {msg.confidence != null && (
@@ -798,8 +830,16 @@ const AIChatPanel = ({
                             <ConfidenceBadge
                               confidence={msg.confidence}
                               size="sm"
+                              mode={(() => {
+                                const rs = msg.metadata?.response_style;
+                                if (rs === 'informational') return 'informational';
+                                if (rs === 'clarification_only') return 'clarification';
+                                if (rs === 'escalation_focus') return 'escalation';
+                                return 'troubleshooting';
+                              })()}
                             />
-                            {msg.confidence < 0.6 && (
+                            {!PROSE_RESPONSE_STYLES.has(msg.metadata?.response_style) &&
+                              msg.confidence < 0.6 && (
                               <p className="text-xs text-amber-600 dark:text-amber-400">
                                 Confidence is low — you can still try the steps above, or choose &quot;Talk to a human&quot; to get support.
                               </p>

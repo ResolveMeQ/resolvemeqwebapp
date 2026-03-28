@@ -3,12 +3,14 @@ import { cn } from '../../utils/cn';
 
 /**
  * ConfidenceBadge - AI confidence with plain-language subtitle
+ * @param {'troubleshooting'|'informational'|'clarification'|'escalation'} mode — subtitle matches response_style from agent
  */
 const ConfidenceBadge = ({
   confidence,
   size = 'md',
   showPercentage = true,
   showPlainLanguage = true,
+  mode = 'troubleshooting',
   className,
 }) => {
   const normalizedConfidence = confidence > 1 ? confidence / 100 : confidence;
@@ -27,6 +29,33 @@ const ConfidenceBadge = ({
     medium: 'Reasonable try — double-check if your situation is unusual.',
     low: 'Uncertain for this case — consider a human or more details.',
   };
+
+  const plainInformational = {
+    high: 'Answer fits this kind of question.',
+    medium: 'Partly certain — ask if you need more detail.',
+    low: 'Limited certainty — verify important facts elsewhere.',
+  };
+
+  const plainClarification = {
+    high: 'We have enough signal to ask the next good question.',
+    medium: 'A few more details will narrow this down.',
+    low: 'Still unclear — share what you see on screen or any error text.',
+  };
+
+  const plainEscalation = {
+    high: 'Human support is the right next step here.',
+    medium: 'A person may be needed — we can still try one quick check.',
+    low: 'Escalation recommended; avoid risky self-service steps.',
+  };
+
+  const plain =
+    mode === 'informational'
+      ? plainInformational
+      : mode === 'clarification'
+        ? plainClarification
+        : mode === 'escalation'
+          ? plainEscalation
+          : plainByLevel;
 
   const config = {
     high: {
@@ -82,7 +111,7 @@ const ConfidenceBadge = ({
       </span>
       {showPlainLanguage && (
         <span className="text-[11px] leading-snug text-gray-600 dark:text-gray-400 pl-0.5">
-          {plainByLevel[level]}
+          {plain[level]}
         </span>
       )}
     </span>
