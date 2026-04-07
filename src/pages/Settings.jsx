@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Settings as SettingsIcon,
@@ -8,10 +9,8 @@ import {
   Save,
   CheckCircle,
   Plus,
-  Edit,
-  ExternalLink,
-  Clock,
   Sparkles,
+  MessageSquare,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -22,9 +21,12 @@ import { SettingsPageSkeleton } from '../components/ui/Skeleton';
 
 /**
  * Settings page component with comprehensive configuration options
+ * @param {{ initialTab?: string }} props
  */
-const Settings = () => {
-  const [activeTab, setActiveTab] = useState('general');
+const Settings = ({ initialTab = 'general' }) => {
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [preferences, setPreferences] = useState(null);
@@ -100,7 +102,55 @@ const Settings = () => {
     systemAlerts: true,
     dailyDigest: false
   });
-  const [integrations, setIntegrations] = useState([]);
+  const [slackStatus, setSlackStatus] = useState(null);
+  const [slackConnecting, setSlackConnecting] = useState(false);
+
+  const loadSlackStatus = useCallback(async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) {
+      setSlackStatus(null);
+      return;
+    }
+    try {
+      const s = await api.integrations.slackStatus(teamId);
+      setSlackStatus(s);
+    } catch (e) {
+      console.error('Slack status:', e);
+      setSlackStatus(null);
+    }
+  }, [preferences?.active_team]);
+
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t && ['general', 'notifications', 'integrations', 'appearance'].includes(t)) {
+      setActiveTab(t);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (location.pathname === '/settings/integrations') {
+      setActiveTab('integrations');
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (searchParams.get('slack') !== 'connected') return;
+    showToast('Slack workspace connected successfully.');
+    loadSlackStatus();
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('slack');
+        return next;
+      },
+      { replace: true }
+    );
+  }, [searchParams, setSearchParams, loadSlackStatus, showToast]);
+
+  useEffect(() => {
+    if (activeTab !== 'integrations' || !preferences?.active_team) return;
+    loadSlackStatus();
+  }, [activeTab, preferences?.active_team, loadSlackStatus]);
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon },
@@ -152,24 +202,19 @@ const Settings = () => {
     }
   };
 
-  const handleIntegrationToggle = (integrationId) => {
-    setIntegrations(prev => prev.map(integration => 
-      integration.id === integrationId 
-        ? { ...integration, status: integration.status === 'connected' ? 'disconnected' : 'connected' }
-        : integration
-    ));
-  };
-
-  const getIntegrationStatusBadge = (status) => {
-    switch (status) {
-      case 'connected':
-        return <Badge variant="success">Connected</Badge>;
-      case 'disconnected':
-        return <Badge variant="warning">Disconnected</Badge>;
-      case 'error':
-        return <Badge variant="error">Error</Badge>;
-      default:
-        return <Badge variant="default">Unknown</Badge>;
+  const handleConnectSlack = async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) {
+      showToast('Choose an active workspace in the sidebar, then try again.', 'error');
+      return;
+    }
+    try {
+      setSlackConnecting(true);
+      const url = await api.integrations.slackAuthorizeUrl(teamId);
+      window.location.assign(url);
+    } catch (e) {
+      showToast(e?.message || 'Could not start Slack connection.', 'error');
+      setSlackConnecting(false);
     }
   };
 
@@ -404,83 +449,80 @@ const Settings = () => {
     </div>
   );
 
-  const renderIntegrations = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+  const renderIntegrations = () => {
+    const teamLabel = preferences?.active_team_name || 'your active workspace';
+    const connected = slackStatus?.connected;
+
+    return (
+      <div className="space-y-4">
         <div>
           <h3 className="text-base font-semibold text-gray-900 dark:text-white">Integrations</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">Connect external services and tools</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+            Link channels to <span className="font-medium text-gray-800 dark:text-gray-200">{teamLabel}</span>
+          </p>
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          type="button"
-          onClick={() => showToast('Integrations feature coming soon')}
-        >
-          <Plus size={16} className="mr-2" />
-          Add Integration
-        </Button>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {integrations.length === 0 ? (
-          <Card className="md:col-span-2 p-12 text-center">
-            <Database className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
-            <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-1">No integrations yet</h4>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Connect Slack, Jira, and other tools to streamline your workflow</p>
+        {!preferences?.active_team && (
+          <Card className="p-4 border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/30">
+            <p className="text-sm text-amber-900 dark:text-amber-200">
+              Select a workspace from the sidebar before connecting Slack.
+            </p>
           </Card>
-        ) : (
-          integrations.map((integration) => (
-            <Card key={integration.id}>
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-semibold text-sm">{integration.name.charAt(0)}</span>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{integration.name}</h4>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 capitalize">{integration.type.replace('-', ' ')}</p>
-                    </div>
-                  </div>
-                  {getIntegrationStatusBadge(integration.status)}
-                </div>
+        )}
 
-                <div className="space-y-2 mb-4">
-                  {integration.lastSync && (
-                    <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                      <Clock size={14} />
-                      <span>Last sync: {new Date(integration.lastSync).toLocaleString()}</span>
-                    </div>
-                  )}
-                  {integration.status === 'connected' && (
-                    <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
-                      <CheckCircle size={14} />
-                      <span>Connected and working</span>
-                    </div>
-                  )}
+        <Card>
+          <div className="p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div
+                  className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: '#4A154B' }}
+                >
+                  <MessageSquare className="w-5 h-5 text-white" aria-hidden />
                 </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-800">
-                  <Button variant="ghost" size="sm" onClick={() => handleIntegrationToggle(integration.id)}>
-                    {integration.status === 'connected' ? 'Disconnect' : 'Connect'}
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="sm">
-                      <Edit size={14} />
-                    </Button>
-                    <Button variant="ghost" size="sm">
-                      <ExternalLink size={14} />
-                    </Button>
-                  </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Slack</h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 max-w-md">
+                    Install the ResolveMeQ app in Slack so your team can open tickets from channels and DMs. Tokens are
+                    stored per workspace.
+                  </p>
+                  {connected && slackStatus?.updated_at && (
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                      Last linked {new Date(slackStatus.updated_at).toLocaleString()}
+                    </p>
+                  )}
                 </div>
               </div>
-            </Card>
-          ))
-        )}
+              <div className="flex flex-col items-end gap-2">
+                {connected ? (
+                  <Badge variant="success">Connected</Badge>
+                ) : (
+                  <Badge variant="warning">Not connected</Badge>
+                )}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="button"
+                  disabled={!preferences?.active_team || slackConnecting}
+                  loading={slackConnecting}
+                  onClick={handleConnectSlack}
+                >
+                  {connected ? 'Reconnect Slack' : 'Connect Slack'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6 border-dashed border-gray-300 dark:border-gray-600">
+          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <Plus size={16} className="shrink-0 opacity-70" />
+            <span>Microsoft Teams, Discord, and more — planned next.</span>
+          </div>
+        </Card>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderContent = () => {
     switch (activeTab) {

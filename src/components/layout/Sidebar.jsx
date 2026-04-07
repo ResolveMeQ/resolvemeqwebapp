@@ -9,6 +9,7 @@ import {
   BookOpen,
   Settings,
   CreditCard,
+  Plug,
   ChevronLeft, 
   ChevronRight,
   ChevronDown,
@@ -66,6 +67,7 @@ const Sidebar = ({
     BookOpen,
     Settings,
     CreditCard,
+    Plug,
   };
 
   const themeIcons = {
@@ -111,7 +113,7 @@ const Sidebar = ({
     },
     {
       label: 'Account',
-      items: NAVIGATION_ITEMS.filter(item => ['billing', 'settings'].includes(item.id))
+      items: NAVIGATION_ITEMS.filter(item => ['billing', 'integrations', 'settings'].includes(item.id))
     }
   ];
 

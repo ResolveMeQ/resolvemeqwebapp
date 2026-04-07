@@ -173,6 +173,12 @@ export const NAVIGATION_ITEMS = [
     icon: 'CreditCard',
   },
   {
+    id: 'integrations',
+    label: 'Integrations',
+    href: '/settings/integrations',
+    icon: 'Plug',
+  },
+  {
     id: 'settings',
     label: 'Settings',
     href: '/settings',

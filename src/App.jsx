@@ -307,6 +307,10 @@ function App() {
       <Route path="/knowledge-base" element={<Layout {...layoutProps}><KnowledgeBase /></Layout>} />
       <Route path="/billing" element={<Layout {...layoutProps}><Billing /></Layout>} />
       <Route path="/settings" element={<Layout {...layoutProps}><Settings /></Layout>} />
+      <Route
+        path="/settings/integrations"
+        element={<Layout {...layoutProps}><Settings initialTab="integrations" /></Layout>}
+      />
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/signup" element={<Navigate to="/" replace />} />
       <Route path="/verify" element={<Navigate to="/" replace />} />

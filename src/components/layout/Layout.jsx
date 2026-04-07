@@ -16,6 +16,7 @@ const PATH_TO_PAGE_ID = {
   '/users': 'users',
   '/knowledge-base': 'knowledge-base',
   '/billing': 'billing',
+  '/settings/integrations': 'integrations',
   '/settings': 'settings',
 };
 

@@ -694,6 +694,27 @@ export const api = {
     },
   },
 
+  /** Slack & future channel integrations */
+  integrations: {
+    slackStatus: async (teamId) => {
+      const q = teamId ? `?team_id=${encodeURIComponent(teamId)}` : '';
+      return apiFetch(`/api/integrations/slack/status/${q}`);
+    },
+    /** Returns Slack OAuth authorize URL (requires team_id). */
+    slackAuthorizeUrl: async (teamId) => {
+      if (!teamId) {
+        throw new Error('team_id is required to connect Slack');
+      }
+      const data = await apiFetch(
+        `/api/integrations/slack/oauth/start/?team_id=${encodeURIComponent(teamId)}&format=json`
+      );
+      if (!data?.authorize_url) {
+        throw new Error(data?.detail || 'Could not start Slack OAuth');
+      }
+      return data.authorize_url;
+    },
+  },
+
   // In-app notifications (header bell)
   notifications: {
     list: async () => apiFetch('/api/auth/notifications/'),
