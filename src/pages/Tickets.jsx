@@ -127,6 +127,16 @@ const Tickets = ({ activeTeamId }) => {
     setTimeout(() => setToast((t) => (t && t.id === id ? null : t)), 4500);
   }, []);
 
+  const scrollTicketCommentsIntoView = useCallback((delayMs = 360) => {
+    window.setTimeout(() => {
+      document.getElementById('ticket-comments-section')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+      document.querySelector('#ticket-comments-section input[type="text"]')?.focus();
+    }, delayMs);
+  }, []);
+
   useEffect(() => {
     if (!createScreenshotFile) {
       setScreenshotPreviewUrl(null);
@@ -218,7 +228,7 @@ const Tickets = ({ activeTeamId }) => {
     const t = setTimeout(() => {
       document.getElementById('ticket-comments-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       document.querySelector('#ticket-comments-section input[type="text"]')?.focus();
-    }, 150);
+    }, 320);
     return () => clearTimeout(t);
   }, [detailLoading, detailTicket]);
 
@@ -764,14 +774,18 @@ const Tickets = ({ activeTeamId }) => {
               }
             }}
             onAppToast={showToast}
-            onFocusComments={() => {
+            onFocusComments={async () => {
               const t = currentTicket;
               if (!t) return;
               const id = Number(t.ticket_id ?? t.id);
               setShowAIAgent(false);
-              setDetailTicket(t);
+              setDetailTicket({ ...t });
               pendingScrollToCommentsRef.current = id;
-              loadTicketDetail(id, { silent: true });
+              try {
+                await loadTicketDetail(id, { silent: true });
+              } finally {
+                scrollTicketCommentsIntoView(380);
+              }
             }}
           />
         )}

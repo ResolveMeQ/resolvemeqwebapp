@@ -61,6 +61,8 @@ const AIChatPanel = ({
   const [typingElapsed, setTypingElapsed] = useState(0);
   const [feedbackPrompts, setFeedbackPrompts] = useState([]);
   const [promptNonce, setPromptNonce] = useState(0);
+  /** In-session dismissals when sessionStorage is unavailable or throws (private mode). */
+  const [memoryDismissedPromptIds, setMemoryDismissedPromptIds] = useState(() => new Set());
   const [agentUsage, setAgentUsage] = useState(null);
   const [expandedStepMsgIds, setExpandedStepMsgIds] = useState({});
   const [thinkingStage, setThinkingStage] = useState(0);
@@ -72,13 +74,32 @@ const AIChatPanel = ({
   const dismissedPromptStorageKey = (promptId) =>
     `resolvemeq_dismiss_feedback_prompt_${ticketId}_${promptId}`;
 
+  const dismissTopFeedbackPrompt = (promptId) => {
+    const pid = String(promptId ?? '');
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(dismissedPromptStorageKey(pid), '1');
+      }
+    } catch {
+      /* private mode / quota — still hide via memory set */
+    }
+    setMemoryDismissedPromptIds((prev) => new Set(prev).add(pid));
+    setPromptNonce((n) => n + 1);
+  };
+
   const visibleFeedbackPrompts = useMemo(() => {
-    if (typeof sessionStorage === 'undefined') return feedbackPrompts;
     return feedbackPrompts.filter((p) => {
-      const key = `resolvemeq_dismiss_feedback_prompt_${ticketId}_${p.id}`;
-      return !sessionStorage.getItem(key);
+      const pid = String(p.id ?? '');
+      if (memoryDismissedPromptIds.has(pid)) return false;
+      if (typeof sessionStorage === 'undefined') return true;
+      try {
+        const key = `resolvemeq_dismiss_feedback_prompt_${ticketId}_${pid}`;
+        return !sessionStorage.getItem(key);
+      } catch {
+        return true;
+      }
     });
-  }, [feedbackPrompts, ticketId, promptNonce]);
+  }, [feedbackPrompts, ticketId, promptNonce, memoryDismissedPromptIds]);
 
   const topFeedbackPrompt = visibleFeedbackPrompts[0];
 
@@ -98,6 +119,10 @@ const AIChatPanel = ({
       loadConversationHistory();
     }
   }, [isOpen, ticketId]);
+
+  useEffect(() => {
+    setMemoryDismissedPromptIds(new Set());
+  }, [ticketId]);
 
   // Situational follow-up prompts (resolution survey, escalation hint, etc.)
   useEffect(() => {
@@ -690,7 +715,7 @@ const AIChatPanel = ({
       exit={{ x: '100%' }}
       transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
       style={{ top: 0, right: 0, bottom: 0, height: '100dvh', maxHeight: '100dvh' }}
-      className="fixed w-full sm:max-w-2xl bg-white dark:bg-gray-950 shadow-2xl z-50 flex flex-col border-l border-gray-200 dark:border-gray-800 overflow-hidden"
+      className="fixed w-full sm:max-w-2xl bg-white dark:bg-gray-950 shadow-2xl z-[60] flex flex-col border-l border-gray-200 dark:border-gray-800 overflow-hidden"
     >
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 pt-[max(1rem,env(safe-area-inset-top))] pb-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
@@ -757,7 +782,10 @@ const AIChatPanel = ({
                       document
                         .getElementById('ticket-comments-section')
                         ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }, 250);
+                      document
+                        .querySelector('#ticket-comments-section input[type="text"]')
+                        ?.focus();
+                    }, 400);
                   }}
                 >
                   {topFeedbackPrompt.cta_label || 'Add context'}
@@ -767,15 +795,7 @@ const AIChatPanel = ({
                 <button
                   type="button"
                   className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-600 text-white hover:bg-amber-700 transition-colors"
-                  onClick={() => {
-                    if (typeof sessionStorage !== 'undefined') {
-                      sessionStorage.setItem(
-                        dismissedPromptStorageKey(topFeedbackPrompt.id),
-                        '1'
-                      );
-                    }
-                    setPromptNonce((n) => n + 1);
-                  }}
+                  onClick={() => dismissTopFeedbackPrompt(topFeedbackPrompt.id)}
                 >
                   {topFeedbackPrompt.cta_label || 'Got it'}
                 </button>
@@ -783,15 +803,7 @@ const AIChatPanel = ({
               <button
                 type="button"
                 className="text-xs text-amber-700/80 dark:text-amber-300/80 hover:underline"
-                onClick={() => {
-                  if (typeof sessionStorage !== 'undefined') {
-                    sessionStorage.setItem(
-                      dismissedPromptStorageKey(topFeedbackPrompt.id),
-                      '1'
-                    );
-                  }
-                  setPromptNonce((n) => n + 1);
-                }}
+                onClick={() => dismissTopFeedbackPrompt(topFeedbackPrompt.id)}
               >
                 Dismiss
               </button>
