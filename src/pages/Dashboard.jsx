@@ -318,6 +318,10 @@ const Dashboard = ({ activeTeamId }) => {
             setChatTicket(null);
             loadDashboardData(true);
           }}
+          onTicketUpdate={(updated) => {
+            if (!updated) return;
+            setChatTicket((prev) => (prev ? { ...prev, ...updated } : null));
+          }}
           onActionComplete={() => loadDashboardData(true)}
           onFocusComments={() => {
             const id = chatTicket?.ticket_id ?? chatTicket?.id;

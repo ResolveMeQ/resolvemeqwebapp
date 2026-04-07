@@ -10,6 +10,7 @@ import {
   ThumbsDown,
   CheckCircle,
   AlertCircle,
+  ImagePlus,
 } from 'lucide-react';
 import { api, AgentQuotaExceededError, isAgentQuotaError } from '../services/api';
 import ConfidenceBadge from './ui/ConfidenceBadge';
@@ -65,6 +66,8 @@ const AIChatPanel = ({
   const [thinkingStage, setThinkingStage] = useState(0);
   const messagesEndRef = useRef(null);
   const liveRef = useRef(null);
+  const screenshotInputRef = useRef(null);
+  const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
 
   const dismissedPromptStorageKey = (promptId) =>
     `resolvemeq_dismiss_feedback_prompt_${ticketId}_${promptId}`;
@@ -315,6 +318,39 @@ const AIChatPanel = ({
       },
     };
     setMessages([welcomeMessage]);
+  };
+
+  const SCREENSHOT_ACCEPT = 'image/jpeg,image/png,image/gif,image/webp';
+  const SCREENSHOT_MAX_BYTES = 5 * 1024 * 1024;
+
+  const handleScreenshotFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !ticketId) return;
+    const okType = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type);
+    if (!okType) {
+      onAppToast?.('Use JPEG, PNG, GIF, or WebP (max 5 MB).', 'error');
+      return;
+    }
+    if (file.size > SCREENSHOT_MAX_BYTES) {
+      onAppToast?.('Image too large (max 5 MB).', 'error');
+      return;
+    }
+    setUploadingScreenshot(true);
+    try {
+      const data = await api.tickets.uploadAttachment(ticketId, file);
+      if (data?.is_ticket_screenshot && data.file_url) {
+        onTicketUpdate?.({ ...ticket, screenshot: data.file_url });
+        onAppToast?.('Screenshot attached. Your next message can reference the image.', 'success');
+      } else {
+        onAppToast?.(data?.message || 'File uploaded.', 'info');
+      }
+    } catch (err) {
+      const msg = err?.message || err?.detail;
+      onAppToast?.(typeof msg === 'string' ? msg : 'Upload failed.', 'error');
+    } finally {
+      setUploadingScreenshot(false);
+    }
   };
 
   const sendMessage = async (textOverride = null) => {
@@ -1197,7 +1233,39 @@ const AIChatPanel = ({
             </div>
           </div>
         )}
+        {ticket?.screenshot && (
+          <div className="mb-2 flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-2 py-1.5">
+            <img
+              src={ticket.screenshot}
+              alt=""
+              className="h-10 w-10 rounded object-cover border border-gray-200 dark:border-gray-600 shrink-0"
+            />
+            <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">
+              Screenshot on this ticket — the assistant can use it on your next message.
+            </p>
+          </div>
+        )}
         <div className="flex gap-2 items-end">
+          <input
+            ref={screenshotInputRef}
+            type="file"
+            accept={SCREENSHOT_ACCEPT}
+            className="hidden"
+            tabIndex={-1}
+            onChange={handleScreenshotFile}
+          />
+          <Button
+            type="button"
+            onClick={() => screenshotInputRef.current?.click()}
+            disabled={isTyping || isLoading || uploadingScreenshot || !ticketId}
+            variant="secondary"
+            size="md"
+            className="px-3 shrink-0 min-h-[44px]"
+            aria-label="Attach screenshot"
+            title="Attach screenshot (JPEG, PNG, GIF, WebP, max 5 MB)"
+          >
+            <ImagePlus className={`w-4 h-4 ${uploadingScreenshot ? 'opacity-50' : ''}`} />
+          </Button>
           <input
             type="text"
             value={inputText}
