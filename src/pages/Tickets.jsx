@@ -28,6 +28,17 @@ import {
   IllustrationQuota,
 } from '../components/ui/ChatStateIllustrations';
 
+const API_ORIGIN = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+
+/** Turn relative media paths from the API into an absolute URL for <img src>. */
+function resolveTicketMediaUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const u = url.trim();
+  if (u.startsWith('http://') || u.startsWith('https://')) return u;
+  if (u.startsWith('/')) return `${API_ORIGIN}${u}`;
+  return u;
+}
+
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
   { value: 'open', label: 'Open' },
@@ -35,6 +46,14 @@ const STATUS_OPTIONS = [
   { value: 'pending_clarification', label: 'Pending clarification' },
   { value: 'escalated', label: 'Escalated' },
   { value: 'resolved', label: 'Resolved' },
+];
+
+/** Matches Slack + API `urgency` query; empty keeps legacy `issue_type` without "(urgency)" suffix. */
+const URGENCY_CREATE_OPTIONS = [
+  { value: '', label: 'Not specified' },
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
 ];
 
 function categoryOptionsForSelect(categories, currentValue) {
@@ -72,17 +91,64 @@ const Tickets = ({ activeTeamId }) => {
   const [deleteLoading, setDeleteLoading] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createAgentQuotaNotice, setCreateAgentQuotaNotice] = useState(null);
-  const [createForm, setCreateForm] = useState({ issue_type: '', description: '', category: 'other' });
+  const [createForm, setCreateForm] = useState({
+    issue_type: '',
+    description: '',
+    category: 'other',
+    urgency: '',
+  });
+  const [createScreenshotFile, setCreateScreenshotFile] = useState(null);
+  const [screenshotPreviewUrl, setScreenshotPreviewUrl] = useState(null);
+  const [createDropActive, setCreateDropActive] = useState(false);
+  const [screenshotLightboxUrl, setScreenshotLightboxUrl] = useState(null);
   const [ticketCategories, setTicketCategories] = useState(TICKET_CATEGORY_FALLBACK);
   const [toast, setToast] = useState(null);
   const toastSeq = useRef(0);
   const pendingScrollToCommentsRef = useRef(null);
+  const screenshotInputRef = useRef(null);
+
+  const closeCreateForm = useCallback(() => {
+    setShowCreateForm(false);
+    setCreateScreenshotFile(null);
+    setScreenshotPreviewUrl(null);
+    setCreateDropActive(false);
+    if (screenshotInputRef.current) screenshotInputRef.current.value = '';
+  }, []);
+
+  const clearCreateScreenshot = useCallback(() => {
+    setCreateScreenshotFile(null);
+    setScreenshotPreviewUrl(null);
+    if (screenshotInputRef.current) screenshotInputRef.current.value = '';
+  }, []);
 
   const showToast = useCallback((message, type = 'success') => {
     const id = ++toastSeq.current;
     setToast({ id, message, type });
     setTimeout(() => setToast((t) => (t && t.id === id ? null : t)), 4500);
   }, []);
+
+  useEffect(() => {
+    if (!createScreenshotFile) {
+      setScreenshotPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(createScreenshotFile);
+    setScreenshotPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [createScreenshotFile]);
+
+  useEffect(() => {
+    if (!detailTicket) setScreenshotLightboxUrl(null);
+  }, [detailTicket]);
+
+  useEffect(() => {
+    if (!screenshotLightboxUrl) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setScreenshotLightboxUrl(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [screenshotLightboxUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -357,15 +423,28 @@ const Tickets = ({ activeTeamId }) => {
     setCreateAgentQuotaNotice(null);
     try {
       const user = TokenService.getUser();
-      const newTicket = await api.tickets.create({
+      const payload = {
         user: user?.id ?? user?.user_id,
         issue_type: createForm.issue_type,
         description: createForm.description || createForm.issue_type,
         category: createForm.category,
         status: 'new',
+      };
+      if (createForm.urgency) payload.urgency = createForm.urgency;
+      const maxBytes = 5 * 1024 * 1024;
+      if (createScreenshotFile && createScreenshotFile.size > maxBytes) {
+        showToast('Screenshot must be 5 MB or smaller.', 'error');
+        setCreateLoading(false);
+        return;
+      }
+      const newTicket = await api.tickets.create(payload, {
+        screenshotFile: createScreenshotFile || undefined,
       });
       const ticketId = newTicket.id || newTicket.ticket_id;
-      setCreateForm({ issue_type: '', description: '', category: 'other' });
+      setCreateForm({ issue_type: '', description: '', category: 'other', urgency: '' });
+      setCreateScreenshotFile(null);
+      setScreenshotPreviewUrl(null);
+      if (screenshotInputRef.current) screenshotInputRef.current.value = '';
       setShowCreateForm(false);
       setCurrentTicket(newTicket);
       setShowAIAgent(true);
@@ -387,6 +466,7 @@ const Tickets = ({ activeTeamId }) => {
       }
     } catch (err) {
       console.error('Error creating ticket:', err);
+      showToast(err?.message || 'Could not create ticket.', 'error');
     } finally {
       setCreateLoading(false);
     }
@@ -505,7 +585,7 @@ const Tickets = ({ activeTeamId }) => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/40 dark:bg-black/60 z-40"
-              onClick={() => setShowCreateForm(false)}
+              onClick={closeCreateForm}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -521,7 +601,7 @@ const Tickets = ({ activeTeamId }) => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setShowCreateForm(false)}
+                    onClick={closeCreateForm}
                     className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                   >
                     <X className="w-5 h-5" />
@@ -563,12 +643,85 @@ const Tickets = ({ activeTeamId }) => {
                       ))}
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Urgency</label>
+                    <select
+                      value={createForm.urgency}
+                      onChange={(e) => setCreateForm((p) => ({ ...p, urgency: e.target.value }))}
+                      className="input-enterprise"
+                    >
+                      {URGENCY_CREATE_OPTIONS.map((o) => (
+                        <option key={o.value || 'none'} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setCreateDropActive(false);
+                      const f = Array.from(e.dataTransfer?.files || []).find((x) =>
+                        (x.type || '').startsWith('image/')
+                      );
+                      if (f) setCreateScreenshotFile(f);
+                    }}
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      setCreateDropActive(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      if (!e.currentTarget.contains(e.relatedTarget)) setCreateDropActive(false);
+                    }}
+                    className={cn(
+                      'rounded-xl border-2 border-dashed p-3 transition-colors',
+                      createDropActive
+                        ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-950/25'
+                        : 'border-gray-200 dark:border-gray-700'
+                    )}
+                  >
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Screenshot (optional)
+                    </label>
+                    <input
+                      ref={screenshotInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      onChange={(e) => setCreateScreenshotFile(e.target.files?.[0] ?? null)}
+                      className="input-enterprise text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-sm file:font-medium dark:file:bg-primary-950"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Drag and drop an image here, or choose a file — JPEG, PNG, GIF, or WebP, up to 5 MB
+                    </p>
+                    {screenshotPreviewUrl && (
+                      <div className="mt-3 flex items-start gap-3">
+                        <img
+                          src={screenshotPreviewUrl}
+                          alt="Screenshot preview"
+                          className="max-h-36 max-w-full rounded-lg border border-gray-200 dark:border-gray-600 object-contain"
+                        />
+                        <button
+                          type="button"
+                          onClick={clearCreateScreenshot}
+                          className="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 shrink-0"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex gap-2 pt-2">
                     <Button type="submit" variant="primary" size="md" loading={createLoading} className="flex-1">
                       <Sparkles className="w-4 h-4 mr-2" />
                       {createLoading ? 'Creating & starting AI…' : 'Create & get AI help'}
                     </Button>
-                    <Button type="button" variant="ghost" size="md" onClick={() => setShowCreateForm(false)} disabled={createLoading}>
+                    <Button type="button" variant="ghost" size="md" onClick={closeCreateForm} disabled={createLoading}>
                       Cancel
                     </Button>
                   </div>
@@ -1082,6 +1235,31 @@ const Tickets = ({ activeTeamId }) => {
                           </div>
                         </div>
 
+                        {detailTicket?.screenshot ? (
+                          <div>
+                            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">
+                              Screenshot
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setScreenshotLightboxUrl(resolveTicketMediaUrl(detailTicket.screenshot))
+                              }
+                              className="block w-full text-left rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                              <img
+                                src={resolveTicketMediaUrl(detailTicket.screenshot)}
+                                alt="Ticket screenshot"
+                                className="w-full max-h-56 object-contain bg-gray-100 dark:bg-gray-900"
+                                loading="lazy"
+                              />
+                              <span className="block px-3 py-2 text-xs text-primary-600 dark:text-primary-400">
+                                Click to enlarge
+                              </span>
+                            </button>
+                          </div>
+                        ) : null}
+
                         {detailTicket?.status === 'resolved' && (
                           <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 text-sm text-green-800 dark:text-green-200">
                             This issue is marked as resolved. Need something else? Use <strong>AI Chat</strong> above or create a new ticket.
@@ -1146,6 +1324,31 @@ const Tickets = ({ activeTeamId }) => {
         </AnimatePresence>,
         document.body
       )}
+
+      {screenshotLightboxUrl &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4"
+            onClick={() => setScreenshotLightboxUrl(null)}
+            role="presentation"
+          >
+            <button
+              type="button"
+              onClick={() => setScreenshotLightboxUrl(null)}
+              className="absolute top-4 right-4 rounded-full p-2 text-white/90 hover:bg-white/10 z-[101]"
+              aria-label="Close"
+            >
+              <X className="w-7 h-7" />
+            </button>
+            <img
+              src={screenshotLightboxUrl}
+              alt="Screenshot full size"
+              className="max-h-[92vh] max-w-full object-contain shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

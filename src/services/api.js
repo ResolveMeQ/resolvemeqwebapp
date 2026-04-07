@@ -272,7 +272,25 @@ export const api = {
       return apiFetch(`/api/tickets/${ticketId}/`);
     },
 
-    create: async (ticketData) => {
+    /**
+     * Create ticket (JSON). Pass `{ screenshotFile: File }` in the second argument to upload
+     * an image from the device via multipart/form-data.
+     */
+    create: async (ticketData, options = {}) => {
+      const { screenshotFile } = options;
+      if (screenshotFile) {
+        const fd = new FormData();
+        Object.entries(ticketData).forEach(([k, v]) => {
+          if (v === undefined || v === null) return;
+          fd.append(k, String(v));
+        });
+        fd.append('screenshot', screenshotFile);
+        return apiFetch('/api/tickets/', {
+          method: 'POST',
+          body: fd,
+          isFormData: true,
+        });
+      }
       return apiFetch('/api/tickets/', {
         method: 'POST',
         body: JSON.stringify(ticketData),
