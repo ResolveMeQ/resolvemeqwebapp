@@ -59,11 +59,14 @@ const GlobalSearchPanel = ({
       openKnowledgeBaseWithQuery();
       return;
     }
-    const q = (query || '').trim();
-    const params = new URLSearchParams();
-    if (q) params.set('q', q);
-    params.set('kb', String(kbId));
-    navigate(`/knowledge-base?${params.toString()}`);
+    const slug = String(article?.title || 'article')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .slice(0, 120) || 'article';
+    navigate(`/knowledge-base/article/${slug}~${encodeURIComponent(String(kbId))}`);
     onClose?.();
   };
 

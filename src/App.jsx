@@ -11,6 +11,7 @@ import KnowledgeBase from './pages/KnowledgeBase';
 import Billing from './pages/Billing';
 import Settings from './pages/Settings';
 import CommunityQuestionPublic from './pages/CommunityQuestionPublic';
+import KnowledgeBaseArticleRoute from './pages/KnowledgeBaseArticleRoute';
 import Login from './pages/auth/Login';
 import Signup from './pages/auth/Signup';
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -260,6 +261,7 @@ function App() {
   const renderAuthRoutes = () => (
     <Routes>
       <Route path="/community/q/:slugAndId" element={<CommunityQuestionPublic />} />
+      <Route path="/knowledge-base/article/:slugAndId" element={<KnowledgeBaseArticleRoute />} />
       <Route path="/knowledge-base" element={<KnowledgeBase isAuthenticated={false} />} />
       <Route path="/login" element={<Login onLogin={handleLogin} onNavigateToSignup={() => navigate('/signup')} onNavigateToForgotPassword={() => navigate('/forgot-password')} />} />
       <Route path="/signup" element={<Signup onSignup={handleSignup} onNavigateToLogin={() => navigate('/login')} onGoogleSignedIn={handleLogin} />} />
@@ -295,6 +297,7 @@ function App() {
   const renderMainRoutes = () => (
     <Routes>
       <Route path="/community/q/:slugAndId" element={<CommunityQuestionPublic />} />
+      <Route path="/knowledge-base/article/:slugAndId" element={<KnowledgeBaseArticleRoute />} />
       <Route path="/" element={<Layout {...layoutProps}><Dashboard /></Layout>} />
       <Route path="/tickets" element={<Layout {...layoutProps}><Tickets /></Layout>} />
       <Route path="/analytics" element={<Layout {...layoutProps}><Analytics /></Layout>} />
