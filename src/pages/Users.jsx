@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Edit, Users as UsersIcon } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -28,6 +29,16 @@ const Users = ({ activeTeamId }) => {
   const [toast, setToast] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
   const toastSeq = useRef(0);
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = () => setIsDesktop(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   const showToast = useCallback((message, type = 'success') => {
     const id = ++toastSeq.current;
@@ -195,6 +206,125 @@ const Users = ({ activeTeamId }) => {
     return <UsersPageSkeleton />;
   }
 
+  const renderUserPanelInner = ({ showTitleRow, showHeaderClose }) => {
+    if (!selectedUser) return null;
+    return (
+      <>
+        {showTitleRow && (
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white min-w-0 pr-2">
+              {panelMode === 'edit' ? 'Edit user' : selectedUser.name || selectedUser.email}
+            </h2>
+            {showHeaderClose && (
+              <button
+                type="button"
+                onClick={closePanel}
+                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 shrink-0"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {panelMode === 'edit' ? (
+          <form onSubmit={handleSaveEdit} className="space-y-4 max-w-md">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+              <input
+                type="text"
+                value={editForm.name}
+                onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+              <input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department</label>
+              <input
+                type="text"
+                value={editForm.department}
+                onChange={(e) => setEditForm((p) => ({ ...p, department: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location</label>
+              <input
+                type="text"
+                value={editForm.location}
+                onChange={(e) => setEditForm((p) => ({ ...p, location: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+              />
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button type="submit" variant="primary" size="sm" disabled={saving} loading={saving}>
+                Save
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setPanelMode('view')} disabled={saving}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-500 dark:text-gray-400 block">Email</span>
+                <span className="text-gray-900 dark:text-white break-all">{selectedUser.email || '—'}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400 block">Role</span>
+                {getRoleBadge(selectedUser.role)}
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400 block">Status</span>
+                {getStatusBadge(selectedUser.status)}
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400 block">Department</span>
+                <span className="text-gray-900 dark:text-white">{selectedUser.department || '—'}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400 block">Location</span>
+                <span className="text-gray-900 dark:text-white">{selectedUser.location || '—'}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400 block">Joined</span>
+                <span className="text-gray-900 dark:text-white">{formatDate(selectedUser.joinDate)}</span>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button variant="outline" size="sm" onClick={() => setPanelMode('edit')}>
+                <Edit className="w-4 h-4 mr-1" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
+                onClick={() => confirmDeleteUser(selectedUser.id)}
+                loading={deleteLoading === selectedUser.id}
+                disabled={deleteLoading !== null}
+              >
+                Delete user
+              </Button>
+            </div>
+          </>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className="space-y-6 p-6">
       <ConfirmModal
@@ -354,118 +484,60 @@ const Users = ({ activeTeamId }) => {
         )}
       </Card>
 
-      {/* Inline detail / edit panel */}
-      {selectedUser && (
+      {/* Detail / edit: inline on md+, full-height sheet on mobile */}
+      {selectedUser && isDesktop && (
         <Card className="p-6 border-l-4 border-l-blue-500 dark:border-l-blue-600">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {panelMode === 'edit' ? 'Edit user' : selectedUser.name || selectedUser.email}
-            </h2>
-            <button
-              type="button"
-              onClick={closePanel}
-              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {panelMode === 'edit' ? (
-            <form onSubmit={handleSaveEdit} className="space-y-4 max-w-md">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
-                <input
-                  type="text"
-                  value={editForm.name}
-                  onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={editForm.email}
-                  onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department</label>
-                <input
-                  type="text"
-                  value={editForm.department}
-                  onChange={(e) => setEditForm((p) => ({ ...p, department: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location</label>
-                <input
-                  type="text"
-                  value={editForm.location}
-                  onChange={(e) => setEditForm((p) => ({ ...p, location: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button type="submit" variant="primary" size="sm" disabled={saving} loading={saving}>
-                  Save
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => setPanelMode('view')} disabled={saving}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400 block">Email</span>
-                  <span className="text-gray-900 dark:text-white">{selectedUser.email || '—'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400 block">Role</span>
-                  {getRoleBadge(selectedUser.role)}
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400 block">Status</span>
-                  {getStatusBadge(selectedUser.status)}
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400 block">Department</span>
-                  <span className="text-gray-900 dark:text-white">{selectedUser.department || '—'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400 block">Location</span>
-                  <span className="text-gray-900 dark:text-white">{selectedUser.location || '—'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400 block">Joined</span>
-                  <span className="text-gray-900 dark:text-white">{formatDate(selectedUser.joinDate)}</span>
-                </div>
-              </div>
-              <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <Button variant="outline" size="sm" onClick={() => setPanelMode('edit')}>
-                  <Edit className="w-4 h-4 mr-1" />
-                  Edit
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
-                  onClick={() => confirmDeleteUser(selectedUser.id)}
-                  loading={deleteLoading === selectedUser.id}
-                  disabled={deleteLoading !== null}
-                >
-                  Delete user
-                </Button>
-              </div>
-            </>
-          )}
+          {renderUserPanelInner({ showTitleRow: true, showHeaderClose: true })}
         </Card>
       )}
+
+      {selectedUser &&
+        !isDesktop &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <AnimatePresence mode="sync">
+            <>
+              <motion.div
+                key="users-sheet-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[60] bg-black/45 dark:bg-black/60"
+                onClick={closePanel}
+                aria-hidden
+              />
+              <motion.aside
+                key="users-sheet"
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'tween', duration: 0.25, ease: 'easeOut' }}
+                className="fixed top-0 right-0 z-[70] flex h-[100dvh] max-h-[100dvh] w-full max-w-[100vw] sm:max-w-lg flex-col overflow-hidden border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow-2xl"
+              >
+                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between shrink-0 pt-[max(0.75rem,env(safe-area-inset-top))]">
+                  <div className="min-w-0 pr-2">
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">User details</h2>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {panelMode === 'edit' ? 'Editing profile' : selectedUser.name || selectedUser.email}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closePanel}
+                    className="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[40px] min-h-[40px] flex items-center justify-center shrink-0"
+                    aria-label="Close"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                  {renderUserPanelInner({ showTitleRow: false, showHeaderClose: false })}
+                </div>
+              </motion.aside>
+            </>
+          </AnimatePresence>,
+          document.body
+        )}
 
       {toast &&
         typeof document !== 'undefined' &&

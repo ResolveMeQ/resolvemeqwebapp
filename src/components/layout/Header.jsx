@@ -69,6 +69,38 @@ const Header = ({
   const notificationsMenuRef = useRef(null);
   const userMenuRef = useRef(null);
   const mobileSearchInputRef = useRef(null);
+  const mobileSearchBlurTimerRef = useRef(null);
+
+  const cancelMobileSearchBlurClose = () => {
+    if (mobileSearchBlurTimerRef.current != null) {
+      window.clearTimeout(mobileSearchBlurTimerRef.current);
+      mobileSearchBlurTimerRef.current = null;
+    }
+  };
+
+  const scheduleMobileSearchClose = () => {
+    cancelMobileSearchBlurClose();
+    mobileSearchBlurTimerRef.current = window.setTimeout(() => {
+      setMobileSearchOpen(false);
+      mobileSearchBlurTimerRef.current = null;
+    }, 180);
+  };
+
+  useEffect(() => {
+    return () => cancelMobileSearchBlurClose();
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = () => {
+      if (mq.matches) {
+        cancelMobileSearchBlurClose();
+        setMobileSearchOpen(false);
+      }
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -174,15 +206,20 @@ const Header = ({
       className
     )}>
       {/* Mobile: search icon groups with theme/notifications (not centered). Desktop: search field flexes. */}
-      <div className="flex items-center gap-2 sm:gap-3 pl-16 lg:pl-6 pr-4 sm:pr-6 py-3 flex-nowrap w-full min-w-0">
+      <div
+        className={cn(
+          'flex items-center gap-2 sm:gap-3 pl-16 lg:pl-6 pr-4 sm:pr-6 py-3 flex-nowrap w-full min-w-0',
+          mobileSearchOpen && 'max-md:gap-2'
+        )}
+      >
         <div
           data-tour="global-search"
           className={cn(
             'min-w-0 flex items-center',
-            mobileSearchOpen ? 'flex-1' : 'hidden md:flex md:flex-1'
+            mobileSearchOpen ? 'flex-1 w-full min-w-0' : 'hidden md:flex md:flex-1'
           )}
         >
-          <form data-global-search-field onSubmit={handleSearch} className="relative w-full">
+          <form data-global-search-field onSubmit={handleSearch} className="relative w-full min-w-0">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
             <input
               ref={mobileSearchInputRef}
@@ -194,12 +231,30 @@ const Header = ({
                 setSearchQuery(v);
                 if (!v.trim()) onSearch?.('');
               }}
-              onBlur={() => setMobileSearchOpen(false)}
-              className="w-full pl-10 pr-10 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-500 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100 text-sm transition-colors duration-150"
+              onFocus={() => {
+                cancelMobileSearchBlurClose();
+                if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+                  setMobileSearchOpen(true);
+                  setIsThemeMenuOpen(false);
+                  setIsNotificationsOpen(false);
+                  setIsUserMenuOpen(false);
+                }
+              }}
+              onBlur={() => {
+                if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+                  // Keep the wide layout while there is an active query (e.g. user opened results).
+                  if (!searchQuery.trim()) {
+                    scheduleMobileSearchClose();
+                  }
+                }
+              }}
+              className="w-full min-w-0 pl-10 pr-10 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-500 dark:placeholder-gray-500 text-gray-900 dark:text-gray-100 text-sm transition-colors duration-150"
             />
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
+                cancelMobileSearchBlurClose();
                 setSearchQuery('');
                 onSearch?.('');
                 setMobileSearchOpen(false);
@@ -215,11 +270,22 @@ const Header = ({
           </form>
         </div>
 
-        <div data-tour="header-account" className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
+        <div
+          data-tour="header-account"
+          className={cn(
+            'flex items-center gap-1 sm:gap-2 shrink-0 ml-auto',
+            mobileSearchOpen && 'max-md:hidden'
+          )}
+        >
           {!mobileSearchOpen && (
             <button
               type="button"
-              onClick={() => setMobileSearchOpen(true)}
+              onClick={() => {
+                setIsThemeMenuOpen(false);
+                setIsNotificationsOpen(false);
+                setIsUserMenuOpen(false);
+                setMobileSearchOpen(true);
+              }}
               className="md:hidden p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
               aria-label="Open search"
             >

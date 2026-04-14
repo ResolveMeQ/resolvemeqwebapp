@@ -757,10 +757,12 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
   const communityDetailPanel = !selectedQuestion ? (
     <p className="text-sm text-gray-500 dark:text-gray-400">Select a question to view details and answers.</p>
   ) : (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-2">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedQuestion.title}</h2>
-        <div className="flex items-center gap-1">
+    <div className="space-y-4 min-w-0 max-w-full overflow-x-hidden">
+      <div className="flex flex-col gap-3 min-w-0 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white min-w-0 break-words pr-1">
+          {selectedQuestion.title}
+        </h2>
+        <div className="flex flex-wrap items-center gap-1 shrink-0 sm:justify-end">
           <Button
             size="sm"
             variant="ghost"
@@ -812,13 +814,18 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
             Comments
           </p>
           {(selectedQuestion.comments || []).map((comment) => (
-            <div key={`q-comment-${comment.id}`} className="text-xs text-gray-700 dark:text-gray-300">
+            <div
+              key={`q-comment-${comment.id}`}
+              className="text-xs text-gray-700 dark:text-gray-300 break-words"
+            >
               <span className="font-medium">{comment.author_name || 'User'}:</span> {comment.body}
             </div>
           ))}
         </div>
       )}
-      <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{selectedQuestion.body}</div>
+      <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
+        {selectedQuestion.body}
+      </div>
       {selectedQuestion.duplicate_of && (
         <div className="rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/20 p-2.5">
           <p className="text-xs font-medium text-amber-900 dark:text-amber-300">
@@ -848,7 +855,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
                 href={a.file_url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-700 text-primary-700 dark:text-primary-300 hover:underline"
+                className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-700 text-primary-700 dark:text-primary-300 hover:underline max-w-full break-all inline-block"
               >
                 {a.original_name}
               </a>
@@ -857,13 +864,14 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
         </div>
       )}
       {selectedQuestion.has_accepted_answer && (
-        <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/70 dark:bg-emerald-950/20 p-2.5 flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-emerald-900 dark:text-emerald-300">
+        <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/70 dark:bg-emerald-950/20 p-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-w-0">
+          <p className="text-xs font-medium text-emerald-900 dark:text-emerald-300 min-w-0">
             This question has an accepted answer.
           </p>
           <Button
             size="sm"
             variant="ghost"
+            className="w-full sm:w-auto shrink-0"
             onClick={() => {
               const node = document.getElementById(`kb-answer-accepted-${selectedQuestion.id}`);
               node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -873,16 +881,17 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
           </Button>
         </div>
       )}
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch min-w-0">
         <input
           value={commentDrafts[`question-${selectedQuestion.id}`] || ''}
           onChange={(e) => setCommentDrafts((p) => ({ ...p, [`question-${selectedQuestion.id}`]: e.target.value }))}
           placeholder="Add a comment to question"
-          className="flex-1 px-2 py-1 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"
+          className="w-full min-w-0 sm:flex-1 px-2 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"
         />
         <Button
           size="sm"
           variant="ghost"
+          className="w-full sm:w-auto shrink-0"
           onClick={() => submitComment('question', selectedQuestion.id)}
           loading={actionLoadingKey === `comment-question-${selectedQuestion.id}`}
           disabled={Boolean(actionLoadingKey)}
@@ -890,14 +899,14 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
           Comment
         </Button>
       </div>
-      <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-800 pt-3">
-        <p className="text-xs font-medium text-gray-600 dark:text-gray-300">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-gray-200 dark:border-gray-800 pt-3 min-w-0">
+        <p className="text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">
           Answers ({selectedQuestion.answer_count ?? selectedQuestion.answers?.length ?? 0})
         </p>
         <select
           value={answerSort}
           onChange={(e) => setAnswerSort(e.target.value)}
-          className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-xs text-gray-900 dark:text-white"
+          className="w-full sm:w-auto min-w-0 max-w-full px-2 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-xs text-gray-900 dark:text-white"
         >
           <option value="top">Top answers</option>
           <option value="newest">Newest first</option>
@@ -909,22 +918,24 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
             key={answer.id}
             id={answer.is_accepted ? `kb-answer-accepted-${selectedQuestion.id}` : undefined}
             className={cn(
-              "rounded-lg border p-3 space-y-2",
+              "rounded-lg border p-3 space-y-2 min-w-0 overflow-hidden",
               answer.is_accepted
                 ? "border-emerald-300 dark:border-emerald-800 bg-emerald-50/40 dark:bg-emerald-950/10"
                 : "border-gray-200 dark:border-gray-800"
             )}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="space-y-1">
+            <div className="flex flex-col gap-3 min-w-0 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
+              <div className="space-y-1 min-w-0 flex-1">
                 {answer.is_accepted && (
                   <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
                     Accepted answer
                   </p>
                 )}
-                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{answer.body}</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
+                  {answer.body}
+                </p>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center justify-end gap-1 shrink-0 border-t border-gray-200/80 dark:border-gray-800/80 pt-2 sm:border-0 sm:pt-0 sm:justify-start">
                 <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 px-1.5">
                   {answer.score ?? 0}
                 </span>
@@ -965,7 +976,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
                     href={a.file_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-700 text-primary-700 dark:text-primary-300 hover:underline"
+                    className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-700 text-primary-700 dark:text-primary-300 hover:underline max-w-full break-all inline-block"
                   >
                     {a.original_name}
                   </a>
@@ -975,22 +986,26 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
             {(answer.comments || []).length > 0 && (
               <div className="space-y-1.5 rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/30 p-2">
                 {(answer.comments || []).map((comment) => (
-                  <div key={`a-comment-${answer.id}-${comment.id}`} className="text-xs text-gray-700 dark:text-gray-300">
+                  <div
+                    key={`a-comment-${answer.id}-${comment.id}`}
+                    className="text-xs text-gray-700 dark:text-gray-300 break-words"
+                  >
                     <span className="font-medium">{comment.author_name || 'User'}:</span> {comment.body}
                   </div>
                 ))}
               </div>
             )}
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch min-w-0">
               <input
                 value={commentDrafts[`answer-${answer.id}`] || ''}
                 onChange={(e) => setCommentDrafts((p) => ({ ...p, [`answer-${answer.id}`]: e.target.value }))}
                 placeholder="Add a comment"
-                className="flex-1 px-2 py-1 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"
+                className="w-full min-w-0 sm:flex-1 px-2 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"
               />
               <Button
                 size="sm"
                 variant="ghost"
+                className="w-full sm:w-auto shrink-0"
                 onClick={() => submitComment('answer', answer.id)}
                 loading={actionLoadingKey === `comment-answer-${answer.id}`}
                 disabled={Boolean(actionLoadingKey)}
@@ -1007,7 +1022,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
           onChange={(e) => setAnswerDraft(e.target.value)}
           rows={3}
           placeholder="Write your answer"
-          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+          className="w-full min-w-0 max-w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
         />
         <input
           type="file"
@@ -1279,7 +1294,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
             )}
           </div>
 
-          <Card className={cn("p-4 min-h-[300px]", !isDesktop && "hidden")}>
+          <Card className={cn("p-4 min-h-[300px] min-w-0 overflow-x-hidden", !isDesktop && "hidden")}>
             {communityDetailPanel}
           </Card>
         </div>
@@ -1304,7 +1319,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
                     animate={{ x: 0 }}
                     exit={{ x: '100%' }}
                     transition={{ type: 'tween', duration: 0.25, ease: 'easeOut' }}
-                    className="fixed top-0 right-0 z-50 flex h-[100dvh] max-h-[100dvh] w-full max-w-2xl flex-col overflow-hidden border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow-2xl"
+                    className="fixed top-0 right-0 z-50 flex h-[100dvh] max-h-[100dvh] w-full max-w-[100vw] sm:max-w-2xl flex-col overflow-hidden border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow-2xl"
                   >
                     <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between shrink-0 pt-[max(0.75rem,env(safe-area-inset-top))]">
                       <h2 className="text-sm font-semibold text-gray-900 dark:text-white truncate pr-3">
@@ -1319,7 +1334,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
                         <X className="w-5 h-5" />
                       </button>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                    <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
                       {communityDetailPanel}
                     </div>
                   </motion.aside>

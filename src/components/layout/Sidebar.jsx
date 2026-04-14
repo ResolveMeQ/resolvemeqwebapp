@@ -335,14 +335,17 @@ const Sidebar = ({
         <SidebarContent />
       </motion.aside>
 
-      {/* Mobile Menu Button - account for safe area on notched devices */}
+      {/* Mobile Menu Button — align with Header row (header: pt safe-area + inner py-3) */}
       <button
         onClick={() => setIsMobileOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 min-w-[44px] min-h-[44px] p-2.5 flex items-center justify-center bg-white dark:bg-gray-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-800 touch-manipulation"
-        style={{ top: 'max(1rem, env(safe-area-inset-top))', left: 'max(1rem, env(safe-area-inset-left))' }}
+        className="lg:hidden fixed z-50 h-10 w-10 min-w-[40px] min-h-[40px] p-0 flex items-center justify-center bg-white dark:bg-gray-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-800 touch-manipulation"
+        style={{
+          top: 'calc(env(safe-area-inset-top) + 0.75rem)',
+          left: 'max(1rem, env(safe-area-inset-left))',
+        }}
         aria-label="Open menu"
       >
-        <Menu size={20} />
+        <Menu size={20} className="shrink-0" />
       </button>
 
       {/* Mobile Sidebar Overlay */}
