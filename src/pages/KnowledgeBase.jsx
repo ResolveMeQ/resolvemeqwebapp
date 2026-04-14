@@ -700,7 +700,10 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
     if (!requireAuthAction('comment')) return;
     const key = `${targetType}-${id}`;
     const text = (commentDrafts[key] || '').trim();
-    if (!text) return;
+    if (!text) {
+      showToast('Write a comment before posting.', 'error');
+      return;
+    }
     const actionKey = `comment-${key}`;
     try {
       setActionLoadingKey(actionKey);
@@ -800,6 +803,18 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
             >
               #{tag}
             </button>
+          ))}
+        </div>
+      )}
+      {(selectedQuestion.comments || []).length > 0 && (
+        <div className="space-y-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/30 p-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+            Comments
+          </p>
+          {(selectedQuestion.comments || []).map((comment) => (
+            <div key={`q-comment-${comment.id}`} className="text-xs text-gray-700 dark:text-gray-300">
+              <span className="font-medium">{comment.author_name || 'User'}:</span> {comment.body}
+            </div>
           ))}
         </div>
       )}
@@ -954,6 +969,15 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
                   >
                     {a.original_name}
                   </a>
+                ))}
+              </div>
+            )}
+            {(answer.comments || []).length > 0 && (
+              <div className="space-y-1.5 rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/30 p-2">
+                {(answer.comments || []).map((comment) => (
+                  <div key={`a-comment-${answer.id}-${comment.id}`} className="text-xs text-gray-700 dark:text-gray-300">
+                    <span className="font-medium">{comment.author_name || 'User'}:</span> {comment.body}
+                  </div>
                 ))}
               </div>
             )}
