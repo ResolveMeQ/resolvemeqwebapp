@@ -130,9 +130,9 @@ const Layout = ({
           <div className="max-w-7xl mx-auto w-full min-w-0">
             {React.Children.map(children, (child) =>
               React.isValidElement(child) && onRefreshUserData
-                ? React.cloneElement(child, { onRefreshUserData, activeTeamId })
+                ? React.cloneElement(child, { onRefreshUserData, activeTeamId, onThemeChange, theme })
                 : React.isValidElement(child)
-                  ? React.cloneElement(child, { activeTeamId })
+                  ? React.cloneElement(child, { activeTeamId, onThemeChange, theme })
                   : child
             )}
           </div>

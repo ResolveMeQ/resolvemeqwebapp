@@ -69,6 +69,7 @@ const AIChatPanel = ({
   const messagesEndRef = useRef(null);
   const liveRef = useRef(null);
   const screenshotInputRef = useRef(null);
+  const chatInputRef = useRef(null);
   const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
 
   const dismissedPromptStorageKey = (promptId) =>
@@ -186,6 +187,13 @@ const AIChatPanel = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Auto-grow chat input as user types (wrap to next line).
+  useEffect(() => {
+    if (!chatInputRef.current) return;
+    chatInputRef.current.style.height = 'auto';
+    chatInputRef.current.style.height = `${Math.min(chatInputRef.current.scrollHeight, 180)}px`;
+  }, [inputText]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1278,15 +1286,16 @@ const AIChatPanel = ({
           >
             <ImagePlus className={`w-4 h-4 ${uploadingScreenshot ? 'opacity-50' : ''}`} />
           </Button>
-          <input
-            type="text"
+          <textarea
+            ref={chatInputRef}
+            rows={1}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleInputKeyDown}
             placeholder="Describe your issue or ask a question..."
             disabled={isTyping || isLoading}
             aria-label="Message to AI assistant"
-            className="flex-1 min-h-[44px] px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            className="flex-1 min-h-[44px] max-h-[180px] px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm resize-none overflow-y-auto"
           />
           <Button
             onClick={() => sendMessage()}

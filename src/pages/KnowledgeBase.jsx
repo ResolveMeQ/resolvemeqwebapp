@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
   BookOpen,
+  MessageSquare,
+  Plus,
+  ArrowBigUp,
+  ArrowBigDown,
+  Check,
   ThumbsUp,
   ThumbsDown,
   Eye,
@@ -77,9 +82,9 @@ function ArticleDetailPanelContent({
 
         {article.tags?.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {article.tags.map((t) => (
+            {article.tags.map((t, idx) => (
               <span
-                key={t}
+                key={`${t}-${idx}`}
                 className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800/50 rounded-md text-xs font-medium"
               >
                 <Tag className="w-3 h-3" />
@@ -128,7 +133,9 @@ function ArticleDetailPanelContent({
   );
 }
 
-const KnowledgeBase = () => {
+const KnowledgeBase = ({ isAuthenticated = true }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [articles, setArticles] = useState([]);
   const [filteredArticles, setFilteredArticles] = useState([]);
@@ -138,6 +145,7 @@ const KnowledgeBase = () => {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [allTags, setAllTags] = useState([]);
   const [sortBy, setSortBy] = useState('recent');
+  const [viewMode, setViewMode] = useState('articles');
   const [toast, setToast] = useState(null);
   const [ratingArticleId, setRatingArticleId] = useState(null);
   const [tagsExpanded, setTagsExpanded] = useState(false);
@@ -145,6 +153,25 @@ const KnowledgeBase = () => {
   const [isDesktop, setIsDesktop] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : true
   );
+  const [communityQuestions, setCommunityQuestions] = useState([]);
+  const [communityLoading, setCommunityLoading] = useState(false);
+  const [communitySort, setCommunitySort] = useState('active');
+  const [communityFilter, setCommunityFilter] = useState('all');
+  const [selectedQuestion, setSelectedQuestion] = useState(null);
+  const [creatingQuestion, setCreatingQuestion] = useState(false);
+  const [questionDraft, setQuestionDraft] = useState({ title: '', body: '', tags: '' });
+  const [duplicateSuggestions, setDuplicateSuggestions] = useState([]);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const [selectedDuplicateQuestion, setSelectedDuplicateQuestion] = useState(null);
+  const [answerDraft, setAnswerDraft] = useState('');
+  const [answerSort, setAnswerSort] = useState('top');
+  const [communityDetailOpen, setCommunityDetailOpen] = useState(false);
+  const [questionFiles, setQuestionFiles] = useState([]);
+  const [answerFiles, setAnswerFiles] = useState([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [commentDrafts, setCommentDrafts] = useState({});
+  const [actionLoadingKey, setActionLoadingKey] = useState(null);
+  const [openingQuestionId, setOpeningQuestionId] = useState(null);
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)');
@@ -158,20 +185,41 @@ const KnowledgeBase = () => {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
+  const requireAuthAction = useCallback(
+    (actionLabel = 'perform this action') => {
+      if (isAuthenticated) return true;
+      showToast(`Please sign in to ${actionLabel}.`, 'error');
+      const next = `${location.pathname}${location.search || ''}`;
+      navigate(`/login?next=${encodeURIComponent(next)}`);
+      return false;
+    },
+    [isAuthenticated, showToast, navigate, location.pathname, location.search]
+  );
+
   useEffect(() => {
     loadArticles();
   }, []);
 
   useEffect(() => {
-    const q = (searchParams.get('q') || '').trim();
-    if (q) setSearchQuery(q);
+    const raw = (searchParams.get('q') || '').trim();
+    const q = raw === 'undefined' || raw === 'null' ? '' : raw;
+    setSearchQuery(q);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const requestedView = (searchParams.get('view') || '').trim().toLowerCase();
+    if (requestedView === 'community') {
+      setViewMode('community');
+    } else if (requestedView === 'articles') {
+      setViewMode('articles');
+    }
   }, [searchParams]);
 
   const kbOpenParam = searchParams.get('kb');
 
   useEffect(() => {
     const id = (kbOpenParam || '').trim();
-    if (!id) return;
+    if (!id || viewMode !== 'articles') return;
     let cancelled = false;
     (async () => {
       try {
@@ -184,11 +232,58 @@ const KnowledgeBase = () => {
     return () => {
       cancelled = true;
     };
-  }, [kbOpenParam]);
+  }, [kbOpenParam, viewMode]);
 
   useEffect(() => {
     filterArticles();
   }, [searchQuery, selectedTags, articles, sortBy]);
+
+  useEffect(() => {
+    if (viewMode !== 'community') return;
+    loadCommunityQuestions();
+  }, [viewMode, searchQuery, communitySort, communityFilter]);
+
+  useEffect(() => {
+    if (!creatingQuestion) {
+      setDuplicateSuggestions([]);
+      setSelectedDuplicateQuestion(null);
+      return;
+    }
+    const title = (questionDraft.title || '').trim();
+    if (title.length < 4) {
+      setDuplicateSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setCheckingDuplicates(true);
+        const matches = await api.knowledgeBase.listCommunityQuestions({
+          q: title,
+          sort: 'votes',
+          filter: 'all',
+        });
+        setDuplicateSuggestions((Array.isArray(matches) ? matches : []).slice(0, 4));
+      } catch {
+        setDuplicateSuggestions([]);
+      } finally {
+        setCheckingDuplicates(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [creatingQuestion, questionDraft.title]);
+
+  useEffect(() => {
+    const qid = (searchParams.get('question') || '').trim();
+    if (!qid || viewMode !== 'community') return;
+    loadCommunityQuestionDetail(Number(qid));
+  }, [searchParams, viewMode]);
+
+  useEffect(() => {
+    if (isDesktop) {
+      setCommunityDetailOpen(false);
+    }
+  }, [isDesktop]);
 
   const loadArticles = async () => {
     try {
@@ -288,6 +383,7 @@ const KnowledgeBase = () => {
   };
 
   const handleRate = async (articleId, isHelpful) => {
+    if (!requireAuthAction('rate articles')) return;
     const id = articleId ?? selectedArticle?.kb_id ?? selectedArticle?.id;
     if (!id) return;
     setRatingArticleId(id);
@@ -328,6 +424,20 @@ const KnowledgeBase = () => {
         })
       : '—';
 
+  const slugifyTitle = (value) =>
+    String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .slice(0, 120) || 'question';
+
+  const buildCommunityPublicPath = (question) => {
+    if (!question?.id) return '/knowledge-base?view=community';
+    return `/community/q/${slugifyTitle(question.title)}-${question.id}`;
+  };
+
   // Strip markdown formatting for preview text
   const stripMarkdown = (text) => {
     if (!text) return '';
@@ -343,17 +453,780 @@ const KnowledgeBase = () => {
       .trim();
   };
 
+  const updateViewMode = (mode) => {
+    setViewMode(mode);
+    if (mode !== 'community') {
+      setCommunityDetailOpen(false);
+    }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('view', mode);
+        if (mode !== 'community') {
+          next.delete('question');
+        }
+        if (mode !== 'articles') {
+          next.delete('kb');
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  const loadCommunityQuestions = async () => {
+    try {
+      setCommunityLoading(true);
+      const q = (searchQuery || '').trim();
+      const data = await api.knowledgeBase.listCommunityQuestions({
+        q: q && q !== 'undefined' && q !== 'null' ? q : undefined,
+        sort: communitySort,
+        filter: communityFilter,
+      });
+      setCommunityQuestions(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error loading community questions:', error);
+      setCommunityQuestions([]);
+      showToast('Failed to load community Q&A.', 'error');
+    } finally {
+      setCommunityLoading(false);
+    }
+  };
+
+  const loadCommunityQuestionDetail = async (id) => {
+    if (!id || Number.isNaN(id)) return;
+    try {
+      const data = await api.knowledgeBase.getCommunityQuestion(id);
+      setSelectedQuestion(data);
+    } catch {
+      setSelectedQuestion(null);
+    }
+  };
+
+  const openCommunityQuestion = async (question) => {
+    try {
+      setOpeningQuestionId(question.id);
+      if (!isDesktop) {
+        setCommunityDetailOpen(true);
+      }
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('view', 'community');
+          next.set('question', String(question.id));
+          return next;
+        },
+        { replace: true }
+      );
+      await loadCommunityQuestionDetail(question.id);
+    } finally {
+      setOpeningQuestionId(null);
+    }
+  };
+
+  const handleCreateQuestion = async (e) => {
+    e.preventDefault();
+    if (!requireAuthAction('post a question')) return;
+    const tags = (questionDraft.tags || '')
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    try {
+      setUploadingFiles(true);
+      const uploadedAttachments = [];
+      for (const file of questionFiles) {
+        const uploaded = await api.knowledgeBase.uploadCommunityAttachment(file);
+        uploadedAttachments.push(uploaded);
+      }
+      const created = await api.knowledgeBase.createCommunityQuestion({
+        title: questionDraft.title.trim(),
+        body: questionDraft.body.trim(),
+        tags,
+        attachment_ids: uploadedAttachments.map((a) => a.id),
+        duplicate_of: selectedDuplicateQuestion?.id || null,
+        duplicate_note: selectedDuplicateQuestion
+          ? "Marked as potential duplicate during authoring."
+          : "",
+      });
+      setQuestionDraft({ title: '', body: '', tags: '' });
+      setQuestionFiles([]);
+      setSelectedDuplicateQuestion(null);
+      setCreatingQuestion(false);
+      showToast('Question posted.');
+      await loadCommunityQuestions();
+      await openCommunityQuestion(created);
+    } catch (error) {
+      showToast(error?.message || 'Failed to post question.', 'error');
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
+  const handleVoteQuestion = async (id, value) => {
+    if (!requireAuthAction('vote')) return;
+    const actionKey = `vote-question-${id}-${value}`;
+    try {
+      setActionLoadingKey(actionKey);
+      const result = await api.knowledgeBase.voteCommunityQuestion(id, value);
+      if (selectedQuestion?.id === id) {
+        setSelectedQuestion((prev) =>
+          prev
+            ? {
+                ...prev,
+                score: typeof result?.score === 'number' ? result.score : prev.score,
+                user_vote: result?.user_vote ?? value,
+              }
+            : prev
+        );
+      }
+      setCommunityQuestions((prev) =>
+        prev.map((q) =>
+          q.id === id
+            ? {
+                ...q,
+                score: typeof result?.score === 'number' ? result.score : q.score,
+                user_vote: result?.user_vote ?? value,
+              }
+            : q
+        )
+      );
+      await Promise.all([loadCommunityQuestions(), loadCommunityQuestionDetail(id)]);
+      showToast(value > 0 ? 'Question upvoted.' : 'Question downvoted.');
+    } catch (error) {
+      showToast(error?.message || 'Unable to vote.', 'error');
+    } finally {
+      setActionLoadingKey(null);
+    }
+  };
+
+  const handleVoteAnswer = async (id, value) => {
+    if (!requireAuthAction('vote')) return;
+    if (!selectedQuestion) return;
+    const actionKey = `vote-answer-${id}-${value}`;
+    try {
+      setActionLoadingKey(actionKey);
+      const result = await api.knowledgeBase.voteCommunityAnswer(id, value);
+      setSelectedQuestion((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          answers: (prev.answers || []).map((a) =>
+            a.id === id
+              ? {
+                  ...a,
+                  score: typeof result?.score === 'number' ? result.score : a.score,
+                  user_vote: result?.user_vote ?? value,
+                }
+              : a
+          ),
+        };
+      });
+      await loadCommunityQuestionDetail(selectedQuestion.id);
+      showToast(value > 0 ? 'Answer upvoted.' : 'Answer downvoted.');
+    } catch (error) {
+      showToast(error?.message || 'Unable to vote.', 'error');
+    } finally {
+      setActionLoadingKey(null);
+    }
+  };
+
+  const handleAddAnswer = async (e) => {
+    e.preventDefault();
+    if (!requireAuthAction('post an answer')) return;
+    if (!selectedQuestion) return;
+    try {
+      setUploadingFiles(true);
+      const uploadedAttachments = [];
+      for (const file of answerFiles) {
+        const uploaded = await api.knowledgeBase.uploadCommunityAttachment(file);
+        uploadedAttachments.push(uploaded);
+      }
+      await api.knowledgeBase.addCommunityAnswer(selectedQuestion.id, {
+        body: answerDraft.trim(),
+        attachment_ids: uploadedAttachments.map((a) => a.id),
+      });
+      setAnswerDraft('');
+      setAnswerFiles([]);
+      showToast('Answer posted.');
+      await Promise.all([loadCommunityQuestions(), loadCommunityQuestionDetail(selectedQuestion.id)]);
+    } catch (error) {
+      showToast(error?.message || 'Unable to post answer.', 'error');
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
+  const submitComment = async (targetType, id) => {
+    if (!requireAuthAction('comment')) return;
+    const key = `${targetType}-${id}`;
+    const text = (commentDrafts[key] || '').trim();
+    if (!text) return;
+    const actionKey = `comment-${key}`;
+    try {
+      setActionLoadingKey(actionKey);
+      if (targetType === 'question') {
+        await api.knowledgeBase.addCommunityQuestionComment(id, { body: text });
+      } else {
+        await api.knowledgeBase.addCommunityAnswerComment(id, { body: text });
+      }
+      setCommentDrafts((prev) => ({ ...prev, [key]: '' }));
+      await loadCommunityQuestionDetail(selectedQuestion.id);
+      showToast('Comment posted.');
+    } catch (error) {
+      showToast(error?.message || 'Unable to post comment.', 'error');
+    } finally {
+      setActionLoadingKey(null);
+    }
+  };
+
+  const handleAcceptAnswer = async (answerId) => {
+    if (!requireAuthAction('accept an answer')) return;
+    if (!selectedQuestion) return;
+    const actionKey = `accept-answer-${answerId}`;
+    try {
+      setActionLoadingKey(actionKey);
+      await api.knowledgeBase.acceptCommunityAnswer(answerId);
+      showToast('Accepted answer updated.');
+      await loadCommunityQuestionDetail(selectedQuestion.id);
+    } catch (error) {
+      showToast(error?.message || 'Unable to accept answer.', 'error');
+    } finally {
+      setActionLoadingKey(null);
+    }
+  };
+
+  const getSortedAnswers = () => {
+    const answers = [...(selectedQuestion?.answers || [])];
+    if (answerSort === 'newest') {
+      return answers.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    }
+    return answers.sort((a, b) => {
+      if ((a.is_accepted ? 1 : 0) !== (b.is_accepted ? 1 : 0)) {
+        return (b.is_accepted ? 1 : 0) - (a.is_accepted ? 1 : 0);
+      }
+      if ((a.score || 0) !== (b.score || 0)) {
+        return (b.score || 0) - (a.score || 0);
+      }
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    });
+  };
+
+  const communityDetailPanel = !selectedQuestion ? (
+    <p className="text-sm text-gray-500 dark:text-gray-400">Select a question to view details and answers.</p>
+  ) : (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-2">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedQuestion.title}</h2>
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 px-1.5">
+            {selectedQuestion.score ?? 0}
+          </span>
+          <Button
+            size="sm"
+            variant={selectedQuestion.user_vote === 1 ? "primary" : "ghost"}
+            onClick={() => handleVoteQuestion(selectedQuestion.id, 1)}
+            loading={actionLoadingKey === `vote-question-${selectedQuestion.id}-1`}
+            disabled={Boolean(actionLoadingKey)}
+          >
+            <ArrowBigUp className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant={selectedQuestion.user_vote === -1 ? "primary" : "ghost"}
+            onClick={() => handleVoteQuestion(selectedQuestion.id, -1)}
+            loading={actionLoadingKey === `vote-question-${selectedQuestion.id}--1`}
+            disabled={Boolean(actionLoadingKey)}
+          >
+            <ArrowBigDown className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+      <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{selectedQuestion.body}</div>
+      {selectedQuestion.duplicate_of && (
+        <div className="rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/20 p-2.5">
+          <p className="text-xs font-medium text-amber-900 dark:text-amber-300">
+            This question is linked as a potential duplicate of:
+          </p>
+          <button
+            type="button"
+            className="mt-1 text-xs text-amber-800 dark:text-amber-200 hover:underline"
+            onClick={() =>
+              openCommunityQuestion({
+                id: selectedQuestion.duplicate_of,
+                title: selectedQuestion.duplicate_of_title || `Question #${selectedQuestion.duplicate_of}`,
+              })
+            }
+          >
+            {selectedQuestion.duplicate_of_title || `Question #${selectedQuestion.duplicate_of}`}
+          </button>
+        </div>
+      )}
+      {(selectedQuestion.attachments || []).length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-gray-600 dark:text-gray-300">Attachments</p>
+          <div className="flex flex-wrap gap-2">
+            {selectedQuestion.attachments.map((a) => (
+              <a
+                key={a.id}
+                href={a.file_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-700 text-primary-700 dark:text-primary-300 hover:underline"
+              >
+                {a.original_name}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+      {selectedQuestion.has_accepted_answer && (
+        <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/70 dark:bg-emerald-950/20 p-2.5 flex items-center justify-between gap-2">
+          <p className="text-xs font-medium text-emerald-900 dark:text-emerald-300">
+            This question has an accepted answer.
+          </p>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              const node = document.getElementById(`kb-answer-accepted-${selectedQuestion.id}`);
+              node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
+          >
+            Jump to accepted
+          </Button>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input
+          value={commentDrafts[`question-${selectedQuestion.id}`] || ''}
+          onChange={(e) => setCommentDrafts((p) => ({ ...p, [`question-${selectedQuestion.id}`]: e.target.value }))}
+          placeholder="Add a comment to question"
+          className="flex-1 px-2 py-1 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"
+        />
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => submitComment('question', selectedQuestion.id)}
+          loading={actionLoadingKey === `comment-question-${selectedQuestion.id}`}
+          disabled={Boolean(actionLoadingKey)}
+        >
+          Comment
+        </Button>
+      </div>
+      <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-800 pt-3">
+        <p className="text-xs font-medium text-gray-600 dark:text-gray-300">
+          Answers ({selectedQuestion.answer_count ?? selectedQuestion.answers?.length ?? 0})
+        </p>
+        <select
+          value={answerSort}
+          onChange={(e) => setAnswerSort(e.target.value)}
+          className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-xs text-gray-900 dark:text-white"
+        >
+          <option value="top">Top answers</option>
+          <option value="newest">Newest first</option>
+        </select>
+      </div>
+      <div className="space-y-3">
+        {getSortedAnswers().map((answer) => (
+          <div
+            key={answer.id}
+            id={answer.is_accepted ? `kb-answer-accepted-${selectedQuestion.id}` : undefined}
+            className={cn(
+              "rounded-lg border p-3 space-y-2",
+              answer.is_accepted
+                ? "border-emerald-300 dark:border-emerald-800 bg-emerald-50/40 dark:bg-emerald-950/10"
+                : "border-gray-200 dark:border-gray-800"
+            )}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-1">
+                {answer.is_accepted && (
+                  <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                    Accepted answer
+                  </p>
+                )}
+                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{answer.body}</p>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 px-1.5">
+                  {answer.score ?? 0}
+                </span>
+                <Button
+                  size="sm"
+                  variant={answer.user_vote === 1 ? "primary" : "ghost"}
+                  onClick={() => handleVoteAnswer(answer.id, 1)}
+                  loading={actionLoadingKey === `vote-answer-${answer.id}-1`}
+                  disabled={Boolean(actionLoadingKey)}
+                >
+                  <ArrowBigUp className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant={answer.user_vote === -1 ? "primary" : "ghost"}
+                  onClick={() => handleVoteAnswer(answer.id, -1)}
+                  loading={actionLoadingKey === `vote-answer-${answer.id}--1`}
+                  disabled={Boolean(actionLoadingKey)}
+                >
+                  <ArrowBigDown className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant={answer.is_accepted ? 'primary' : 'outline'}
+                  onClick={() => handleAcceptAnswer(answer.id)}
+                  loading={actionLoadingKey === `accept-answer-${answer.id}`}
+                  disabled={Boolean(actionLoadingKey)}
+                >
+                  <Check className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            {(answer.attachments || []).length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {answer.attachments.map((a) => (
+                  <a
+                    key={a.id}
+                    href={a.file_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-700 text-primary-700 dark:text-primary-300 hover:underline"
+                  >
+                    {a.original_name}
+                  </a>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                value={commentDrafts[`answer-${answer.id}`] || ''}
+                onChange={(e) => setCommentDrafts((p) => ({ ...p, [`answer-${answer.id}`]: e.target.value }))}
+                placeholder="Add a comment"
+                className="flex-1 px-2 py-1 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => submitComment('answer', answer.id)}
+                loading={actionLoadingKey === `comment-answer-${answer.id}`}
+                disabled={Boolean(actionLoadingKey)}
+              >
+                Comment
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <form onSubmit={handleAddAnswer} className="space-y-2 border-t border-gray-200 dark:border-gray-800 pt-3">
+        <textarea
+          value={answerDraft}
+          onChange={(e) => setAnswerDraft(e.target.value)}
+          rows={3}
+          placeholder="Write your answer"
+          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+        />
+        <input
+          type="file"
+          multiple
+          onChange={(e) => setAnswerFiles(Array.from(e.target.files || []))}
+          className="w-full text-xs text-gray-600 dark:text-gray-300"
+        />
+        {answerFiles.length > 0 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {answerFiles.length} attachment(s) selected
+          </p>
+        )}
+        <div className="flex justify-end">
+          <Button type="submit" variant="primary" loading={uploadingFiles} disabled={uploadingFiles}>
+            Post Answer
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+
+  if (viewMode === 'community') {
+    return (
+      <div className="space-y-6">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">
+              Knowledge Base
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Community Q&A for internal contributors and public readers
+            </p>
+          </div>
+          <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-1">
+            <button
+              type="button"
+              onClick={() => updateViewMode('articles')}
+              className="px-3 py-1.5 text-sm rounded-md text-gray-600 dark:text-gray-300"
+            >
+              Articles
+            </button>
+            <button
+              type="button"
+              onClick={() => updateViewMode('community')}
+              className="px-3 py-1.5 text-sm rounded-md bg-primary-600 text-white"
+            >
+              Community Q&A
+            </button>
+          </div>
+        </header>
+
+        <div className="flex flex-wrap gap-3">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search questions..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none text-gray-900 dark:text-white"
+            />
+          </div>
+          <select
+            value={communitySort}
+            onChange={(e) => setCommunitySort(e.target.value)}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white"
+          >
+            <option value="active">Most active</option>
+            <option value="votes">Top voted</option>
+            <option value="newest">Newest</option>
+            <option value="unanswered">Unanswered</option>
+          </select>
+          <select
+            value={communityFilter}
+            onChange={(e) => setCommunityFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white"
+          >
+            <option value="all">All questions</option>
+            <option value="unanswered">Only unanswered</option>
+            <option value="accepted">Has accepted answer</option>
+          </select>
+          <Button variant="primary" onClick={() => setCreatingQuestion((v) => !v)}>
+            <Plus className="w-4 h-4 mr-1.5" />
+            Ask question
+          </Button>
+        </div>
+
+        {creatingQuestion && (
+          <Card className="p-4">
+            <form onSubmit={handleCreateQuestion} className="space-y-3">
+              <input
+                value={questionDraft.title}
+                onChange={(e) => setQuestionDraft((p) => ({ ...p, title: e.target.value }))}
+                placeholder="Question title"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+                required
+              />
+              {checkingDuplicates && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">Checking similar questions...</p>
+              )}
+              {!checkingDuplicates && duplicateSuggestions.length > 0 && (
+                <div className="rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/20 p-2.5 space-y-2">
+                  <p className="text-xs font-medium text-amber-900 dark:text-amber-300">
+                    Similar existing questions found:
+                  </p>
+                  {selectedDuplicateQuestion && (
+                    <div className="flex items-center justify-between text-xs px-2 py-1.5 rounded border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/20">
+                      <span className="font-medium text-emerald-900 dark:text-emerald-300">
+                        Marked duplicate of: {selectedDuplicateQuestion.title}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-emerald-700 dark:text-emerald-300 hover:underline"
+                        onClick={() => setSelectedDuplicateQuestion(null)}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                  {duplicateSuggestions.map((q) => (
+                    <div key={q.id} className="flex gap-2">
+                      <button
+                        type="button"
+                        className="flex-1 text-left text-xs px-2 py-1.5 rounded border border-amber-200 dark:border-amber-800/50 hover:bg-amber-100/80 dark:hover:bg-amber-900/30"
+                        onClick={async () => {
+                          setCreatingQuestion(false);
+                          await openCommunityQuestion(q);
+                        }}
+                      >
+                        {q.title}
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs px-2 py-1.5 rounded border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/30"
+                        onClick={() => setSelectedDuplicateQuestion(q)}
+                      >
+                        Mark duplicate
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <textarea
+                value={questionDraft.body}
+                onChange={(e) => setQuestionDraft((p) => ({ ...p, body: e.target.value }))}
+                placeholder="Describe your issue or question..."
+                rows={4}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+                required
+              />
+              <input
+                value={questionDraft.tags}
+                onChange={(e) => setQuestionDraft((p) => ({ ...p, tags: e.target.value }))}
+                placeholder="Tags (comma-separated)"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+              />
+              <input
+                type="file"
+                multiple
+                onChange={(e) => setQuestionFiles(Array.from(e.target.files || []))}
+                className="w-full text-xs text-gray-600 dark:text-gray-300"
+              />
+              {questionFiles.length > 0 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {questionFiles.length} attachment(s) selected
+                </p>
+              )}
+              <div className="flex justify-end">
+                <Button type="submit" variant="primary" loading={uploadingFiles} disabled={uploadingFiles}>
+                  Post Question
+                </Button>
+              </div>
+            </form>
+          </Card>
+        )}
+
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.15fr] gap-4">
+          <div className="space-y-3">
+            {communityLoading ? (
+              <KnowledgeBaseArticlesSkeleton />
+            ) : (
+              (communityQuestions || []).map((question) => (
+                <Card
+                  key={question.id}
+                  className={cn(
+                    "p-4 cursor-pointer hover:shadow-sm transition-all",
+                    selectedQuestion?.id === question.id && "ring-2 ring-primary-500 border-primary-300 dark:border-primary-700"
+                  )}
+                  onClick={() => openCommunityQuestion(question)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{question.title}</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {question.answer_count ?? 0} answers · {question.views ?? 0} views · score {question.score ?? 0}
+                      </p>
+                      {question.duplicate_of_title && (
+                        <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-1">
+                          Potential duplicate of: {question.duplicate_of_title}
+                        </p>
+                      )}
+                    </div>
+                    {openingQuestionId === question.id ? (
+                      <span className="text-[11px] text-gray-500 dark:text-gray-400 shrink-0">Opening...</span>
+                    ) : (
+                      <MessageSquare className="w-4 h-4 text-primary-500 shrink-0" />
+                    )}
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+
+          <Card className={cn("p-4 min-h-[300px]", !isDesktop && "hidden")}>
+            {communityDetailPanel}
+          </Card>
+        </div>
+
+        {!isDesktop &&
+          createPortal(
+            <AnimatePresence mode="sync">
+              {communityDetailOpen && selectedQuestion && (
+                <>
+                  <motion.div
+                    key="community-detail-backdrop"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-40 bg-black/45 dark:bg-black/60"
+                    onClick={() => setCommunityDetailOpen(false)}
+                    aria-hidden
+                  />
+                  <motion.aside
+                    key="community-detail-sheet"
+                    initial={{ x: '100%' }}
+                    animate={{ x: 0 }}
+                    exit={{ x: '100%' }}
+                    transition={{ type: 'tween', duration: 0.25, ease: 'easeOut' }}
+                    className="fixed top-0 right-0 z-50 flex h-[100dvh] max-h-[100dvh] w-full max-w-2xl flex-col overflow-hidden border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow-2xl"
+                  >
+                    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between shrink-0 pt-[max(0.75rem,env(safe-area-inset-top))]">
+                      <h2 className="text-sm font-semibold text-gray-900 dark:text-white truncate pr-3">
+                        Question details
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={() => setCommunityDetailOpen(false)}
+                        className="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                        aria-label="Close question details"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                      {communityDetailPanel}
+                    </div>
+                  </motion.aside>
+                </>
+              )}
+            </AnimatePresence>,
+            document.body
+          )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-8rem)] lg:min-h-[500px]">
       {/* Left: list and filters */}
       <div className="flex-1 min-w-0 flex flex-col space-y-6 overflow-y-auto scrollbar-hide">
-        <header>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">
-            Knowledge Base
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Search documentation and solutions
-          </p>
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">
+              Knowledge Base
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Search documentation and solutions
+            </p>
+          </div>
+          <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-1">
+            <button
+              type="button"
+              onClick={() => updateViewMode('articles')}
+              className={cn(
+                "px-3 py-1.5 text-sm rounded-md",
+                viewMode === "articles"
+                  ? "bg-primary-600 text-white"
+                  : "text-gray-600 dark:text-gray-300"
+              )}
+            >
+              Articles
+            </button>
+            <button
+              type="button"
+              onClick={() => updateViewMode('community')}
+              className={cn(
+                "px-3 py-1.5 text-sm rounded-md",
+                viewMode === "community"
+                  ? "bg-primary-600 text-white"
+                  : "text-gray-600 dark:text-gray-300"
+              )}
+            >
+              Community Q&A
+            </button>
+          </div>
         </header>
 
       {/* Toolbar */}
@@ -391,9 +1264,9 @@ const KnowledgeBase = () => {
       {allTags.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Tags:</span>
-          {(tagsExpanded ? allTags : allTags.slice(0, TAGS_VISIBLE_COLLAPSED)).map((tag) => (
+          {(tagsExpanded ? allTags : allTags.slice(0, TAGS_VISIBLE_COLLAPSED)).map((tag, idx) => (
             <button
-              key={tag}
+              key={`${tag}-${idx}`}
               type="button"
               onClick={() => toggleTag(tag)}
               className={cn(
@@ -422,9 +1295,9 @@ const KnowledgeBase = () => {
       {selectedTags.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Filtered by:</span>
-          {selectedTags.map((tag) => (
+          {selectedTags.map((tag, idx) => (
             <span
-              key={tag}
+              key={`${tag}-${idx}`}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800/50 rounded-md text-xs font-medium"
             >
               {tag}
@@ -480,9 +1353,9 @@ const KnowledgeBase = () => {
                 </p>
                 {article.tags?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-4">
-                    {article.tags.slice(0, 3).map((t) => (
+                    {article.tags.slice(0, 3).map((t, idx) => (
                       <span
-                        key={t}
+                        key={`${t}-${idx}`}
                         className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded text-xs"
                       >
                         {t}

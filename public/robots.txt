@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /knowledge-base
+Allow: /community/
+Disallow: /api/
+
+Sitemap: https://app.resolvemeq.net/sitemap.xml

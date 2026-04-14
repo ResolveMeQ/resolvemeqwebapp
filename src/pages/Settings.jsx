@@ -23,7 +23,7 @@ import { SettingsPageSkeleton } from '../components/ui/Skeleton';
  * Settings page component with comprehensive configuration options
  * @param {{ initialTab?: string }} props
  */
-const Settings = ({ initialTab = 'general' }) => {
+const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -70,20 +70,25 @@ const Settings = ({ initialTab = 'general' }) => {
       const data = await api.settings.getPreferences();
       setPreferences(data);
       if (data) {
+        const selectedTheme = data.theme ?? theme ?? 'dark';
         setNotificationSettings({
           emailNotifications: data.email_notifications ?? true,
           pushNotifications: data.push_notifications ?? true,
           ticketUpdates: data.ticket_updates ?? true,
           systemAlerts: data.system_alerts ?? true,
-          dailyDigest: data.daily_digest ?? false
+          dailyDigest: data.daily_digest ?? false,
+          communityNewQuestions: data.community_new_questions ?? true,
+          communityAnswers: data.community_answers ?? true,
+          communityComments: data.community_comments ?? true,
         });
         setGeneralSettings({
           timezone: data.timezone ?? 'UTC',
           language: data.language ?? 'en'
         });
         setAppearanceSettings({
-          theme: data.theme ?? 'dark'
+          theme: selectedTheme
         });
+        onThemeChange?.(selectedTheme);
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
@@ -100,10 +105,26 @@ const Settings = ({ initialTab = 'general' }) => {
     pushNotifications: true,
     ticketUpdates: true,
     systemAlerts: true,
-    dailyDigest: false
+    dailyDigest: false,
+    communityNewQuestions: true,
+    communityAnswers: true,
+    communityComments: true,
   });
   const [slackStatus, setSlackStatus] = useState(null);
   const [slackConnecting, setSlackConnecting] = useState(false);
+
+  useEffect(() => {
+    if (!theme) return;
+    setAppearanceSettings((prev) => ({ ...prev, theme }));
+  }, [theme]);
+
+  const handleAppearanceThemeSelect = useCallback(
+    (themeValue) => {
+      setAppearanceSettings((prev) => ({ ...prev, theme: themeValue }));
+      onThemeChange?.(themeValue);
+    },
+    [onThemeChange]
+  );
 
   const loadSlackStatus = useCallback(async () => {
     const teamId = preferences?.active_team;
@@ -168,6 +189,9 @@ const Settings = ({ initialTab = 'general' }) => {
         ticket_updates: notificationSettings.ticketUpdates,
         system_alerts: notificationSettings.systemAlerts,
         daily_digest: notificationSettings.dailyDigest,
+        community_new_questions: notificationSettings.communityNewQuestions,
+        community_answers: notificationSettings.communityAnswers,
+        community_comments: notificationSettings.communityComments,
         timezone: generalSettings.timezone || 'UTC',
         language: generalSettings.language || 'en',
         theme: appearanceSettings.theme || 'light'
@@ -388,6 +412,36 @@ const Settings = ({ initialTab = 'general' }) => {
                 <div className={toggleTrackClass} />
               </label>
             </div>
+            <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-800 last:border-0">
+              <div>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">Community: new questions</h4>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Notify when teammates ask new community questions</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked={notificationSettings.communityNewQuestions} onChange={(e) => setNotificationSettings(prev => ({ ...prev, communityNewQuestions: e.target.checked }))} className="sr-only peer" />
+                <div className={toggleTrackClass} />
+              </label>
+            </div>
+            <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-800 last:border-0">
+              <div>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">Community: answers</h4>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Notify when your questions get answers or your answers are accepted</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked={notificationSettings.communityAnswers} onChange={(e) => setNotificationSettings(prev => ({ ...prev, communityAnswers: e.target.checked }))} className="sr-only peer" />
+                <div className={toggleTrackClass} />
+              </label>
+            </div>
+            <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-800 last:border-0">
+              <div>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">Community: comments</h4>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Notify when your community threads receive comments</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked={notificationSettings.communityComments} onChange={(e) => setNotificationSettings(prev => ({ ...prev, communityComments: e.target.checked }))} className="sr-only peer" />
+                <div className={toggleTrackClass} />
+              </label>
+            </div>
           </div>
         </div>
       </Card>
@@ -405,7 +459,7 @@ const Settings = ({ initialTab = 'general' }) => {
               <button
                 key={themeValue}
                 type="button"
-                onClick={() => setAppearanceSettings(prev => ({ ...prev, theme: themeValue }))}
+                onClick={() => handleAppearanceThemeSelect(themeValue)}
                 className={cn(
                   'border-2 rounded-lg p-4 text-center cursor-pointer transition-colors duration-150',
                   appearanceSettings.theme === themeValue

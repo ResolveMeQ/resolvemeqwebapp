@@ -22,6 +22,17 @@ export function normalizeSessionUser(raw) {
   };
 }
 
+function buildQueryString(params = {}) {
+  const search = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value == null) return;
+    const str = String(value).trim();
+    if (!str || str === 'undefined' || str === 'null') return;
+    search.append(key, str);
+  });
+  return search.toString();
+}
+
 // Token management
 export const TokenService = {
   getAccessToken: () => localStorage.getItem('access_token'),
@@ -428,6 +439,81 @@ export const api = {
       return apiFetch(`/api/knowledge_base/articles/${id}/rate/`, {
         method: 'POST',
         body: JSON.stringify({ is_helpful: isHelpful }),
+      });
+    },
+
+    listCommunityQuestions: async (params = {}) => {
+      const qs = buildQueryString(params);
+      return apiFetch(`/api/knowledge_base/community/questions/${qs ? `?${qs}` : ''}`);
+    },
+
+    getCommunityQuestion: async (questionId) => {
+      return apiFetch(`/api/knowledge_base/community/questions/${questionId}/`);
+    },
+
+    getPublicCommunityQuestion: async (questionId, slugAndId) => {
+      const base = `/api/knowledge_base/community/public/questions/`;
+      if (slugAndId) {
+        return apiFetch(`${base}${encodeURIComponent(slugAndId)}/`);
+      }
+      return apiFetch(`${base}${questionId}/`);
+    },
+
+    createCommunityQuestion: async (payload) => {
+      return apiFetch('/api/knowledge_base/community/questions/', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+    addCommunityAnswer: async (questionId, payload) => {
+      return apiFetch(`/api/knowledge_base/community/questions/${questionId}/answers/`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+    addCommunityQuestionComment: async (questionId, payload) => {
+      return apiFetch(`/api/knowledge_base/community/questions/${questionId}/comments/`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+    addCommunityAnswerComment: async (answerId, payload) => {
+      return apiFetch(`/api/knowledge_base/community/answers/${answerId}/comments/`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+    voteCommunityQuestion: async (questionId, value) => {
+      return apiFetch(`/api/knowledge_base/community/questions/${questionId}/vote/`, {
+        method: 'POST',
+        body: JSON.stringify({ value }),
+      });
+    },
+
+    voteCommunityAnswer: async (answerId, value) => {
+      return apiFetch(`/api/knowledge_base/community/answers/${answerId}/vote/`, {
+        method: 'POST',
+        body: JSON.stringify({ value }),
+      });
+    },
+
+    acceptCommunityAnswer: async (answerId) => {
+      return apiFetch(`/api/knowledge_base/community/answers/${answerId}/accept/`, {
+        method: 'POST',
+      });
+    },
+
+    uploadCommunityAttachment: async (file) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return apiFetch('/api/knowledge_base/community/attachments/upload/', {
+        method: 'POST',
+        body: formData,
+        isFormData: true,
       });
     },
   },

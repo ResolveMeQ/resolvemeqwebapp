@@ -71,6 +71,7 @@ const GlobalSearchPanel = ({
     (results?.tickets && results.tickets.length > 0) ||
     (results?.communityResolvedTickets && results.communityResolvedTickets.length > 0) ||
     (results?.knowledgeBase && results.knowledgeBase.length > 0) ||
+    (results?.communityQuestions && results.communityQuestions.length > 0) ||
     (results?.users && results.users.length > 0);
 
   return (
@@ -283,6 +284,31 @@ const GlobalSearchPanel = ({
                   No articles match this search.
                 </p>
               )}
+            </div>
+            <div className="mt-3">
+              <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">
+                Community Q&A
+              </p>
+              <div className="space-y-1.5">
+                {(results?.communityQuestions || []).slice(0, 4).map((q) => (
+                  <div
+                    key={`q-${q.id}`}
+                    role="button"
+                    tabIndex={0}
+                    className="rounded-md px-2.5 py-1.5 bg-gray-50 dark:bg-gray-800/70 border border-gray-100 dark:border-gray-700 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                    onClick={() => navigate(`/knowledge-base?view=community&question=${q.id}`)}
+                    onKeyDown={(e) => e.key === 'Enter' && navigate(`/knowledge-base?view=community&question=${q.id}`)}
+                  >
+                    <p className="font-medium text-gray-900 dark:text-white truncate">{q.title}</p>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                      {q.answer_count ?? 0} answers · score {q.score ?? 0}
+                    </p>
+                  </div>
+                ))}
+                {!loading && (results?.communityQuestions || []).length === 0 && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500">No community questions match.</p>
+                )}
+              </div>
             </div>
           </div>
 

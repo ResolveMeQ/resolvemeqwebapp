@@ -106,6 +106,7 @@ const Tickets = ({ activeTeamId }) => {
   const toastSeq = useRef(0);
   const pendingScrollToCommentsRef = useRef(null);
   const screenshotInputRef = useRef(null);
+  const commentInputRef = useRef(null);
 
   const closeCreateForm = useCallback(() => {
     setShowCreateForm(false);
@@ -133,9 +134,15 @@ const Tickets = ({ activeTeamId }) => {
         behavior: 'smooth',
         block: 'start',
       });
-      document.querySelector('#ticket-comments-section input[type="text"]')?.focus();
+      document.querySelector('#ticket-comments-section textarea, #ticket-comments-section input[type="text"]')?.focus();
     }, delayMs);
   }, []);
+
+  useEffect(() => {
+    if (!commentInputRef.current) return;
+    commentInputRef.current.style.height = 'auto';
+    commentInputRef.current.style.height = `${Math.min(commentInputRef.current.scrollHeight, 160)}px`;
+  }, [commentText]);
 
   useEffect(() => {
     if (!createScreenshotFile) {
@@ -365,6 +372,15 @@ const Tickets = ({ activeTeamId }) => {
       setCommentText(text);
     } finally {
       setCommentLoading(false);
+    }
+  };
+
+  const handleCommentKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (commentText.trim() && !commentLoading) {
+        handleAddComment();
+      }
     }
   };
 
@@ -728,7 +744,7 @@ const Tickets = ({ activeTeamId }) => {
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button type="submit" variant="primary" size="md" loading={createLoading} className="flex-1">
-                      <Sparkles className="w-4 h-4 mr-2" />
+                      <Plus className="w-4 h-4 mr-2" />
                       {createLoading ? 'Creating & starting AI…' : 'Create & get AI help'}
                     </Button>
                     <Button type="button" variant="ghost" size="md" onClick={closeCreateForm} disabled={createLoading}>
@@ -1290,13 +1306,43 @@ const Tickets = ({ activeTeamId }) => {
                         </div>
 
                         <div id="ticket-comments-section" className="pt-6 border-t border-gray-200 dark:border-gray-800">
-                          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">Comments {(detailTicket?.comments?.length ?? 0) ? `(${detailTicket.comments.length})` : ''}</p>
+                          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                              Comments {(detailTicket?.comments?.length ?? 0) ? `(${detailTicket.comments.length})` : ''}
+                            </p>
+                            {detailTicket?.conversation_state_label && (
+                              <span
+                                className={cn(
+                                  "text-[11px] px-2 py-1 rounded-full border",
+                                  detailTicket.awaiting_response_from === 'support'
+                                    ? "border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300"
+                                    : detailTicket.awaiting_response_from === 'user'
+                                      ? "border-blue-300 text-blue-700 dark:border-blue-800 dark:text-blue-300"
+                                      : "border-gray-300 text-gray-600 dark:border-gray-700 dark:text-gray-300"
+                                )}
+                              >
+                                {detailTicket.conversation_state_label}
+                              </span>
+                            )}
+                          </div>
                           {(detailTicket?.comments?.length ?? 0) > 0 && (
                             <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
                               {(detailTicket.comments || []).map((c) => (
                                 <div key={c.id} className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
                                   <div className="flex items-center justify-between gap-2 mb-1">
-                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{c.author ?? 'User'}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{c.author ?? 'User'}</span>
+                                      {c.author_role && (
+                                        <span className={cn(
+                                          "text-[10px] px-1.5 py-0.5 rounded border",
+                                          c.author_role === 'requester'
+                                            ? "border-gray-300 text-gray-600 dark:border-gray-700 dark:text-gray-300"
+                                            : "border-primary-300 text-primary-700 dark:border-primary-700 dark:text-primary-300"
+                                        )}>
+                                          {c.author_role === 'requester' ? 'Requester' : 'Support'}
+                                        </span>
+                                      )}
+                                    </div>
                                     <span className="text-xs text-gray-500 dark:text-gray-400">{c.created_at ? formatTicketTime(c.created_at) : ''}</span>
                                   </div>
                                   <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{c.content}</p>
@@ -1304,13 +1350,15 @@ const Tickets = ({ activeTeamId }) => {
                               ))}
                             </div>
                           )}
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
+                          <div className="flex gap-2 items-end">
+                            <textarea
+                              ref={commentInputRef}
+                              rows={1}
                               value={commentText}
                               onChange={(e) => setCommentText(e.target.value)}
+                              onKeyDown={handleCommentKeyDown}
                               placeholder="Type a comment..."
-                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                              className="flex-1 min-h-[40px] max-h-[160px] px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none resize-none overflow-y-auto"
                             />
                             <Button variant="primary" size="sm" onClick={handleAddComment} disabled={!commentText.trim()} loading={commentLoading}>
                               Send

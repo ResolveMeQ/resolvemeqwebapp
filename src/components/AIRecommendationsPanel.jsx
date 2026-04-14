@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, TrendingUp, AlertCircle, CheckCircle, Clock, Zap, ExternalLink, X } from 'lucide-react';
+import { TrendingUp, AlertCircle, CheckCircle, Zap, ExternalLink, X } from 'lucide-react';
 import { api } from '../services/api';
 import Card from './ui/Card';
 import { AIRecommendationsPanelSkeleton } from './ui/Skeleton';
@@ -16,7 +16,6 @@ const AIRecommendationsPanel = () => {
       return new Set();
     }
   });
-  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -54,20 +53,15 @@ const AIRecommendationsPanel = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [recommendationsData, analyticsData] = await Promise.all([
-        api.agent.getRecommendations(),
-        api.agent.getAnalytics()
-      ]);
+      const recommendationsData = await api.agent.getRecommendations();
       setRecommendations(
         Array.isArray(recommendationsData) ? recommendationsData : (recommendationsData?.recommendations || [])
       );
-      setAnalytics(analyticsData);
       setError(null);
     } catch (err) {
       console.error('Error loading AI data:', err);
       setError('Failed to load AI recommendations');
       setRecommendations([]);
-      setAnalytics(null);
     } finally {
       setLoading(false);
     }
@@ -103,64 +97,6 @@ const AIRecommendationsPanel = () => {
 
   return (
     <>
-      {/* AI Agent Status Card */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-primary-600">
-              <Brain className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white">AI Agent Status</h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Autonomous resolution engine</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50 rounded-md">
-            <div className="h-1.5 w-1.5 bg-green-600 dark:bg-green-400 rounded-full"></div>
-            <span className="text-xs font-semibold uppercase tracking-wide">Active</span>
-          </div>
-        </div>
-
-        {analytics && (
-          <div className="space-y-2">
-            <p className="text-[11px] text-gray-500 dark:text-gray-400">
-              First three metrics are for <span className="font-medium">your visible tickets</span>. Platform row is overall product KB / automation.
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Processing</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                  {analytics.agent_processing_rate}%
-                </p>
-              </div>
-              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Success</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                  {analytics.resolution_success_rate}%
-                </p>
-              </div>
-              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Confidence</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                  {(analytics.average_confidence_score * 100).toFixed(0)}%
-                </p>
-              </div>
-              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Platform solutions</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                  {analytics.platform?.high_confidence_autonomous_solutions ?? analytics.autonomous_solutions ?? '—'}
-                </p>
-                {analytics.platform?.knowledge_base?.total_articles != null && (
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
-                    KB articles: {analytics.platform.knowledge_base.total_articles}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </Card>
-
       {/* Recommendations List */}
       {recommendations.length > 0 && visibleCount > 0 && (
         <Card className="p-6">

@@ -9,7 +9,8 @@ import {
   Sun,
   Moon,
   Monitor,
-  X
+  X,
+  Gem,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { THEME_MODES } from '../../constants';
@@ -125,6 +126,14 @@ const Header = ({
   }, [user]);
 
   useEffect(() => {
+    if (!user) return undefined;
+    const timer = window.setInterval(() => {
+      fetchNotifications();
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [user]);
+
+  useEffect(() => {
     if (isNotificationsOpen && user) fetchNotifications();
   }, [isNotificationsOpen]);
 
@@ -221,16 +230,19 @@ const Header = ({
           {planName && (
             <>
               <div
-                className="md:hidden max-w-[6.5rem] min-[380px]:max-w-[8rem] px-2 py-1 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/50 rounded-lg"
+                className="md:hidden max-w-[8.5rem] px-2.5 py-1.5 rounded-full border border-primary-300/70 dark:border-primary-700/70 bg-gradient-to-r from-primary-600/10 via-violet-500/10 to-indigo-500/10 dark:from-primary-500/20 dark:via-violet-500/20 dark:to-indigo-500/20 shadow-sm"
                 title={planName}
               >
-                <span className="block text-[10px] font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wide truncate">
-                  {planName}
+                <span className="flex items-center gap-1.5">
+                  <Gem className="w-3 h-3 text-primary-600 dark:text-primary-300 shrink-0" />
+                  <span className="block text-[10px] font-semibold text-primary-700 dark:text-primary-200 uppercase tracking-[0.08em] truncate">
+                    {planName}
+                  </span>
                 </span>
               </div>
-              <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/50 rounded-lg">
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-                <span className="text-xs font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wide">{planName}</span>
+              <div className="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-primary-300/70 dark:border-primary-700/70 bg-gradient-to-r from-primary-600/10 via-violet-500/10 to-indigo-500/10 dark:from-primary-500/20 dark:via-violet-500/20 dark:to-indigo-500/20 shadow-sm">
+                <Gem className="w-3.5 h-3.5 text-primary-600 dark:text-primary-300" />
+                <span className="text-xs font-semibold text-primary-700 dark:text-primary-200 uppercase tracking-[0.08em]">{planName}</span>
               </div>
             </>
           )}

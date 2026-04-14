@@ -10,6 +10,7 @@ import Users from './pages/Users';
 import KnowledgeBase from './pages/KnowledgeBase';
 import Billing from './pages/Billing';
 import Settings from './pages/Settings';
+import CommunityQuestionPublic from './pages/CommunityQuestionPublic';
 import Login from './pages/auth/Login';
 import Signup from './pages/auth/Signup';
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -28,6 +29,7 @@ function App() {
     tickets: [],
     communityResolvedTickets: [],
     knowledgeBase: [],
+    communityQuestions: [],
     users: [],
   });
   const [theme, setTheme] = useState(THEME_MODES.DARK);
@@ -129,59 +131,48 @@ function App() {
   // Theme management
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || THEME_MODES.DARK;
-    console.log('Initial theme:', savedTheme);
     setTheme(savedTheme);
-    applyTheme(savedTheme);
+  }, []);
 
-    // Listen for system theme changes when in auto mode
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleSystemThemeChange = (e) => {
-      if (savedTheme === THEME_MODES.AUTO) {
-        console.log('System theme changed, applying auto mode');
+    const handleSystemThemeChange = () => {
+      if (theme === THEME_MODES.AUTO) {
         applyTheme(THEME_MODES.AUTO);
       }
     };
 
     mediaQuery.addEventListener('change', handleSystemThemeChange);
-
-    return () => {
-      mediaQuery.removeEventListener('change', handleSystemThemeChange);
-    };
-  }, []);
+    return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
+  }, [theme]);
 
   const applyTheme = (newTheme) => {
     const root = document.documentElement;
-    console.log('Applying theme:', newTheme);
     
     // Always start by removing dark class to ensure light mode
     root.classList.remove('dark');
     
     if (newTheme === THEME_MODES.DARK) {
       root.classList.add('dark');
-      console.log('Dark mode applied');
     } else if (newTheme === THEME_MODES.LIGHT) {
       root.classList.remove('dark');
-      console.log('Light mode applied');
     } else if (newTheme === THEME_MODES.AUTO) {
       // Auto mode - follow system preference
       if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
         root.classList.add('dark');
-        console.log('Auto mode: Dark (system preference)');
       } else {
         root.classList.remove('dark');
-        console.log('Auto mode: Light (system preference)');
       }
     }
-    
-    // Log the current state
-    console.log('Current dark class:', root.classList.contains('dark'));
   };
 
   const handleThemeChange = (newTheme) => {
-    console.log('Theme change requested:', newTheme);
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
-    applyTheme(newTheme);
   };
 
   const handleNavigate = (to) => {
@@ -194,7 +185,7 @@ function App() {
     setSearchQuery(trimmed);
 
     if (!trimmed) {
-      setSearchResults({ tickets: [], communityResolvedTickets: [], knowledgeBase: [], users: [] });
+      setSearchResults({ tickets: [], communityResolvedTickets: [], knowledgeBase: [], communityQuestions: [], users: [] });
       setSearchError(null);
       setSearchLoading(false);
       return;
@@ -204,9 +195,10 @@ function App() {
     setSearchError(null);
 
     try {
-      const [ticketSearch, kbArticles, teamMembers] = await Promise.all([
+      const [ticketSearch, kbArticles, communityQuestions, teamMembers] = await Promise.all([
         api.tickets.search({ q: trimmed }).catch(() => ({})),
         api.knowledgeBase.search(trimmed).catch(() => []),
+        api.knowledgeBase.listCommunityQuestions({ q: trimmed, sort: 'votes' }).catch(() => []),
         api.users.listTeamMembers().catch(() => []),
       ]);
 
@@ -233,12 +225,13 @@ function App() {
         tickets: mine,
         communityResolvedTickets: community,
         knowledgeBase: Array.isArray(kbArticles) ? kbArticles : [],
+        communityQuestions: Array.isArray(communityQuestions) ? communityQuestions : [],
         users: usersFiltered,
       });
     } catch (err) {
       console.error('Global search failed:', err);
       setSearchError(err?.message || 'Search failed. Please try again.');
-      setSearchResults({ tickets: [], communityResolvedTickets: [], knowledgeBase: [], users: [] });
+      setSearchResults({ tickets: [], communityResolvedTickets: [], knowledgeBase: [], communityQuestions: [], users: [] });
     } finally {
       setSearchLoading(false);
     }
@@ -266,6 +259,8 @@ function App() {
 
   const renderAuthRoutes = () => (
     <Routes>
+      <Route path="/community/q/:slugAndId" element={<CommunityQuestionPublic />} />
+      <Route path="/knowledge-base" element={<KnowledgeBase isAuthenticated={false} />} />
       <Route path="/login" element={<Login onLogin={handleLogin} onNavigateToSignup={() => navigate('/signup')} onNavigateToForgotPassword={() => navigate('/forgot-password')} />} />
       <Route path="/signup" element={<Signup onSignup={handleSignup} onNavigateToLogin={() => navigate('/login')} onGoogleSignedIn={handleLogin} />} />
       <Route path="/verify" element={<Verify onNavigateToLogin={() => navigate('/login')} />} />
@@ -299,6 +294,7 @@ function App() {
 
   const renderMainRoutes = () => (
     <Routes>
+      <Route path="/community/q/:slugAndId" element={<CommunityQuestionPublic />} />
       <Route path="/" element={<Layout {...layoutProps}><Dashboard /></Layout>} />
       <Route path="/tickets" element={<Layout {...layoutProps}><Tickets /></Layout>} />
       <Route path="/analytics" element={<Layout {...layoutProps}><Analytics /></Layout>} />
