@@ -177,7 +177,7 @@ const Dashboard = ({ activeTeamId }) => {
     if (s === 'in-progress' || s === 'in_progress') return <Badge variant="info">In Progress</Badge>;
     if (s === 'resolved') return <Badge variant="success">Resolved</Badge>;
     if (s === 'escalated') return <Badge variant="error">Escalated</Badge>;
-    if (s === 'pending_clarification') return <Badge variant="warning">Pending clarification</Badge>;
+    if (s === 'pending_clarification') return <Badge variant="warning">Needs info</Badge>;
     if (s === 'pending') return <Badge variant="warning">Pending</Badge>;
     // Format unknown statuses: snake_case → Title Case
     const friendly = (status || '—')

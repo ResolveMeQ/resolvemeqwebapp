@@ -83,33 +83,33 @@ const ResolutionFeedback = ({ ticketId, onFeedbackSubmitted, feedbackAlreadySubm
         )}
         {/* Resolution confirmation */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Was your issue resolved?
           </label>
-          <div className="flex space-x-4">
+          <div className="flex flex-wrap justify-center gap-2">
             <button
               type="button"
               onClick={() => { setResolved(true); setFormError(''); }}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-md border-2 transition-all ${
+              className={`inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-md border text-sm font-medium transition-all ${
                 resolved === true
                   ? 'border-green-500 bg-green-50 text-green-700 dark:border-green-400 dark:bg-green-900/30 dark:text-green-300'
                   : 'border-gray-300 hover:border-green-300 dark:border-gray-600 dark:hover:border-green-600'
               }`}
             >
-              <ThumbsUp className="w-5 h-5" />
-              <span className="font-medium">Yes, it works!</span>
+              <ThumbsUp className="w-4 h-4 shrink-0" />
+              <span>Yes, it works!</span>
             </button>
             <button
               type="button"
               onClick={() => { setResolved(false); setFormError(''); }}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-md border-2 transition-all ${
+              className={`inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-md border text-sm font-medium transition-all ${
                 resolved === false
                   ? 'border-red-500 bg-red-50 text-red-700 dark:border-red-400 dark:bg-red-900/30 dark:text-red-300'
                   : 'border-gray-300 hover:border-red-300 dark:border-gray-600 dark:hover:border-red-600'
               }`}
             >
-              <ThumbsDown className="w-5 h-5" />
-              <span className="font-medium">No, still broken</span>
+              <ThumbsDown className="w-4 h-4 shrink-0" />
+              <span>No, still broken</span>
             </button>
           </div>
         </div>

@@ -43,7 +43,7 @@ const STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
   { value: 'open', label: 'Open' },
   { value: 'in_progress', label: 'In progress' },
-  { value: 'pending_clarification', label: 'Pending clarification' },
+  { value: 'pending_clarification', label: 'Needs info' },
   { value: 'escalated', label: 'Escalated' },
   { value: 'resolved', label: 'Resolved' },
 ];
@@ -525,7 +525,7 @@ const Tickets = ({ activeTeamId }) => {
     if (s === 'escalated') return <Badge variant="error">Escalated</Badge>;
     if (s === 'in-progress' || s === 'in_progress') return <Badge variant="info">In Progress</Badge>;
     if (s === 'new' || s === 'open') return <Badge variant="warning">Open</Badge>;
-    if (s === 'pending_clarification') return <Badge variant="warning">Pending clarification</Badge>;
+    if (s === 'pending_clarification') return <Badge variant="warning">Needs info</Badge>;
     if (s === 'pending') return <Badge variant="warning">Pending</Badge>;
     // Format unknown statuses: snake_case → Title Case
     const friendly = (status || '—').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());

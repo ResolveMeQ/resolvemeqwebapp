@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -34,6 +34,81 @@ const PROSE_RESPONSE_STYLES = new Set([
   'escalation_focus',
 ]);
 
+const CHAT_TEXTAREA_MAX_H = 180;
+const CHAT_COMPOSER_MIN_H = 44;
+
+/**
+ * Draft + auto-grow only re-render this chunk on each keypress, not the full message list
+ * (fixes mobile jank when the chat thread is long).
+ */
+const AIChatComposer = React.memo(function AIChatComposer({ onSend, isTyping, isLoading }) {
+  const [draft, setDraft] = useState('');
+  const taRef = useRef(null);
+  const rafId = useRef(0);
+
+  const syncHeight = useCallback(() => {
+    if (rafId.current) cancelAnimationFrame(rafId.current);
+    rafId.current = requestAnimationFrame(() => {
+      rafId.current = 0;
+      const el = taRef.current;
+      if (!el) return;
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, CHAT_TEXTAREA_MAX_H)}px`;
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    syncHeight();
+    return () => {
+      if (rafId.current) cancelAnimationFrame(rafId.current);
+    };
+  }, [draft, syncHeight]);
+
+  const busy = isTyping || isLoading;
+  const canSend = draft.trim().length > 0 && !busy;
+
+  const doSend = () => {
+    const t = draft.trim();
+    if (!t || busy) return;
+    onSend(t);
+    setDraft('');
+  };
+
+  return (
+    <div className="flex flex-1 gap-2 items-end min-w-0">
+      <textarea
+        ref={taRef}
+        rows={1}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            doSend();
+          }
+        }}
+        placeholder="Describe your issue or ask a question..."
+        disabled={busy}
+        aria-label="Message to AI assistant"
+        className="flex-1 min-w-0 min-h-[44px] max-h-[180px] px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm resize-none overflow-y-auto touch-manipulation"
+        style={{ minHeight: CHAT_COMPOSER_MIN_H, maxHeight: CHAT_TEXTAREA_MAX_H }}
+        enterKeyHint="send"
+        autoComplete="off"
+        autoCorrect="on"
+      />
+      <Button
+        onClick={doSend}
+        disabled={!canSend}
+        variant="primary"
+        size="md"
+        className="px-6 shrink-0"
+      >
+        <Send className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+});
+
 /**
  * AIChatPanel - Real AI chat interface with backend integration
  * Features: Real-time chat, feedback, conversation history
@@ -52,7 +127,6 @@ const AIChatPanel = ({
   const ticketId = ticket?.id ?? ticket?.ticket_id;
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
-  const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState(null);
@@ -68,7 +142,6 @@ const AIChatPanel = ({
   const messagesEndRef = useRef(null);
   const liveRef = useRef(null);
   const screenshotInputRef = useRef(null);
-  const chatInputRef = useRef(null);
   const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
 
   const dismissedPromptStorageKey = (promptId) =>
@@ -186,13 +259,6 @@ const AIChatPanel = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  // Auto-grow chat input as user types (wrap to next line).
-  useEffect(() => {
-    if (!chatInputRef.current) return;
-    chatInputRef.current.style.height = 'auto';
-    chatInputRef.current.style.height = `${Math.min(chatInputRef.current.scrollHeight, 180)}px`;
-  }, [inputText]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -385,8 +451,8 @@ const AIChatPanel = ({
     }
   };
 
-  const sendMessage = async (textOverride = null) => {
-    const messageText = (textOverride || inputText || '').trim();
+  const sendMessage = async (messageTextOrEmpty) => {
+    const messageText = (messageTextOrEmpty != null ? String(messageTextOrEmpty) : '').trim();
     if (!messageText) return;
     if (isTyping) return; // Prevent double-send
 
@@ -399,7 +465,6 @@ const AIChatPanel = ({
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    setInputText('');
     setIsTyping(true);
 
     try {
@@ -706,13 +771,6 @@ const AIChatPanel = ({
     }
   };
 
-  const handleInputKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
   if (!isOpen || !ticketId) return null;
 
   return createPortal(
@@ -825,7 +883,7 @@ const AIChatPanel = ({
         role="log"
         aria-live="polite"
         aria-relevant="additions"
-        className="flex-1 overflow-y-auto p-4 sm:p-6 pb-8 bg-gray-50 dark:bg-gray-900/50 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 min-h-0"
+        className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 pb-8 bg-gray-50 dark:bg-gray-900/50 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 min-h-0 touch-pan-y"
       >
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center" role="status" aria-live="polite">
@@ -1262,26 +1320,7 @@ const AIChatPanel = ({
           >
             <ImagePlus className={`w-4 h-4 ${uploadingScreenshot ? 'opacity-50' : ''}`} />
           </Button>
-          <textarea
-            ref={chatInputRef}
-            rows={1}
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={handleInputKeyDown}
-            placeholder="Describe your issue or ask a question..."
-            disabled={isTyping || isLoading}
-            aria-label="Message to AI assistant"
-            className="flex-1 min-h-[44px] max-h-[180px] px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm resize-none overflow-y-auto"
-          />
-          <Button
-            onClick={() => sendMessage()}
-            disabled={!inputText.trim() || isTyping || isLoading}
-            variant="primary"
-            size="md"
-            className="px-6"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
+          <AIChatComposer onSend={sendMessage} isTyping={isTyping} isLoading={isLoading} />
         </div>
       </div>
     </motion.div>,
