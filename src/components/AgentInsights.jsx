@@ -113,8 +113,6 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket })
   const analysis = agentResponse.analysis || {};
   const solution = agentResponse.solution || {};
   const assignment = agentResponse.assignment || {};
-  const confidence = agentResponse.confidence || 0;
-
   return (
     <div className="space-y-4">
       {quotaError && (
@@ -171,32 +169,6 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket })
           </div>
         </div>
       </Card>
-
-      {/* Confidence Score */}
-      {confidence > 0 && (
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="font-semibold text-gray-900 dark:text-white">Confidence Score</h4>
-            <span className={`text-2xl font-bold ${
-              confidence >= 0.8 ? 'text-green-600 dark:text-green-400' :
-              confidence >= 0.6 ? 'text-yellow-600 dark:text-yellow-400' :
-              'text-red-600 dark:text-red-400'
-            }`}>
-              {(confidence * 100).toFixed(0)}%
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-            <div
-              className={`h-3 rounded-full transition-all ${
-                confidence >= 0.8 ? 'bg-green-600 dark:bg-green-500' :
-                confidence >= 0.6 ? 'bg-yellow-600 dark:bg-yellow-500' :
-                'bg-red-600 dark:bg-red-500'
-              }`}
-              style={{ width: `${confidence * 100}%` }}
-            ></div>
-          </div>
-        </Card>
-      )}
 
       {/* Analysis Details */}
       {Object.keys(analysis).length > 0 && (

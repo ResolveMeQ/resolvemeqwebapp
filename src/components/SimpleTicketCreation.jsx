@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Send, Loader, CheckCircle, X } from 'lucide-react';
 import { api, TokenService, AgentQuotaExceededError, isAgentQuotaError } from '../services/api';
 import Button from './ui/Button';
-import ConfidenceBadge from './ui/ConfidenceBadge';
 import {
   normalizeSuggestedActionsList,
   suggestedActionsFromAgentResponse,
@@ -498,15 +497,6 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
                                 </div>
                               );
                             })()}
-                            {msg.confidence != null && (
-                              <div className="mt-3 space-y-1">
-                                <ConfidenceBadge confidence={msg.confidence} size="sm" />
-                                {msg.confidence < 0.6 && (
-                                  <p className="text-xs text-amber-600 dark:text-amber-400">Confidence is low — try the steps or choose &quot;Talk to a human&quot; for support.</p>
-                                )}
-                              </div>
-                            )}
-
                             {/* Suggested actions: trigger backend (Auto Resolve, Escalate, etc.) */}
                             {normalizeSuggestedActionsList(msg.metadata?.suggested_actions).length > 0 && (
                               <div className="mt-3">

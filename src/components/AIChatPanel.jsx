@@ -13,7 +13,6 @@ import {
   ImagePlus,
 } from 'lucide-react';
 import { api, AgentQuotaExceededError, isAgentQuotaError } from '../services/api';
-import ConfidenceBadge from './ui/ConfidenceBadge';
 import Button from './ui/Button';
 import { cn } from '../utils/cn';
 import {
@@ -37,7 +36,7 @@ const PROSE_RESPONSE_STYLES = new Set([
 
 /**
  * AIChatPanel - Real AI chat interface with backend integration
- * Features: Real-time chat, confidence scores, feedback, conversation history
+ * Features: Real-time chat, feedback, conversation history
  */
 const AIChatPanel = ({
   ticket,
@@ -879,29 +878,6 @@ const AIChatPanel = ({
                             </p>
                           );
                         })()}
-
-                        {/* Confidence badge + low-confidence hint for easier resolution path */}
-                        {msg.confidence != null && (
-                          <div className="mt-3 space-y-1">
-                            <ConfidenceBadge
-                              confidence={msg.confidence}
-                              size="sm"
-                              mode={(() => {
-                                const rs = msg.metadata?.response_style;
-                                if (rs === 'informational') return 'informational';
-                                if (rs === 'clarification_only') return 'clarification';
-                                if (rs === 'escalation_focus') return 'escalation';
-                                return 'troubleshooting';
-                              })()}
-                            />
-                            {!PROSE_RESPONSE_STYLES.has(msg.metadata?.response_style) &&
-                              msg.confidence < 0.6 && (
-                              <p className="text-xs text-amber-600 dark:text-amber-400">
-                                Confidence is low — you can still try the steps above, or choose &quot;Talk to a human&quot; to get support.
-                              </p>
-                            )}
-                          </div>
-                        )}
 
                         {/* Steps: use metadata.steps or full_solution.steps for best resolution UX */}
                         {(() => {

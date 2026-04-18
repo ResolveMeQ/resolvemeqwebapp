@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import Card from './ui/Card';
 import Button from './ui/Button';
-import ConfidenceBadge from './ui/ConfidenceBadge';
 import { cn } from '../utils/cn';
 
 /**
@@ -159,15 +158,6 @@ const AgentActionHistory = ({ ticketId, actions, onRollback }) => {
                         </>
                       )}
                     </div>
-
-                    {action.confidence_score && (
-                      <div className="mb-2">
-                        <ConfidenceBadge
-                          confidence={action.confidence_score}
-                          size="sm"
-                        />
-                      </div>
-                    )}
 
                     {action.rolled_back && action.rollback_reason && (
                       <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-800">

@@ -39,7 +39,7 @@ const ConfidenceBadge = ({
   const plainClarification = {
     high: 'We have enough signal to ask the next good question.',
     medium: 'A few more details will narrow this down.',
-    low: 'Still unclear — share what you see on screen or any error text.',
+    low: 'A bit more context will help — what you see on screen or any error text is useful.',
   };
 
   const plainEscalation = {
