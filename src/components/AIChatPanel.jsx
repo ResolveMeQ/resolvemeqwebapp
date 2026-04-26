@@ -123,6 +123,8 @@ const AIChatPanel = ({
   onAppToast,
   /** When set, "Add context" / focus comments uses this instead of scrolling a global id (e.g. parent re-opens ticket detail). */
   onFocusComments,
+  /** Optional: open parent “Request human help” modal instead of direct escalation. */
+  onRequestHumanHelp,
 }) => {
   const ticketId = ticket?.id ?? ticket?.ticket_id;
   const [messages, setMessages] = useState([]);
@@ -681,17 +683,27 @@ const AIChatPanel = ({
           onActionComplete?.();
         } else if (intent === 'escalate') {
           const summary = buildConversationSummary();
-          const res = await api.tickets.escalate(ticketId, summary ? { conversation_summary: summary } : {});
-          onTicketUpdate?.(res?.ticket);
-          setMessages((prev) => [...prev, {
-            id: `sys-${Date.now()}`,
-            type: 'system',
-            text: 'Escalated to human support. You’ll get updates here and by email when someone picks this up.',
-            createdAt: new Date().toISOString(),
-          }]);
-          onAppToast?.('Ticket escalated. Support will review it.', 'info');
-          window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
-          onActionComplete?.();
+          if (typeof onRequestHumanHelp === 'function') {
+            onRequestHumanHelp(ticketId, { conversation_summary: summary || '' });
+            setMessages((prev) => [...prev, {
+              id: `sys-${Date.now()}`,
+              type: 'system',
+              text: 'Opening a support request form… add a short note so we can route this quickly.',
+              createdAt: new Date().toISOString(),
+            }]);
+          } else {
+            const res = await api.tickets.escalate(ticketId, summary ? { conversation_summary: summary } : {});
+            onTicketUpdate?.(res?.ticket);
+            setMessages((prev) => [...prev, {
+              id: `sys-${Date.now()}`,
+              type: 'system',
+              text: 'Escalated to human support. You’ll get updates here and by email when someone picks this up.',
+              createdAt: new Date().toISOString(),
+            }]);
+            onAppToast?.('Ticket escalated. Support will review it.', 'info');
+            window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
+            onActionComplete?.();
+          }
         } else if (intent === 'request_clarification') {
           sendMessage(message || 'I need more information to proceed. Could you provide more details?');
         } else {
@@ -742,17 +754,27 @@ const AIChatPanel = ({
         onActionComplete?.();
       } else if (actionStr.includes('escalate')) {
         const summary = buildConversationSummary();
-        const res = await api.tickets.escalate(ticketId, summary ? { conversation_summary: summary } : {});
-        onTicketUpdate?.(res?.ticket);
-        setMessages((prev) => [...prev, {
-          id: `sys-${Date.now()}`,
-          type: 'system',
-          text: 'Escalated to human support. You’ll get updates here and by email when someone picks this up.',
-          createdAt: new Date().toISOString(),
-        }]);
-        onAppToast?.('Ticket escalated. Support will review it.', 'info');
-        window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
-        onActionComplete?.();
+        if (typeof onRequestHumanHelp === 'function') {
+          onRequestHumanHelp(ticketId, { conversation_summary: summary || '' });
+          setMessages((prev) => [...prev, {
+            id: `sys-${Date.now()}`,
+            type: 'system',
+            text: 'Opening a support request form… add a short note so we can route this quickly.',
+            createdAt: new Date().toISOString(),
+          }]);
+        } else {
+          const res = await api.tickets.escalate(ticketId, summary ? { conversation_summary: summary } : {});
+          onTicketUpdate?.(res?.ticket);
+          setMessages((prev) => [...prev, {
+            id: `sys-${Date.now()}`,
+            type: 'system',
+            text: 'Escalated to human support. You’ll get updates here and by email when someone picks this up.',
+            createdAt: new Date().toISOString(),
+          }]);
+          onAppToast?.('Ticket escalated. Support will review it.', 'info');
+          window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
+          onActionComplete?.();
+        }
       } else if (actionStr.includes('clarification')) {
         sendMessage('I need more information to proceed. Could you provide more details?');
       } else {

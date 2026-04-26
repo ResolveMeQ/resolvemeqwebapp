@@ -198,6 +198,13 @@ const Billing = ({ onRefreshUserData }) => {
 
   const nextBillingDate = subscription?.current_period_end ? formatDate(subscription.current_period_end) : null;
   const nextAmount = currentPlanDetail && (billingCycle === 'yearly' ? currentPlanDetail.price_yearly : currentPlanDetail.price_monthly);
+  const periodEndDate = subscription?.current_period_end ? new Date(subscription.current_period_end) : null;
+  const periodEndIsPast = periodEndDate ? periodEndDate.getTime() < Date.now() - (6 * 60 * 60 * 1000) : false;
+  const effectiveStatus = subscription?.status === 'trial'
+    ? 'trial'
+    : periodEndIsPast
+      ? 'past_due'
+      : (subscription?.status || '');
 
   if (loading && !subscription && plansFromApi.length === 0) {
     return <BillingPageSkeleton />;
@@ -219,6 +226,39 @@ const Billing = ({ onRefreshUserData }) => {
             <RefreshCw className="w-4 h-4 mr-1" />
             Retry
           </Button>
+        </div>
+      )}
+
+      {subscription?.over_limit && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+          <div className="text-sm text-amber-900 dark:text-amber-100">
+            <p className="font-medium">You’re over your current plan limits.</p>
+            <p className="mt-0.5 text-amber-800/90 dark:text-amber-100/80">
+              Nothing has been deleted — but some actions are blocked until you upgrade or reduce usage.
+            </p>
+            {Array.isArray(subscription?.over_limit_reasons) && subscription.over_limit_reasons.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {subscription.over_limit_reasons.map((r, idx) => (
+                  <li key={idx} className="text-xs text-amber-800 dark:text-amber-100/80">
+                    {r?.type === 'teams'
+                      ? `Teams: ${r.used} used (limit ${r.limit})`
+                      : r?.type === 'members_per_team'
+                        ? `Members per team: up to ${r.used} in a team (limit ${r.limit})`
+                        : 'Plan limit exceeded'}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => loadBilling(true)}>
+              <RefreshCw className="w-4 h-4 mr-1" />
+              Refresh
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => showToast('Upgrade to increase limits from the plans below.', 'info')}>
+              View plans
+            </Button>
+          </div>
         </div>
       )}
 
@@ -279,13 +319,18 @@ const Billing = ({ onRefreshUserData }) => {
             </div>
             <span className={cn(
               'inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium',
-              subscription?.status === 'trial' && 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/50',
-              subscription?.status === 'active' && 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/50',
-              subscription?.status === 'past_due' && 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50',
-              (!subscription?.status || subscription?.status === 'canceled') && 'bg-gray-50 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
+              effectiveStatus === 'trial' && 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/50',
+              effectiveStatus === 'active' && 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/50',
+              effectiveStatus === 'past_due' && 'bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800/50',
+              (!effectiveStatus || effectiveStatus === 'canceled') && 'bg-gray-50 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
             )}>
-              {subscription?.status === 'active' && <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 inline-block" />}
-              {subscription?.status === 'trial' ? 'Free trial' : (subscription?.status || 'No subscription').replace('_', ' ')}
+              {effectiveStatus === 'active' && <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 inline-block" />}
+              {effectiveStatus === 'past_due' && <span className="w-1.5 h-1.5 bg-amber-500 rounded-full mr-1.5 inline-block" />}
+              {effectiveStatus === 'trial'
+                ? 'Free trial'
+                : effectiveStatus === 'past_due'
+                  ? 'Payment overdue'
+                  : (effectiveStatus || 'No subscription').replace('_', ' ')}
             </span>
           </div>
         </div>
@@ -297,11 +342,52 @@ const Billing = ({ onRefreshUserData }) => {
             {subscription?.status === 'trial' && subscription?.trial_ends_at ? (
               <>Your free trial ends on <strong className="text-gray-900 dark:text-white">{formatDate(subscription.trial_ends_at)}</strong>. Upgrade to a paid plan to continue with full access.</>
             ) : nextBillingDate ? (
-              <>Your subscription {subscription?.status === 'active' ? 'renews' : 'renewed'} on <strong className="text-gray-900 dark:text-white">{nextBillingDate}</strong>. {nextAmount != null && nextAmount > 0 && <>You will be charged <strong>{formatPrice(nextAmount)}</strong>.</>}</>
+              periodEndIsPast ? (
+                <>
+                  Your billing period ended on <strong className="text-gray-900 dark:text-white">{nextBillingDate}</strong>. To keep full access, please renew your subscription or update your payment method.
+                </>
+              ) : (
+                <>
+                  Your subscription {subscription?.status === 'active' ? 'renews' : 'renewed'} on{' '}
+                  <strong className="text-gray-900 dark:text-white">{nextBillingDate}</strong>.{' '}
+                  {nextAmount != null && nextAmount > 0 && (
+                    <>
+                      You will be charged <strong>{formatPrice(nextAmount)}</strong>.
+                    </>
+                  )}
+                </>
+              )
             ) : (
               'No upcoming billing date. Choose a plan below to subscribe.'
             )}
           </p>
+          {periodEndIsPast && subscription?.gateway_customer_id && (
+            <div className="mt-4">
+              <Button
+                variant="primary"
+                size="sm"
+                loading={portalLoading}
+                disabled={portalLoading}
+                onClick={async () => {
+                  setPortalLoading(true);
+                  try {
+                    const res = await api.billing.openCustomerPortal();
+                    if (res?.url) {
+                      window.location.href = res.url;
+                      return;
+                    }
+                    showToast('Could not open billing portal. Please try again.', 'error');
+                  } catch (err) {
+                    showToast(err?.message || 'Failed to open billing portal.', 'error');
+                  } finally {
+                    setPortalLoading(false);
+                  }
+                }}
+              >
+                Update payment method
+              </Button>
+            </div>
+          )}
           {currentPlanDetail && (
             <ul className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-400">
               <li className="flex items-center gap-2"><Check size={14} className="text-green-600 shrink-0" /> Up to {currentPlanDetail.max_teams} teams</li>

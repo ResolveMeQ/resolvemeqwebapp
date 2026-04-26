@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TOUR_STORAGE_KEY } from './components/AppTour';
-import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import Tickets from './pages/Tickets';
@@ -21,8 +21,25 @@ import './index.css';
 import { THEME_MODES } from './constants';
 import { TokenService, api } from './services/api';
 
+function safeNextPath(next) {
+  const raw = String(next || '').trim();
+  if (!raw) return null;
+  // Only allow internal relative paths.
+  if (!raw.startsWith('/')) return null;
+  if (raw.startsWith('//')) return null;
+  return raw;
+}
+
+function AuthGate({ isAuthenticated, children }) {
+  const location = useLocation();
+  if (isAuthenticated) return children;
+  const next = `${location.pathname}${location.search || ''}`;
+  return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />;
+}
+
 function App() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
@@ -243,34 +260,23 @@ function App() {
     setIsAuthenticated(false);
     setUser(null);
     setTourRun(false);
-    navigate('/login');
+    const next = safeNextPath(`${location.pathname}${location.search || ''}`) || '/';
+    navigate(`/login?next=${encodeURIComponent(next)}`);
   };
 
   // Authentication handlers
   const handleLogin = (loginData) => {
     setUser(loginData.user);
     setIsAuthenticated(true);
-    navigate('/');
+    const params = new URLSearchParams(window.location.search || '');
+    const nextParam = safeNextPath(params.get('next'));
+    navigate(nextParam || '/');
   };
 
   const handleSignup = (userData) => {
     setAuthPage('login');
     navigate('/login');
   };
-
-  const renderAuthRoutes = () => (
-    <Routes>
-      <Route path="/community/q/:slugAndId" element={<CommunityQuestionPublic />} />
-      <Route path="/knowledge-base/article/:slugAndId" element={<KnowledgeBaseArticleRoute />} />
-      <Route path="/knowledge-base" element={<KnowledgeBase isAuthenticated={false} />} />
-      <Route path="/login" element={<Login onLogin={handleLogin} onNavigateToSignup={() => navigate('/signup')} onNavigateToForgotPassword={() => navigate('/forgot-password')} />} />
-      <Route path="/signup" element={<Signup onSignup={handleSignup} onNavigateToLogin={() => navigate('/login')} onGoogleSignedIn={handleLogin} />} />
-      <Route path="/verify" element={<Verify onNavigateToLogin={() => navigate('/login')} />} />
-      <Route path="/forgot-password" element={<ForgotPassword onNavigateToLogin={() => navigate('/login')} />} />
-      <Route path="/reset-password" element={<ResetPassword onNavigateToLogin={() => navigate('/login')} />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
-  );
 
   const layoutProps = {
     user,
@@ -298,24 +304,115 @@ function App() {
     <Routes>
       <Route path="/community/q/:slugAndId" element={<CommunityQuestionPublic />} />
       <Route path="/knowledge-base/article/:slugAndId" element={<KnowledgeBaseArticleRoute />} />
-      <Route path="/" element={<Layout {...layoutProps}><Dashboard /></Layout>} />
-      <Route path="/tickets" element={<Layout {...layoutProps}><Tickets /></Layout>} />
-      <Route path="/analytics" element={<Layout {...layoutProps}><Analytics /></Layout>} />
-      <Route path="/teams" element={<Layout {...layoutProps}><Teams /></Layout>} />
-      <Route path="/users" element={<Layout {...layoutProps}><Users /></Layout>} />
-      <Route path="/knowledge-base" element={<Layout {...layoutProps}><KnowledgeBase /></Layout>} />
-      <Route path="/billing" element={<Layout {...layoutProps}><Billing /></Layout>} />
-      <Route path="/settings" element={<Layout {...layoutProps}><Settings /></Layout>} />
+      <Route
+        path="/"
+        element={
+          <AuthGate isAuthenticated={isAuthenticated}>
+            <Layout {...layoutProps}><Dashboard /></Layout>
+          </AuthGate>
+        }
+      />
+      <Route
+        path="/tickets"
+        element={
+          <AuthGate isAuthenticated={isAuthenticated}>
+            <Layout {...layoutProps}><Tickets /></Layout>
+          </AuthGate>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <AuthGate isAuthenticated={isAuthenticated}>
+            <Layout {...layoutProps}><Analytics /></Layout>
+          </AuthGate>
+        }
+      />
+      <Route
+        path="/teams"
+        element={
+          <AuthGate isAuthenticated={isAuthenticated}>
+            <Layout {...layoutProps}><Teams /></Layout>
+          </AuthGate>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <AuthGate isAuthenticated={isAuthenticated}>
+            <Layout {...layoutProps}><Users /></Layout>
+          </AuthGate>
+        }
+      />
+      <Route
+        path="/knowledge-base"
+        element={
+          <Layout {...layoutProps}>
+            <KnowledgeBase isAuthenticated={isAuthenticated} />
+          </Layout>
+        }
+      />
+      <Route
+        path="/billing"
+        element={
+          <AuthGate isAuthenticated={isAuthenticated}>
+            <Layout {...layoutProps}><Billing /></Layout>
+          </AuthGate>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <AuthGate isAuthenticated={isAuthenticated}>
+            <Layout {...layoutProps}><Settings /></Layout>
+          </AuthGate>
+        }
+      />
       <Route
         path="/settings/integrations"
-        element={<Layout {...layoutProps}><Settings initialTab="integrations" /></Layout>}
+        element={
+          <AuthGate isAuthenticated={isAuthenticated}>
+            <Layout {...layoutProps}><Settings initialTab="integrations" /></Layout>
+          </AuthGate>
+        }
       />
-      <Route path="/login" element={<Navigate to="/" replace />} />
-      <Route path="/signup" element={<Navigate to="/" replace />} />
-      <Route path="/verify" element={<Navigate to="/" replace />} />
-      <Route path="/forgot-password" element={<Navigate to="/" replace />} />
-      <Route path="/reset-password" element={<Navigate to="/" replace />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route
+        path="/login"
+        element={
+          isAuthenticated
+            ? <Navigate to="/" replace />
+            : <Login
+                onLogin={handleLogin}
+                onNavigateToSignup={() => navigate('/signup')}
+                onNavigateToForgotPassword={() => navigate('/forgot-password')}
+              />
+        }
+      />
+      <Route
+        path="/signup"
+        element={
+          isAuthenticated
+            ? <Navigate to="/" replace />
+            : <Signup
+                onSignup={handleSignup}
+                onNavigateToLogin={() => navigate('/login')}
+                onGoogleSignedIn={handleLogin}
+              />
+        }
+      />
+      <Route
+        path="/verify"
+        element={isAuthenticated ? <Navigate to="/" replace /> : <Verify onNavigateToLogin={() => navigate('/login')} />}
+      />
+      <Route
+        path="/forgot-password"
+        element={isAuthenticated ? <Navigate to="/" replace /> : <ForgotPassword onNavigateToLogin={() => navigate('/login')} />}
+      />
+      <Route
+        path="/reset-password"
+        element={isAuthenticated ? <Navigate to="/" replace /> : <ResetPassword onNavigateToLogin={() => navigate('/login')} />}
+      />
+      <Route path="*" element={<Navigate to="/knowledge-base" replace />} />
     </Routes>
   );
 
@@ -329,11 +426,6 @@ function App() {
         </div>
       </div>
     );
-  }
-
-  // Show authentication routes if not authenticated
-  if (!isAuthenticated) {
-    return renderAuthRoutes();
   }
 
   return renderMainRoutes();

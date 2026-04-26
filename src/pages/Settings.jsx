@@ -80,6 +80,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
           communityNewQuestions: data.community_new_questions ?? true,
           communityAnswers: data.community_answers ?? true,
           communityComments: data.community_comments ?? true,
+          communityMentions: data.community_mentions ?? true,
         });
         setGeneralSettings({
           timezone: data.timezone ?? 'UTC',
@@ -109,6 +110,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     communityNewQuestions: true,
     communityAnswers: true,
     communityComments: true,
+    communityMentions: true,
   });
   const [slackStatus, setSlackStatus] = useState(null);
   const [slackConnecting, setSlackConnecting] = useState(false);
@@ -192,6 +194,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
         community_new_questions: notificationSettings.communityNewQuestions,
         community_answers: notificationSettings.communityAnswers,
         community_comments: notificationSettings.communityComments,
+        community_mentions: notificationSettings.communityMentions,
         timezone: generalSettings.timezone || 'UTC',
         language: generalSettings.language || 'en',
         theme: appearanceSettings.theme || 'light'
@@ -439,6 +442,16 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" checked={notificationSettings.communityComments} onChange={(e) => setNotificationSettings(prev => ({ ...prev, communityComments: e.target.checked }))} className="sr-only peer" />
+                <div className={toggleTrackClass} />
+              </label>
+            </div>
+            <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-800 last:border-0">
+              <div>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">Community: mentions</h4>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Notify when someone @mentions you in community Q&amp;A</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked={notificationSettings.communityMentions} onChange={(e) => setNotificationSettings(prev => ({ ...prev, communityMentions: e.target.checked }))} className="sr-only peer" />
                 <div className={toggleTrackClass} />
               </label>
             </div>

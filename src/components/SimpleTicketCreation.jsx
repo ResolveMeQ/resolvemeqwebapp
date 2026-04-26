@@ -20,7 +20,7 @@ import {
  * 4. Conversation continues until resolved
  * 5. No hidden buttons, no confusion
  */
-const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
+const SimpleTicketCreation = ({ onTicketCreated, onClose, onRequestHumanHelp }) => {
   const [step, setStep] = useState('describe'); // describe, analyzing, conversation
   const [issueDescription, setIssueDescription] = useState('');
   const [ticket, setTicket] = useState(null);
@@ -293,13 +293,22 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
             .slice(-8)
             .map((m) => (m.type === 'user' ? `User: ${(m.text || '').slice(0, 150)}` : `AI: ${(m.text || '').slice(0, 150)}`))
             .join(' | ');
-          await api.tickets.escalate(tid, summary ? { conversation_summary: summary } : {});
-          window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
-          setConversation((prev) => [...prev, {
-            type: 'system',
-            text: 'Ticket escalated to support.',
-            timestamp: new Date().toISOString(),
-          }]);
+          if (typeof onRequestHumanHelp === 'function') {
+            onRequestHumanHelp(tid, { conversation_summary: summary || '' });
+            setConversation((prev) => [...prev, {
+              type: 'system',
+              text: 'Opening a support request form… add a short note so we can route this quickly.',
+              timestamp: new Date().toISOString(),
+            }]);
+          } else {
+            await api.tickets.escalate(tid, summary ? { conversation_summary: summary } : {});
+            window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
+            setConversation((prev) => [...prev, {
+              type: 'system',
+              text: 'Ticket escalated to support.',
+              timestamp: new Date().toISOString(),
+            }]);
+          }
         } else if (intent === 'request_clarification') {
           sendMessage(message || 'Could you provide more details about the issue?');
         } else {
@@ -336,13 +345,22 @@ const SimpleTicketCreation = ({ onTicketCreated, onClose }) => {
           .slice(-8)
           .map((m) => (m.type === 'user' ? `User: ${(m.text || '').slice(0, 150)}` : `AI: ${(m.text || '').slice(0, 150)}`))
           .join(' | ');
-        await api.tickets.escalate(tid, summary ? { conversation_summary: summary } : {});
-        window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
-        setConversation((prev) => [...prev, {
-          type: 'system',
-          text: 'Ticket escalated to support.',
-          timestamp: new Date().toISOString(),
-        }]);
+        if (typeof onRequestHumanHelp === 'function') {
+          onRequestHumanHelp(tid, { conversation_summary: summary || '' });
+          setConversation((prev) => [...prev, {
+            type: 'system',
+            text: 'Opening a support request form… add a short note so we can route this quickly.',
+            timestamp: new Date().toISOString(),
+          }]);
+        } else {
+          await api.tickets.escalate(tid, summary ? { conversation_summary: summary } : {});
+          window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
+          setConversation((prev) => [...prev, {
+            type: 'system',
+            text: 'Ticket escalated to support.',
+            timestamp: new Date().toISOString(),
+          }]);
+        }
       } else if (actionStr.includes('clarification')) {
         sendMessage('Could you provide more details about the issue?');
       } else {

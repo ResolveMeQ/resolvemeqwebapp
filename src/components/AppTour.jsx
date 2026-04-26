@@ -32,21 +32,10 @@ export function buildTourSteps(hasTeamSwitcher) {
       disableBeacon: true,
     },
     {
-      target: 'body',
-      placement: 'center',
-      title: 'Find your way around',
-      content: (
-        <div className="text-sm text-gray-700 dark:text-gray-200 space-y-2">
-          <p>
-            On a large screen, use the <strong>left sidebar</strong> for Dashboard, Tickets,
-            Analytics, Knowledge base, Teams, Users, Billing, and Settings.
-          </p>
-          <p>
-            On a phone or tablet, open the <strong>menu (☰)</strong> in the top-left for the same
-            links.
-          </p>
-        </div>
-      ),
+      target: '[data-tour="sidebar-nav"]',
+      title: 'Navigation',
+      content:
+        'Use the left sidebar to switch between Tickets, Knowledge Base, Analytics, Teams, Billing, and Settings. On mobile, open the ☰ menu button.',
       disableBeacon: true,
     },
   ];
@@ -67,6 +56,27 @@ export function buildTourSteps(hasTeamSwitcher) {
       title: 'Global search',
       content:
         'Search tickets, knowledge base articles, and people. On small screens, tap the magnifying glass if the field is hidden. Clear the field or press Escape to close results.',
+      disableBeacon: true,
+    },
+    {
+      target: '[data-tour="kb-tabs"]',
+      title: 'Knowledge Base',
+      content:
+        'Switch between Articles and Community Q&A. Browse publicly, but posting and voting requires sign-in.',
+      disableBeacon: true,
+    },
+    {
+      target: '[data-tour="kb-ask-question"]',
+      title: 'Ask a question',
+      content:
+        'Use “Ask question” to post issues for your workspace. Tip: type @ to mention teammates.',
+      disableBeacon: true,
+    },
+    {
+      target: '[data-tour="new-ticket"]',
+      title: 'Create a ticket',
+      content:
+        'When you need help, create a ticket. The AI assistant can walk through fixes and escalate to a human when needed.',
       disableBeacon: true,
     },
     {

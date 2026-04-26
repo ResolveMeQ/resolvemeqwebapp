@@ -116,17 +116,20 @@ const apiFetch = async (endpoint, options = {}) => {
           } else {
             // Refresh failed, logout user
             TokenService.clearTokens();
-            window.location.href = '/';
+            const next = `${window.location.pathname}${window.location.search || ''}`;
+            window.location.href = `/login?next=${encodeURIComponent(next)}`;
             throw new Error('Session expired. Please login again.');
           }
         } catch (error) {
           TokenService.clearTokens();
-          window.location.href = '/';
+          const next = `${window.location.pathname}${window.location.search || ''}`;
+          window.location.href = `/login?next=${encodeURIComponent(next)}`;
           throw error;
         }
       } else {
         TokenService.clearTokens();
-        window.location.href = '/';
+        const next = `${window.location.pathname}${window.location.search || ''}`;
+        window.location.href = `/login?next=${encodeURIComponent(next)}`;
         throw new Error('Unauthorized');
       }
     }
@@ -359,6 +362,11 @@ export const api = {
       return apiFetch(`/api/tickets/${ticketId}/history/`);
     },
 
+    /** GET /api/tickets/reply-needed-count/ -> { count } */
+    replyNeededCount: async () => {
+      return apiFetch('/api/tickets/reply-needed-count/');
+    },
+
     /** GET /api/tickets/<ticket_id>/action-history/ */
     actionHistory: async (ticketId) => {
       return apiFetch(`/api/tickets/${ticketId}/action-history/`);
@@ -551,6 +559,12 @@ export const api = {
       return apiFetch(`/api/users/${userId}/`, {
         method: 'DELETE',
       });
+    },
+
+    /** GET /api/users/mention-suggestions/?q=... */
+    mentionSuggestions: async (q) => {
+      const qs = buildQueryString({ q });
+      return apiFetch(`/api/users/mention-suggestions/${qs ? `?${qs}` : ''}`);
     },
   },
 

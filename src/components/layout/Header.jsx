@@ -15,6 +15,7 @@ import {
 import { cn } from '../../utils/cn';
 import { THEME_MODES } from '../../constants';
 import { api } from '../../services/api';
+import { useLocation } from 'react-router-dom';
 
 /**
  * Header component with search, notifications, and user menu.
@@ -32,6 +33,7 @@ const Header = ({
   theme = THEME_MODES.LIGHT,
   className
 }) => {
+  const location = useLocation();
   /** Backend profile uses user_email / user_full_name; normalizeSessionUser maps to email / full_name (see api.js). */
   const emailTrimmed =
     (user?.email && String(user.email).trim()) ||
@@ -138,6 +140,7 @@ const Header = ({
   const [notifications, setNotifications] = useState([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState(null);
+  const [replyNeededCount, setReplyNeededCount] = useState(0);
 
   const fetchNotifications = async () => {
     setNotificationsLoading(true);
@@ -157,10 +160,25 @@ const Header = ({
     if (user) fetchNotifications();
   }, [user]);
 
+  const fetchReplyNeeded = async () => {
+    try {
+      const data = await api.tickets.replyNeededCount();
+      const c = Number(data?.count || 0);
+      setReplyNeededCount(Number.isFinite(c) && c > 0 ? c : 0);
+    } catch {
+      setReplyNeededCount(0);
+    }
+  };
+
+  useEffect(() => {
+    if (user) fetchReplyNeeded();
+  }, [user]);
+
   useEffect(() => {
     if (!user) return undefined;
     const timer = window.setInterval(() => {
       fetchNotifications();
+      fetchReplyNeeded();
     }, 30000);
     return () => window.clearInterval(timer);
   }, [user]);
@@ -171,7 +189,11 @@ const Header = ({
 
   // Refresh when ticket actions (create, resolve, escalate) trigger from elsewhere
   useEffect(() => {
-    const onRefresh = () => { if (user) fetchNotifications(); };
+    const onRefresh = () => {
+      if (!user) return;
+      fetchNotifications();
+      fetchReplyNeeded();
+    };
     window.addEventListener('resolvemeq:refresh-notifications', onRefresh);
     return () => window.removeEventListener('resolvemeq:refresh-notifications', onRefresh);
   }, [user]);
@@ -205,6 +227,23 @@ const Header = ({
       'sticky top-0 z-30 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 pt-[env(safe-area-inset-top)]',
       className
     )}>
+      {user && replyNeededCount > 0 && (
+        <div className="px-4 sm:px-6 py-2 border-b border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/25">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-amber-900 dark:text-amber-100">
+              <span className="font-medium">Support replied.</span>{' '}
+              You have {replyNeededCount} ticket{replyNeededCount === 1 ? '' : 's'} waiting for your response.
+            </p>
+            <button
+              type="button"
+              onClick={() => onNavigate?.('/tickets')}
+              className="text-sm font-medium text-amber-900 hover:text-amber-950 dark:text-amber-100 dark:hover:text-white underline underline-offset-2"
+            >
+              View tickets
+            </button>
+          </div>
+        </div>
+      )}
       {/* Mobile: search icon groups with theme/notifications (not centered). Desktop: search field flexes. */}
       <div
         className={cn(
@@ -459,32 +498,48 @@ const Header = ({
 
           {/* User Menu */}
           <div className="relative" ref={userMenuRef}>
-            <button
-              onClick={() => {
-                setIsUserMenuOpen(!isUserMenuOpen);
-                setIsNotificationsOpen(false);
-                setIsThemeMenuOpen(false);
-              }}
-              className="flex items-center space-x-2.5 px-1.5 sm:px-2 py-1.5 min-h-[40px] sm:min-h-0 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
-              aria-label="User menu"
-            >
-              <div className="w-7 h-7 bg-gradient-to-br from-primary-600 to-primary-700 rounded-full flex items-center justify-center">
-                {user?.avatar || user?.profile_image_url ? (
-                  <img src={user.avatar || user.profile_image_url} alt={accountMenuName} className="w-full h-full rounded-full object-cover" />
-                ) : (
-                  <span className="text-white font-semibold text-xs">
-                    {String(accountMenuName).charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
-              <div className="hidden md:block text-left min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[200px]">{accountMenuName}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-500 truncate max-w-[200px]" title={emailTrimmed || undefined}>
-                  {accountMenuEmail}
-                </p>
-              </div>
-              <ChevronDown size={14} className="text-gray-400 dark:text-gray-500 hidden md:block" />
-            </button>
+            {user ? (
+              <button
+                onClick={() => {
+                  setIsUserMenuOpen(!isUserMenuOpen);
+                  setIsNotificationsOpen(false);
+                  setIsThemeMenuOpen(false);
+                }}
+                className="flex items-center space-x-2.5 px-1.5 sm:px-2 py-1.5 min-h-[40px] sm:min-h-0 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
+                aria-label="User menu"
+              >
+                <div className="w-7 h-7 bg-gradient-to-br from-primary-600 to-primary-700 rounded-full flex items-center justify-center">
+                  {user?.avatar || user?.profile_image_url ? (
+                    <img src={user.avatar || user.profile_image_url} alt={accountMenuName} className="w-full h-full rounded-full object-cover" />
+                  ) : (
+                    <span className="text-white font-semibold text-xs">
+                      {String(accountMenuName).charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="hidden md:block text-left min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[200px]">{accountMenuName}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 truncate max-w-[200px]" title={emailTrimmed || undefined}>
+                    {accountMenuEmail}
+                  </p>
+                </div>
+                <ChevronDown size={14} className="text-gray-400 dark:text-gray-500 hidden md:block" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNotificationsOpen(false);
+                  setIsThemeMenuOpen(false);
+                  setIsUserMenuOpen(false);
+                  const next = `${location.pathname}${location.search || ''}`;
+                  onNavigate?.(`/login?next=${encodeURIComponent(next)}`);
+                }}
+                className="px-3 py-2 min-h-[40px] rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                Sign in
+              </button>
+            )}
 
             <AnimatePresence>
               {isUserMenuOpen && (

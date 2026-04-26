@@ -14,8 +14,8 @@ export function getTicketNextStep(ticket) {
   }
   if (s === 'escalated') {
     return {
-      title: 'Next step',
-      body: 'Support will review your ticket. You’ll get updates in the app and by email when there’s progress.',
+      title: 'In review',
+      body: 'A support specialist will review this. You can add more details below while you wait — it helps us move faster.',
       tone: 'warning',
     };
   }

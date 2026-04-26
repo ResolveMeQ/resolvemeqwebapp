@@ -28,6 +28,51 @@ import { cn } from '../utils/cn';
 import { KnowledgeBaseArticlesSkeleton } from '../components/ui/Skeleton';
 import { renderMarkdown } from '../utils/markdown';
 
+const MENTION_RE = /(?<![\\w@])@([A-Za-z0-9_.+-]{2,150})/g;
+
+function getMentionQuery(text, caretPos) {
+  const value = String(text ?? '');
+  const pos = typeof caretPos === 'number' ? caretPos : value.length;
+  const upto = value.slice(0, Math.max(0, pos));
+
+  const lastBreak = Math.max(upto.lastIndexOf(' '), upto.lastIndexOf('\\n'), upto.lastIndexOf('\\t'));
+  const segment = upto.slice(lastBreak + 1);
+  const at = segment.lastIndexOf('@');
+  if (at < 0) return null;
+
+  const query = segment.slice(at + 1);
+  if (!query || /[^A-Za-z0-9_.+-]/.test(query)) return null;
+  if (query.length > 50) return null;
+
+  const start = (lastBreak + 1) + at;
+  const end = pos;
+  return { query, start, end };
+}
+
+function renderTextWithMentions(text) {
+  const value = String(text ?? '');
+  const parts = [];
+  let last = 0;
+  for (const match of value.matchAll(MENTION_RE)) {
+    const idx = match.index ?? 0;
+    const token = match[0];
+    const username = match[1];
+    if (idx > last) parts.push(value.slice(last, idx));
+    parts.push(
+      <span
+        key={`m-${idx}-${username}`}
+        className="inline-flex items-center px-1 rounded bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 font-medium"
+        title={`@${username}`}
+      >
+        {token}
+      </span>
+    );
+    last = idx + token.length;
+  }
+  if (last < value.length) parts.push(value.slice(last));
+  return parts.length ? parts : value;
+}
+
 /** Shared article body for desktop side panel and mobile full-height sheet */
 function ArticleDetailPanelContent({
   article,
@@ -137,6 +182,7 @@ function ArticleDetailPanelContent({
 const KnowledgeBase = ({ isAuthenticated = true }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [mentionDebounceTimer, setMentionDebounceTimer] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [articles, setArticles] = useState([]);
   const [filteredArticles, setFilteredArticles] = useState([]);
@@ -174,6 +220,157 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
   const [commentDrafts, setCommentDrafts] = useState({});
   const [actionLoadingKey, setActionLoadingKey] = useState(null);
   const [openingQuestionId, setOpeningQuestionId] = useState(null);
+
+  // Mentions (autocomplete)
+  const [mentionState, setMentionState] = useState({
+    open: false,
+    loading: false,
+    items: [],
+    query: '',
+    error: '',
+    fieldKey: '',
+    range: null,
+    activeIndex: 0,
+  });
+
+  const closeMentions = useCallback(() => {
+    setMentionState((s) => ({
+      ...s,
+      open: false,
+      loading: false,
+      items: [],
+      query: '',
+      error: '',
+      fieldKey: '',
+      range: null,
+      activeIndex: 0,
+    }));
+  }, []);
+
+  const requestMentions = useCallback(
+    async ({ query, fieldKey, range }) => {
+      if (!isAuthenticated) return;
+      if (!query || query.length < 2) return;
+      setMentionState((s) => ({
+        ...s,
+        open: true,
+        loading: true,
+        query,
+        error: '',
+        fieldKey,
+        range,
+        activeIndex: 0,
+      }));
+      try {
+        const data = await api.users.mentionSuggestions(query);
+        const list = Array.isArray(data) ? data : [];
+        setMentionState((s) => ({
+          ...s,
+          open: true,
+          loading: false,
+          items: list.slice(0, 20),
+          activeIndex: 0,
+        }));
+      } catch (e) {
+        const msg =
+          (e && typeof e === 'object' && 'message' in e && e.message) ? String(e.message) : 'Unable to load suggestions.';
+        setMentionState((s) => ({
+          ...s,
+          open: true,
+          loading: false,
+          items: [],
+          error: msg,
+        }));
+      }
+    },
+    [isAuthenticated]
+  );
+
+  const applyMention = useCallback(
+    (userObj) => {
+      const username = (userObj?.username || '').trim();
+      if (!username) return;
+      const { fieldKey, range } = mentionState;
+      if (!fieldKey || !range) return;
+
+      const replace = (text) => {
+        const value = String(text ?? '');
+        const before = value.slice(0, range.start);
+        const after = value.slice(range.end);
+        return `${before}@${username} ${after}`;
+      };
+
+      if (fieldKey === 'question.title') {
+        setQuestionDraft((p) => ({ ...p, title: replace(p.title) }));
+      } else if (fieldKey === 'question.body') {
+        setQuestionDraft((p) => ({ ...p, body: replace(p.body) }));
+      } else if (fieldKey === 'answer.body') {
+        setAnswerDraft((p) => replace(p));
+      } else if (fieldKey.startsWith('comment.')) {
+        const key = fieldKey.slice('comment.'.length);
+        setCommentDrafts((p) => ({ ...p, [key]: replace(p[key]) }));
+      }
+
+      closeMentions();
+    },
+    [mentionState, closeMentions]
+  );
+
+  const onMaybeMention = useCallback(
+    ({ fieldKey, text, caretPos }) => {
+      if (!isAuthenticated) return;
+      const info = getMentionQuery(text, caretPos);
+      if (!info) {
+        closeMentions();
+        return;
+      }
+      requestMentions({
+        query: info.query,
+        fieldKey,
+        range: { start: info.start, end: info.end },
+      });
+    },
+    [isAuthenticated, closeMentions, requestMentions]
+  );
+
+  useEffect(() => {
+    if (!mentionState.open) return;
+    const onKeyDown = (e) => {
+      if (!mentionState.open) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeMentions();
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionState((s) => ({
+          ...s,
+          activeIndex: Math.min((s.activeIndex ?? 0) + 1, Math.max(0, (s.items?.length ?? 1) - 1)),
+        }));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionState((s) => ({ ...s, activeIndex: Math.max((s.activeIndex ?? 0) - 1, 0) }));
+      }
+      if (e.key === 'Enter' && mentionState.items?.length) {
+        // Only intercept Enter when the mention picker is open; click/submit is handled elsewhere.
+        e.preventDefault();
+        const idx = mentionState.activeIndex ?? 0;
+        const picked = mentionState.items[idx];
+        if (picked) applyMention(picked);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [mentionState.open, mentionState.items, mentionState.activeIndex, closeMentions, applyMention]);
+
+  useEffect(() => {
+    return () => {
+      if (mentionDebounceTimer) window.clearTimeout(mentionDebounceTimer);
+    };
+  }, [mentionDebounceTimer]);
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)');
@@ -818,13 +1015,13 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
               key={`q-comment-${comment.id}`}
               className="text-xs text-gray-700 dark:text-gray-300 break-words"
             >
-              <span className="font-medium">{comment.author_name || 'User'}:</span> {comment.body}
+              <span className="font-medium">{comment.author_name || 'User'}:</span> {renderTextWithMentions(comment.body)}
             </div>
           ))}
         </div>
       )}
       <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
-        {selectedQuestion.body}
+        {renderTextWithMentions(selectedQuestion.body)}
       </div>
       {selectedQuestion.duplicate_of && (
         <div className="rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/20 p-2.5">
@@ -884,7 +1081,16 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch min-w-0">
         <input
           value={commentDrafts[`question-${selectedQuestion.id}`] || ''}
-          onChange={(e) => setCommentDrafts((p) => ({ ...p, [`question-${selectedQuestion.id}`]: e.target.value }))}
+          onChange={(e) => {
+            const v = e.target.value;
+            setCommentDrafts((p) => ({ ...p, [`question-${selectedQuestion.id}`]: v }));
+            const caret = e.target.selectionStart;
+            if (mentionDebounceTimer) window.clearTimeout(mentionDebounceTimer);
+            const t = window.setTimeout(() => {
+              onMaybeMention({ fieldKey: `comment.question-${selectedQuestion.id}`, text: v, caretPos: caret });
+            }, 160);
+            setMentionDebounceTimer(t);
+          }}
           placeholder="Add a comment to question"
           className="w-full min-w-0 sm:flex-1 px-2 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"
         />
@@ -932,7 +1138,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
                   </p>
                 )}
                 <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
-                  {answer.body}
+                  {renderTextWithMentions(answer.body)}
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-1 shrink-0 border-t border-gray-200/80 dark:border-gray-800/80 pt-2 sm:border-0 sm:pt-0 sm:justify-start">
@@ -990,7 +1196,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
                     key={`a-comment-${answer.id}-${comment.id}`}
                     className="text-xs text-gray-700 dark:text-gray-300 break-words"
                   >
-                    <span className="font-medium">{comment.author_name || 'User'}:</span> {comment.body}
+                    <span className="font-medium">{comment.author_name || 'User'}:</span> {renderTextWithMentions(comment.body)}
                   </div>
                 ))}
               </div>
@@ -998,7 +1204,16 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch min-w-0">
               <input
                 value={commentDrafts[`answer-${answer.id}`] || ''}
-                onChange={(e) => setCommentDrafts((p) => ({ ...p, [`answer-${answer.id}`]: e.target.value }))}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setCommentDrafts((p) => ({ ...p, [`answer-${answer.id}`]: v }));
+                  const caret = e.target.selectionStart;
+                  if (mentionDebounceTimer) window.clearTimeout(mentionDebounceTimer);
+                  const t = window.setTimeout(() => {
+                    onMaybeMention({ fieldKey: `comment.answer-${answer.id}`, text: v, caretPos: caret });
+                  }, 160);
+                  setMentionDebounceTimer(t);
+                }}
                 placeholder="Add a comment"
                 className="w-full min-w-0 sm:flex-1 px-2 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"
               />
@@ -1019,7 +1234,16 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
       <form onSubmit={handleAddAnswer} className="space-y-2 border-t border-gray-200 dark:border-gray-800 pt-3">
         <textarea
           value={answerDraft}
-          onChange={(e) => setAnswerDraft(e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value;
+            setAnswerDraft(v);
+            const caret = e.target.selectionStart;
+            if (mentionDebounceTimer) window.clearTimeout(mentionDebounceTimer);
+            const t = window.setTimeout(() => {
+              onMaybeMention({ fieldKey: 'answer.body', text: v, caretPos: caret });
+            }, 160);
+            setMentionDebounceTimer(t);
+          }}
           rows={3}
           placeholder="Write your answer"
           className="w-full min-w-0 max-w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
@@ -1084,7 +1308,10 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
               Community Q&A for internal contributors and public readers
             </p>
           </div>
-          <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-1">
+          <div
+            data-tour="kb-tabs"
+            className="inline-flex rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-1"
+          >
             <button
               type="button"
               onClick={() => updateViewMode('articles')}
@@ -1142,7 +1369,11 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
               Tag: #{communityTag} (clear)
             </button>
           )}
-          <Button variant="primary" onClick={() => setCreatingQuestion((v) => !v)}>
+          <Button
+            data-tour="kb-ask-question"
+            variant="primary"
+            onClick={() => setCreatingQuestion((v) => !v)}
+          >
             <Plus className="w-4 h-4 mr-1.5" />
             Ask question
           </Button>
@@ -1153,7 +1384,16 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
             <form onSubmit={handleCreateQuestion} className="space-y-3">
               <input
                 value={questionDraft.title}
-                onChange={(e) => setQuestionDraft((p) => ({ ...p, title: e.target.value }))}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setQuestionDraft((p) => ({ ...p, title: v }));
+                  const caret = e.target.selectionStart;
+                  if (mentionDebounceTimer) window.clearTimeout(mentionDebounceTimer);
+                  const t = window.setTimeout(() => {
+                    onMaybeMention({ fieldKey: 'question.title', text: v, caretPos: caret });
+                  }, 160);
+                  setMentionDebounceTimer(t);
+                }}
                 placeholder="Question title"
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
                 required
@@ -1208,7 +1448,16 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
               )}
               <textarea
                 value={questionDraft.body}
-                onChange={(e) => setQuestionDraft((p) => ({ ...p, body: e.target.value }))}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setQuestionDraft((p) => ({ ...p, body: v }));
+                  const caret = e.target.selectionStart;
+                  if (mentionDebounceTimer) window.clearTimeout(mentionDebounceTimer);
+                  const t = window.setTimeout(() => {
+                    onMaybeMention({ fieldKey: 'question.body', text: v, caretPos: caret });
+                  }, 160);
+                  setMentionDebounceTimer(t);
+                }}
                 placeholder="Describe your issue or question..."
                 rows={4}
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
@@ -1341,6 +1590,75 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
                 </>
               )}
             </AnimatePresence>,
+            document.body
+          )}
+
+        {mentionState.open &&
+          isAuthenticated &&
+          createPortal(
+            <div
+              className="fixed z-[60] left-1/2 -translate-x-1/2 bottom-6 w-[min(560px,calc(100vw-2rem))] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl overflow-hidden"
+              role="listbox"
+              aria-label="Mention suggestions"
+            >
+              <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                  Mention: <span className="font-mono">@{mentionState.query}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={closeMentions}
+                  className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  Esc
+                </button>
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                {mentionState.loading ? (
+                  <div className="px-3 py-3 text-sm text-gray-600 dark:text-gray-300">Loading…</div>
+                ) : mentionState.error ? (
+                  <div className="px-3 py-3 text-sm text-red-700 dark:text-red-300">
+                    {mentionState.error}
+                  </div>
+                ) : mentionState.items.length === 0 ? (
+                  <div className="px-3 py-3 text-sm text-gray-600 dark:text-gray-300">No matches.</div>
+                ) : (
+                  mentionState.items.map((u, idx) => {
+                    const active = idx === (mentionState.activeIndex ?? 0);
+                    const label = (u.full_name || '').trim() || u.username || u.email || 'User';
+                    return (
+                      <button
+                        key={u.id || `${u.username}-${idx}`}
+                        type="button"
+                        role="option"
+                        aria-selected={active}
+                        onMouseEnter={() => setMentionState((s) => ({ ...s, activeIndex: idx }))}
+                        onClick={() => applyMention(u)}
+                        className={cn(
+                          "w-full text-left px-3 py-2 flex items-center justify-between gap-3 text-sm",
+                          active
+                            ? "bg-primary-50 dark:bg-primary-900/20 text-primary-800 dark:text-primary-200"
+                            : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        )}
+                      >
+                        <span className="min-w-0">
+                          <span className="font-medium truncate block">{label}</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate block">
+                            @{u.username}{u.email ? ` · ${u.email}` : ''}
+                          </span>
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Enter</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              {!mentionState.loading && mentionState.items.length > 0 && (
+                <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-800 text-[11px] text-gray-500 dark:text-gray-400">
+                  Use ↑ ↓ then Enter.
+                </div>
+              )}
+            </div>,
             document.body
           )}
       </div>
@@ -1611,6 +1929,75 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
               </>
             )}
           </AnimatePresence>,
+          document.body
+        )}
+
+      {mentionState.open &&
+        isAuthenticated &&
+        createPortal(
+          <div
+            className="fixed z-[60] left-1/2 -translate-x-1/2 bottom-6 w-[min(560px,calc(100vw-2rem))] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl overflow-hidden"
+            role="listbox"
+            aria-label="Mention suggestions"
+          >
+            <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                Mention: <span className="font-mono">@{mentionState.query}</span>
+              </p>
+              <button
+                type="button"
+                onClick={closeMentions}
+                className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                Esc
+              </button>
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              {mentionState.loading ? (
+                <div className="px-3 py-3 text-sm text-gray-600 dark:text-gray-300">Loading…</div>
+              ) : mentionState.error ? (
+                <div className="px-3 py-3 text-sm text-red-700 dark:text-red-300">
+                  {mentionState.error}
+                </div>
+              ) : mentionState.items.length === 0 ? (
+                <div className="px-3 py-3 text-sm text-gray-600 dark:text-gray-300">No matches.</div>
+              ) : (
+                mentionState.items.map((u, idx) => {
+                  const active = idx === (mentionState.activeIndex ?? 0);
+                  const label = (u.full_name || '').trim() || u.username || u.email || 'User';
+                  return (
+                    <button
+                      key={u.id || `${u.username}-${idx}`}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      onMouseEnter={() => setMentionState((s) => ({ ...s, activeIndex: idx }))}
+                      onClick={() => applyMention(u)}
+                      className={cn(
+                        "w-full text-left px-3 py-2 flex items-center justify-between gap-3 text-sm",
+                        active
+                          ? "bg-primary-50 dark:bg-primary-900/20 text-primary-800 dark:text-primary-200"
+                          : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      )}
+                    >
+                      <span className="min-w-0">
+                        <span className="font-medium truncate block">{label}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate block">
+                          @{u.username}{u.email ? ` · ${u.email}` : ''}
+                        </span>
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Enter</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+            {!mentionState.loading && mentionState.items.length > 0 && (
+              <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-800 text-[11px] text-gray-500 dark:text-gray-400">
+                Use ↑ ↓ then Enter.
+              </div>
+            )}
+          </div>,
           document.body
         )}
 

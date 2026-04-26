@@ -88,6 +88,8 @@ const Tickets = ({ activeTeamId }) => {
   const [saveEditLoading, setSaveEditLoading] = useState(false);
   const [commentLoading, setCommentLoading] = useState(false);
   const [escalateLoading, setEscalateLoading] = useState(null);
+  const [escalateModal, setEscalateModal] = useState({ open: false, ticketId: null });
+  const [escalateForm, setEscalateForm] = useState({ reason: 'talk_to_human', note: '', phone: '', conversation_summary: '' });
   const [deleteLoading, setDeleteLoading] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createAgentQuotaNotice, setCreateAgentQuotaNotice] = useState(null);
@@ -321,10 +323,23 @@ const Tickets = ({ activeTeamId }) => {
     }
   };
 
-  const handleEscalate = async (ticketId) => {
+  const openEscalate = (ticketId, { conversation_summary } = {}) => {
+    if (!ticketId) return;
+    setEscalateForm({ reason: 'talk_to_human', note: '', phone: '', conversation_summary: (conversation_summary || '').trim() });
+    setEscalateModal({ open: true, ticketId });
+  };
+
+  const submitEscalate = async () => {
+    const ticketId = escalateModal?.ticketId;
+    if (!ticketId) return;
     setEscalateLoading(ticketId);
     try {
-      await api.tickets.escalate(ticketId);
+      await api.tickets.escalate(ticketId, {
+        reason: (escalateForm.reason || '').trim() || 'talk_to_human',
+        note: (escalateForm.note || '').trim(),
+        phone: (escalateForm.phone || '').trim(),
+        conversation_summary: (escalateForm.conversation_summary || '').trim(),
+      });
       setActiveTickets((prev) =>
         prev.map((t) =>
           (t.ticket_id ?? t.id) === ticketId ? { ...t, status: 'escalated' } : t
@@ -334,10 +349,8 @@ const Tickets = ({ activeTeamId }) => {
         setDetailTicket((prev) => (prev ? { ...prev, status: 'escalated' } : null));
       }
       window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
-      showToast(
-        'Escalated. A human will review your ticket — you’ll get updates in the app and by email.',
-        'info'
-      );
+      setEscalateModal({ open: false, ticketId: null });
+      showToast('Request sent. A support specialist will review this ticket soon.', 'info');
     } catch (err) {
       console.error('Error escalating:', err);
     } finally {
@@ -522,7 +535,7 @@ const Tickets = ({ activeTeamId }) => {
   const getStatusBadge = (status) => {
     const s = (status || '').toLowerCase();
     if (s === 'resolved') return <Badge variant="success">Resolved</Badge>;
-    if (s === 'escalated') return <Badge variant="error">Escalated</Badge>;
+    if (s === 'escalated') return <Badge variant="warning">In review</Badge>;
     if (s === 'in-progress' || s === 'in_progress') return <Badge variant="info">In Progress</Badge>;
     if (s === 'new' || s === 'open') return <Badge variant="warning">Open</Badge>;
     if (s === 'pending_clarification') return <Badge variant="warning">Needs info</Badge>;
@@ -570,6 +583,7 @@ const Tickets = ({ activeTeamId }) => {
           </p>
         </div>
         <Button
+          data-tour="new-ticket"
           onClick={() => {
             setCreateAgentQuotaNotice(null);
             setShowCreateForm(true);
@@ -790,6 +804,7 @@ const Tickets = ({ activeTeamId }) => {
               }
             }}
             onAppToast={showToast}
+            onRequestHumanHelp={(ticketId, payload = {}) => openEscalate(ticketId, payload)}
             onFocusComments={async () => {
               const t = currentTicket;
               if (!t) return;
@@ -1248,8 +1263,13 @@ const Tickets = ({ activeTeamId }) => {
                             ))}
                           </select>
                           {(detailTicket?.status !== 'escalated' && detailTicket?.status !== 'resolved') && (
-                            <Button variant="outline" size="sm" onClick={() => handleEscalate(detailTicket?.ticket_id ?? detailTicket?.id)} loading={escalateLoading === (detailTicket?.ticket_id ?? detailTicket?.id)}>
-                              Escalate
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEscalate(detailTicket?.ticket_id ?? detailTicket?.id)}
+                              loading={escalateLoading === (detailTicket?.ticket_id ?? detailTicket?.id)}
+                            >
+                              Request human help
                             </Button>
                           )}
                           <Button variant="ghost" size="sm" onClick={() => openAIChatForTicket(detailTicket)}>
@@ -1299,7 +1319,7 @@ const Tickets = ({ activeTeamId }) => {
                         <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
                           <AgentInsights
                             ticketId={detailTicket?.ticket_id ?? detailTicket?.id}
-                            onEscalate={() => handleEscalate(detailTicket?.ticket_id ?? detailTicket?.id)}
+                            onEscalate={() => openEscalate(detailTicket?.ticket_id ?? detailTicket?.id)}
                             onActionComplete={() => loadTicketDetail(detailTicket?.ticket_id ?? detailTicket?.id, { silent: true })}
                             onOpenTicket={(id) => loadTicketDetail(id)}
                           />
@@ -1386,6 +1406,97 @@ const Tickets = ({ activeTeamId }) => {
         </AnimatePresence>,
         document.body
       )}
+
+      {escalateModal?.open &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Request human help">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/50 dark:bg-black/60"
+              aria-label="Close"
+              onClick={() => !escalateLoading && setEscalateModal({ open: false, ticketId: null })}
+            />
+            <div className="relative w-full max-w-lg rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl p-6">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Request human help</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    We’ll notify the support team and keep this ticket in review. You can continue adding comments while you wait.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  onClick={() => !escalateLoading && setEscalateModal({ open: false, ticketId: null })}
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    What do you need help with?
+                  </label>
+                  <select
+                    value={escalateForm.reason}
+                    onChange={(e) => setEscalateForm((p) => ({ ...p, reason: e.target.value }))}
+                    className="w-full text-sm border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                  >
+                    <option value="talk_to_human">Talk to a support specialist</option>
+                    <option value="urgent_blocked">I’m blocked (urgent)</option>
+                    <option value="billing_account">Billing / account issue</option>
+                    <option value="security_access">Security / access issue</option>
+                    <option value="other">Something else</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Phone number (optional)
+                  </label>
+                  <input
+                    type="tel"
+                    value={escalateForm.phone}
+                    onChange={(e) => setEscalateForm((p) => ({ ...p, phone: e.target.value }))}
+                    placeholder="e.g. +1 555 012 3456"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    maxLength={40}
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+                    Share this only if you’d like a call back.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Add a short note (optional)
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={escalateForm.note}
+                    onChange={(e) => setEscalateForm((p) => ({ ...p, note: e.target.value }))}
+                    placeholder="What have you tried? What’s the impact?"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    maxLength={2000}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button type="button" variant="ghost" size="sm" disabled={escalateLoading} onClick={() => setEscalateModal({ open: false, ticketId: null })}>
+                    Cancel
+                  </Button>
+                  <Button type="button" variant="primary" size="sm" loading={escalateLoading} disabled={escalateLoading} onClick={submitEscalate}>
+                    Send request
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {screenshotLightboxUrl &&
         createPortal(
