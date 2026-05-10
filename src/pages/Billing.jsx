@@ -21,7 +21,7 @@ import {
 import { cn } from '../utils/cn';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { api } from '../services/api';
+import { api, isBillingRecoverableError } from '../services/api';
 import { BillingPageSkeleton } from '../components/ui/Skeleton';
 
 const Billing = ({ onRefreshUserData }) => {
@@ -145,7 +145,29 @@ const Billing = ({ onRefreshUserData }) => {
           res?.scheduled ? res?.detail || 'Downgrade scheduled for your next billing date.' : 'Plan updated successfully.',
         );
       } catch (err) {
-        showToast(err?.message || err?.detail || 'Failed to change plan.', 'error');
+        if (
+          isBillingRecoverableError(err) &&
+          err.recovery === 'checkout' &&
+          err.billing_error === 'subscription_not_found'
+        ) {
+          showToast('Taking you to secure checkout to finish this plan change.', 'success');
+          try {
+            const returnUrl = `${window.location.origin}/billing?checkout=success`;
+            const checkoutRes = await api.billing.createCheckoutSession({
+              plan: planId,
+              billing_interval: billingCycle === 'monthly' ? 'monthly' : 'yearly',
+              return_url: returnUrl,
+            });
+            if (checkoutRes?.checkout_url) {
+              window.location.href = checkoutRes.checkout_url;
+              return;
+            }
+          } catch (checkoutErr) {
+            showToast(checkoutErr?.message || 'Could not start checkout. Try again or contact support.', 'error');
+          }
+        } else {
+          showToast(err?.message || err?.detail || 'Failed to change plan.', 'error');
+        }
       } finally {
         setUpgradingPlanId(null);
       }

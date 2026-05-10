@@ -157,6 +157,24 @@ export function isAgentQuotaError(error) {
   return error instanceof AgentQuotaExceededError || error?.code === 'agent_quota_exceeded';
 }
 
+/**
+ * Structured billing errors from Django (e.g. stale gateway_subscription_id).
+ * UI should offer recovery flows instead of only showing detail text.
+ */
+export class BillingRecoverableError extends Error {
+  constructor(message, payload = {}) {
+    super(message || 'Billing update could not complete.');
+    this.name = 'BillingRecoverableError';
+    this.billing_error = payload.billing_error;
+    this.recovery = payload.recovery;
+    this.payload = payload;
+  }
+}
+
+export function isBillingRecoverableError(error) {
+  return error instanceof BillingRecoverableError;
+}
+
 const handleResponse = async (response) => {
   const contentType = response.headers.get('content-type');
   const isJson = contentType && contentType.includes('application/json');
@@ -171,6 +189,20 @@ const handleResponse = async (response) => {
   }
 
   if (!response.ok) {
+    if (
+      data &&
+      typeof data === 'object' &&
+      !Array.isArray(data) &&
+      data.billing_error &&
+      data.recovery
+    ) {
+      const friendly =
+        data.detail ||
+        data.message ||
+        'We could not complete that billing update. Try the suggested option below.';
+      throw new BillingRecoverableError(typeof friendly === 'string' ? friendly : JSON.stringify(friendly), data);
+    }
+
     // Prefer explicit message/error/detail; then first field error from DRF serializer.errors
     let msg = data && (data.message || data.error || (Array.isArray(data.detail) ? data.detail[0] : data.detail));
     if (msg == null && data && typeof data === 'object' && !Array.isArray(data)) {
