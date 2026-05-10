@@ -82,6 +82,13 @@ const Billing = ({ onRefreshUserData }) => {
   }, [showToast]);
 
   useEffect(() => {
+    const bi = subscription?.billing_interval;
+    if (bi === 'monthly' || bi === 'yearly') {
+      setBillingCycle(bi);
+    }
+  }, [subscription?.id, subscription?.billing_interval]);
+
+  useEffect(() => {
     const checkoutSuccess = searchParams.get('checkout') === 'success' || searchParams.get('session_id');
     loadBilling().then((ok) => {
       if (ok && checkoutSuccess) {
@@ -101,6 +108,23 @@ const Billing = ({ onRefreshUserData }) => {
 
   const hasDodoSubscription = Boolean(subscription?.gateway_subscription_id);
 
+  /** Must match Dodo subscription cadence — not the price toggle — or change-plan 404s. */
+  const billingIntervalForChangePlan = () => {
+    const fromApi = subscription?.billing_interval;
+    if (fromApi === 'monthly' || fromApi === 'yearly') return fromApi;
+    const s = subscription?.current_period_start;
+    const e = subscription?.current_period_end;
+    if (!s || !e) return billingCycle === 'monthly' ? 'monthly' : 'yearly';
+    const start = new Date(s).getTime();
+    const end = new Date(e).getTime();
+    if (!(end > start)) return billingCycle === 'monthly' ? 'monthly' : 'yearly';
+    const days = Math.round((end - start) / 86400000);
+    if (days >= 24 && days <= 40) return 'monthly';
+    if (days >= 300) return 'yearly';
+    if (days <= 45) return 'monthly';
+    return billingCycle === 'monthly' ? 'monthly' : 'yearly';
+  };
+
   const handleChangePlan = async (planId) => {
     if (!planId || planId === currentPlanId) return;
 
@@ -113,7 +137,7 @@ const Billing = ({ onRefreshUserData }) => {
       try {
         await api.billing.changePlan({
           plan: planId,
-          billing_interval: billingCycle === 'monthly' ? 'monthly' : 'yearly',
+          billing_interval: billingIntervalForChangePlan(),
         });
         await loadBilling();
         onRefreshUserData?.();
