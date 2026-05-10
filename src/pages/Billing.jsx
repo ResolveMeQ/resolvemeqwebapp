@@ -135,13 +135,15 @@ const Billing = ({ onRefreshUserData }) => {
       }
       setUpgradingPlanId(planId);
       try {
-        await api.billing.changePlan({
+        const res = await api.billing.changePlan({
           plan: planId,
           billing_interval: billingIntervalForChangePlan(),
         });
         await loadBilling();
         onRefreshUserData?.();
-        showToast('Plan updated successfully.');
+        showToast(
+          res?.scheduled ? res?.detail || 'Downgrade scheduled for your next billing date.' : 'Plan updated successfully.',
+        );
       } catch (err) {
         showToast(err?.message || err?.detail || 'Failed to change plan.', 'error');
       } finally {
