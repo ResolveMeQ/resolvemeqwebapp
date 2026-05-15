@@ -186,16 +186,44 @@ const Dashboard = ({ activeTeamId }) => {
     return <Badge variant="default">{friendly}</Badge>;
   };
 
+  /**
+   * Tickets have no top-level `priority` column; AI analysis may store severity in agent_response.
+   */
+  const resolveTicketPriority = (ticket) => {
+    if (!ticket) return '';
+    const top = ticket.priority;
+    if (top != null && String(top).trim()) {
+      return String(top).trim().toLowerCase();
+    }
+    const ar = ticket.agent_response;
+    if (ar && typeof ar === 'object') {
+      const analysis = ar.analysis && typeof ar.analysis === 'object' ? ar.analysis : null;
+      const cand = ar.severity ?? ar.priority ?? (analysis && (analysis.severity ?? analysis.priority));
+      if (cand != null && String(cand).trim()) {
+        return String(cand).trim().toLowerCase();
+      }
+    }
+    return '';
+  };
+
   const getPriorityBadge = (priority) => {
-    switch (priority?.toLowerCase()) {
+    const p = (priority || '').toLowerCase().trim();
+    if (!p) {
+      return <Badge variant="default">Standard</Badge>;
+    }
+    switch (p) {
+      case 'critical':
+        return <Badge variant="error" className="bg-red-100 text-red-700">Critical</Badge>;
       case 'high':
         return <Badge variant="error" className="bg-red-100 text-red-700">High</Badge>;
       case 'medium':
         return <Badge variant="warning" className="bg-yellow-100 text-yellow-700">Medium</Badge>;
       case 'low':
         return <Badge variant="success" className="bg-green-100 text-green-700">Low</Badge>;
-      default:
-        return <Badge variant="default">Unknown</Badge>;
+      default: {
+        const friendly = p.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        return <Badge variant="default">{friendly}</Badge>;
+      }
     }
   };
 
@@ -429,7 +457,7 @@ const Dashboard = ({ activeTeamId }) => {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {getPriorityBadge(ticket.priority)}
+                    {getPriorityBadge(resolveTicketPriority(ticket))}
                     {getStatusBadge(ticket.status)}
                     <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-primary-500 dark:group-hover:text-primary-400" />
                   </div>

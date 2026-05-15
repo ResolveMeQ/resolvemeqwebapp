@@ -731,6 +731,28 @@ export const api = {
         }),
       });
     },
+    /**
+     * Staff only (Django is_staff): grant or extend a user's subscription without Dodo checkout.
+     * Body: user_id, plan_id (UUIDs), optional months_valid (1–60), clear_gateway (default true), note.
+     */
+    staffGrantSubscription: async ({
+      user_id,
+      plan_id,
+      months_valid = 12,
+      clear_gateway = true,
+      note = '',
+    }) => {
+      return apiFetch('/api/billing/staff/grant-subscription/', {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id,
+          plan_id,
+          months_valid,
+          clear_gateway,
+          note,
+        }),
+      });
+    },
   },
 
   // Solutions endpoints

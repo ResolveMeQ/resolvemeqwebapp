@@ -792,6 +792,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
       showToast('Question posted.');
       await loadCommunityQuestions();
       await openCommunityQuestion(created);
+      window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
     } catch (error) {
       showToast(error?.message || 'Failed to post question.', 'error');
     } finally {
@@ -886,6 +887,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
       setAnswerFiles([]);
       showToast('Answer posted.');
       await Promise.all([loadCommunityQuestions(), loadCommunityQuestionDetail(selectedQuestion.id)]);
+      window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
     } catch (error) {
       showToast(error?.message || 'Unable to post answer.', 'error');
     } finally {
@@ -912,6 +914,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
       setCommentDrafts((prev) => ({ ...prev, [key]: '' }));
       await loadCommunityQuestionDetail(selectedQuestion.id);
       showToast('Comment posted.');
+      window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
     } catch (error) {
       showToast(error?.message || 'Unable to post comment.', 'error');
     } finally {
