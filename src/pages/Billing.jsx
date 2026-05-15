@@ -125,6 +125,22 @@ const Billing = ({ onRefreshUserData }) => {
     return billingCycle === 'monthly' ? 'monthly' : 'yearly';
   };
 
+  /** Hosted Dodo checkout for a plan UUID (new sub or recovery when change-plan cannot link). */
+  const startHostedCheckoutForPlan = async (planId, billing_interval) => {
+    const returnUrl = `${window.location.origin}/billing?checkout=success`;
+    const res = await api.billing.createCheckoutSession({
+      plan: planId,
+      billing_interval,
+      return_url: returnUrl,
+    });
+    if (res?.checkout_url) {
+      window.location.href = res.checkout_url;
+      return true;
+    }
+    showToast('Checkout did not return a URL. Please try again or contact support.', 'error');
+    return false;
+  };
+
   const handleChangePlan = async (planId) => {
     if (!planId || planId === currentPlanId) return;
 
@@ -152,16 +168,7 @@ const Billing = ({ onRefreshUserData }) => {
         ) {
           showToast('Taking you to secure checkout to finish this plan change.', 'success');
           try {
-            const returnUrl = `${window.location.origin}/billing?checkout=success`;
-            const checkoutRes = await api.billing.createCheckoutSession({
-              plan: planId,
-              billing_interval: billingCycle === 'monthly' ? 'monthly' : 'yearly',
-              return_url: returnUrl,
-            });
-            if (checkoutRes?.checkout_url) {
-              window.location.href = checkoutRes.checkout_url;
-              return;
-            }
+            await startHostedCheckoutForPlan(planId, billingIntervalForChangePlan());
           } catch (checkoutErr) {
             showToast(checkoutErr?.message || 'Could not start checkout. Try again or contact support.', 'error');
           }
@@ -196,17 +203,11 @@ const Billing = ({ onRefreshUserData }) => {
 
     setUpgradingPlanId(planId);
     try {
-      const returnUrl = `${window.location.origin}/billing?checkout=success`;
-      const res = await api.billing.createCheckoutSession({
-        plan: planId,
-        billing_interval: billingCycle === 'monthly' ? 'monthly' : 'yearly',
-        return_url: returnUrl,
-      });
-      if (res?.checkout_url) {
-        window.location.href = res.checkout_url;
-        return;
-      }
-      showToast('Checkout did not return a URL. Please try again or contact support.', 'error');
+      const ok = await startHostedCheckoutForPlan(
+        planId,
+        billingCycle === 'monthly' ? 'monthly' : 'yearly',
+      );
+      if (ok) return;
     } catch (err) {
       showToast(err?.message || 'Could not start checkout. Please try again.', 'error');
     } finally {
