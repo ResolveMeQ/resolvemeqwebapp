@@ -87,6 +87,8 @@ const Tickets = ({ activeTeamId }) => {
   const [createLoading, setCreateLoading] = useState(false);
   const [saveEditLoading, setSaveEditLoading] = useState(false);
   const [commentLoading, setCommentLoading] = useState(false);
+  const [agentReplyText, setAgentReplyText] = useState('');
+  const [agentReplyLoading, setAgentReplyLoading] = useState(false);
   const [escalateLoading, setEscalateLoading] = useState(null);
   const [escalateModal, setEscalateModal] = useState({ open: false, ticketId: null });
   const [escalateForm, setEscalateForm] = useState({ reason: 'talk_to_human', note: '', phone: '', conversation_summary: '' });
@@ -109,6 +111,7 @@ const Tickets = ({ activeTeamId }) => {
   const pendingScrollToCommentsRef = useRef(null);
   const screenshotInputRef = useRef(null);
   const commentInputRef = useRef(null);
+  const agentReplyInputRef = useRef(null);
 
   const closeCreateForm = useCallback(() => {
     setShowCreateForm(false);
@@ -401,6 +404,24 @@ const Tickets = ({ activeTeamId }) => {
       if (commentText.trim() && !commentLoading) {
         handleAddComment();
       }
+    }
+  };
+
+  /** Reply to the customer -- lands in their AI chat thread, not the internal notes above. */
+  const handleSendAgentReply = async () => {
+    if (!detailTicket || !agentReplyText.trim()) return;
+    const id = detailTicket.ticket_id ?? detailTicket.id;
+    const text = agentReplyText.trim();
+    setAgentReplyLoading(true);
+    try {
+      await api.agent.sendAgentReply(id, text);
+      setAgentReplyText('');
+      showToast('Reply sent to the customer.', 'success');
+    } catch (err) {
+      console.error('Error sending agent reply:', err);
+      showToast(err?.message || 'Could not send your reply. Try again.', 'error');
+    } finally {
+      setAgentReplyLoading(false);
     }
   };
 
@@ -1332,10 +1353,40 @@ const Tickets = ({ activeTeamId }) => {
                           />
                         </div>
 
+                        {detailTicket?.status === 'escalated' && detailTicket?.claimed_at && (
+                          <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
+                            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">
+                              Reply to customer
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                              Lands in the same chat thread the customer's been using — not these internal notes.
+                            </p>
+                            <div className="flex gap-2 items-end">
+                              <textarea
+                                ref={agentReplyInputRef}
+                                rows={1}
+                                value={agentReplyText}
+                                onChange={(e) => setAgentReplyText(e.target.value)}
+                                placeholder="Type your reply to the customer..."
+                                className="flex-1 min-h-[40px] max-h-[160px] px-3 py-2 border border-emerald-300 dark:border-emerald-800 rounded-lg bg-white dark:bg-gray-900 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-none overflow-y-auto"
+                              />
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={handleSendAgentReply}
+                                disabled={!agentReplyText.trim()}
+                                loading={agentReplyLoading}
+                              >
+                                Send
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
                         <div id="ticket-comments-section" className="pt-6 border-t border-gray-200 dark:border-gray-800">
                           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                             <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                              Comments {(detailTicket?.comments?.length ?? 0) ? `(${detailTicket.comments.length})` : ''}
+                              Internal notes {(detailTicket?.comments?.length ?? 0) ? `(${detailTicket.comments.length})` : ''}
                             </p>
                             {detailTicket?.conversation_state_label && (
                               <span
@@ -1352,6 +1403,9 @@ const Tickets = ({ activeTeamId }) => {
                               </span>
                             )}
                           </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                            Internal team notes — not sent to the customer.
+                          </p>
                           {(detailTicket?.comments?.length ?? 0) > 0 && (
                             <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
                               {(detailTicket.comments || []).map((c) => (
@@ -1429,7 +1483,7 @@ const Tickets = ({ activeTeamId }) => {
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Request human help</h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    We’ll notify the support team and keep this ticket in review. You can continue adding comments while you wait.
+                    We’ll notify the support team and keep this ticket in review. A specialist will reply in this ticket’s AI chat once they’re on it — keep an eye there.
                   </p>
                 </div>
                 <button

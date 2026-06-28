@@ -984,6 +984,14 @@ export const api = {
       return apiFetch(`/api/tickets/${ticketId}/chat/history/`);
     },
 
+    /** Teammate's reply to the customer -- lands in the same chat thread (requires the ticket to be claimed). */
+    sendAgentReply: async (ticketId, message) => {
+      return apiFetch(`/api/tickets/${ticketId}/chat/agent-reply/`, {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+      });
+    },
+
     submitChatFeedback: async (ticketId, messageId, helpful, comment = null) => {
       const body = {
         rating: helpful ? 'helpful' : 'not_helpful',

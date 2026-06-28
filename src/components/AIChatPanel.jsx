@@ -11,6 +11,7 @@ import {
   CheckCircle,
   AlertCircle,
   ImagePlus,
+  UserCheck,
 } from 'lucide-react';
 import { api, AgentQuotaExceededError, isAgentQuotaError } from '../services/api';
 import Button from './ui/Button';
@@ -214,6 +215,54 @@ const AIChatPanel = ({
     }
   }, [isOpen, ticketId]);
 
+  // Poll for new messages while the panel is open on an escalated ticket -- there's no
+  // push/WebSocket here, so without this an agent's reply only shows up after the
+  // customer navigates away and back. Append-only (by id) so it never clobbers
+  // client-only bubbles (resolution-check prompts, retry/error messages, etc.) that
+  // don't come from the history endpoint.
+  useEffect(() => {
+    if (!isOpen || !ticketId || ticket?.status !== 'escalated') return;
+    const interval = setInterval(async () => {
+      try {
+        const data = await api.agent.getChatHistory(ticketId);
+        const conv = data.conversation || data;
+        const msgList = Array.isArray(data.messages)
+          ? data.messages
+          : Array.isArray(conv?.messages)
+            ? conv.messages
+            : [];
+        if (!msgList.length) return;
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const newOnes = msgList
+            .filter((msg) => !existingIds.has(msg.id))
+            .map((msg) => {
+              const meta = msg.metadata || {};
+              return {
+                id: msg.id,
+                type: msg.sender_type || msg.type,
+                text: msg.text,
+                confidence: msg.confidence,
+                authorName: msg.author_name,
+                metadata: {
+                  ...meta,
+                  suggested_actions: normalizeSuggestedActionsList(meta.suggested_actions),
+                },
+                messageType: msg.message_type,
+                wasHelpful: msg.was_helpful,
+                showFeedbackPrompt: false,
+                createdAt: msg.created_at,
+              };
+            });
+          return newOnes.length ? [...prev, ...newOnes] : prev;
+        });
+      } catch {
+        // Best-effort -- a missed poll just means the customer waits for the next tick.
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [isOpen, ticketId, ticket?.status]);
+
   useEffect(() => {
     setMemoryDismissedPromptIds(new Set());
   }, [ticketId]);
@@ -363,6 +412,7 @@ const AIChatPanel = ({
               type: msg.sender_type || msg.type,
               text: msg.text,
               confidence: msg.confidence,
+              authorName: msg.author_name,
               metadata: {
                 ...meta,
                 suggested_actions: normalizeSuggestedActionsList(meta.suggested_actions),
@@ -502,29 +552,43 @@ const AIChatPanel = ({
         setConversationId(data.conversation_id);
       }
 
-      // Add AI response to UI
+      // When a human has claimed the ticket, the backend intentionally skips the AI
+      // (see routed_to_human) -- there's no AI bubble to add, the customer's own
+      // message above is the whole story until the agent replies.
       const aiMsg = data.ai_message;
-      const meta = aiMsg.metadata || {};
-      const wh = aiMsg.was_helpful;
-      const hidePrompt =
-        aiMsg.show_feedback_prompt === false || wh != null;
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: aiMsg.id,
-          type: aiMsg.sender_type,
-          text: aiMsg.text,
-          confidence: aiMsg.confidence,
-          metadata: {
-            ...meta,
-            suggested_actions: normalizeSuggestedActionsList(meta.suggested_actions),
+      if (aiMsg) {
+        const meta = aiMsg.metadata || {};
+        const wh = aiMsg.was_helpful;
+        const hidePrompt =
+          aiMsg.show_feedback_prompt === false || wh != null;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: aiMsg.id,
+            type: aiMsg.sender_type,
+            text: aiMsg.text,
+            confidence: aiMsg.confidence,
+            metadata: {
+              ...meta,
+              suggested_actions: normalizeSuggestedActionsList(meta.suggested_actions),
+            },
+            messageType: aiMsg.message_type,
+            wasHelpful: wh ?? null,
+            showFeedbackPrompt: hidePrompt ? false : aiMsg.sender_type === 'ai',
+            createdAt: aiMsg.created_at,
           },
-          messageType: aiMsg.message_type,
-          wasHelpful: wh ?? null,
-          showFeedbackPrompt: hidePrompt ? false : aiMsg.sender_type === 'ai',
-          createdAt: aiMsg.created_at,
-        },
-      ]);
+        ]);
+      } else if (data.routed_to_human) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `sys-${Date.now()}`,
+            type: 'system',
+            text: 'Sent to support — a teammate is on this ticket and will reply here.',
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      }
       // Notify parent if ticket status changed (e.g. new→in_progress on first message)
       if (data.ticket_status && data.ticket_status !== (ticket?.status)) {
         onTicketUpdate?.({ ...ticket, status: data.ticket_status });
@@ -1287,6 +1351,22 @@ const AIChatPanel = ({
                       )}
                     </div>
                     )}
+                  </div>
+                ) : msg.type === 'agent' ? (
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
+                      <UserCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="bg-emerald-50 dark:bg-emerald-900/15 rounded-lg p-4 border border-emerald-200 dark:border-emerald-800/50 shadow-sm">
+                        <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-1.5">
+                          {msg.authorName || 'Support'}
+                        </p>
+                        <p className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap">
+                          {msg.text}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex justify-end">
