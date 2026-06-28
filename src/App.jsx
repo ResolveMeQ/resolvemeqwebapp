@@ -4,6 +4,7 @@ import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import Tickets from './pages/Tickets';
+import EscalationQueue from './pages/EscalationQueue';
 import Analytics from './pages/Analytics';
 import Teams from './pages/Teams';
 import Users from './pages/Users';
@@ -317,6 +318,14 @@ function App() {
         element={
           <AuthGate isAuthenticated={isAuthenticated}>
             <Layout {...layoutProps}><Tickets /></Layout>
+          </AuthGate>
+        }
+      />
+      <Route
+        path="/escalation-queue"
+        element={
+          <AuthGate isAuthenticated={isAuthenticated}>
+            <Layout {...layoutProps}><EscalationQueue /></Layout>
           </AuthGate>
         }
       />

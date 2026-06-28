@@ -1,16 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Home, 
-  Ticket, 
-  BarChart3, 
-  Users, 
+import {
+  Home,
+  Ticket,
+  AlertTriangle,
+  BarChart3,
+  Users,
   User,
   BookOpen,
   Settings,
   CreditCard,
   Plug,
-  ChevronLeft, 
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   Menu,
@@ -61,6 +62,7 @@ const Sidebar = ({
   const iconMap = {
     Home,
     Ticket,
+    AlertTriangle,
     BarChart3,
     Users,
     User,
@@ -101,7 +103,7 @@ const Sidebar = ({
   const navigationGroups = [
     {
       label: 'Operations',
-      items: NAVIGATION_ITEMS.filter(item => ['dashboard', 'tickets'].includes(item.id))
+      items: NAVIGATION_ITEMS.filter(item => ['dashboard', 'tickets', 'escalation-queue'].includes(item.id))
     },
     {
       label: 'Intelligence',

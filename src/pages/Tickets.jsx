@@ -334,23 +334,30 @@ const Tickets = ({ activeTeamId }) => {
     if (!ticketId) return;
     setEscalateLoading(ticketId);
     try {
-      await api.tickets.escalate(ticketId, {
+      const res = await api.tickets.escalate(ticketId, {
         reason: (escalateForm.reason || '').trim() || 'talk_to_human',
         note: (escalateForm.note || '').trim(),
         phone: (escalateForm.phone || '').trim(),
         conversation_summary: (escalateForm.conversation_summary || '').trim(),
       });
+      const eta = res?.eta;
+      const patch = {
+        status: 'escalated',
+        escalation_priority: eta?.priority,
+        sla_due_at: eta?.sla_due_at,
+      };
       setActiveTickets((prev) =>
-        prev.map((t) =>
-          (t.ticket_id ?? t.id) === ticketId ? { ...t, status: 'escalated' } : t
-        )
+        prev.map((t) => ((t.ticket_id ?? t.id) === ticketId ? { ...t, ...patch } : t))
       );
       if (detailTicket && (detailTicket.ticket_id ?? detailTicket.id) === ticketId) {
-        setDetailTicket((prev) => (prev ? { ...prev, status: 'escalated' } : null));
+        setDetailTicket((prev) => (prev ? { ...prev, ...patch } : null));
       }
       window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
       setEscalateModal({ open: false, ticketId: null });
-      showToast('Request sent. A support specialist will review this ticket soon.', 'info');
+      const etaText = eta?.eta_text
+        ? `Request sent (${(eta.priority || 'medium').toUpperCase()} priority). Expect a response ${eta.eta_text}.`
+        : 'Request sent. A support specialist will review this ticket soon.';
+      showToast(etaText, 'info');
     } catch (err) {
       console.error('Error escalating:', err);
     } finally {

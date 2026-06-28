@@ -1,3 +1,11 @@
+/** Relative-hours ETA text from an ISO due date, e.g. "within about 6 hours". */
+function formatEta(slaIso) {
+  if (!slaIso) return null;
+  const hours = (new Date(slaIso).getTime() - Date.now()) / 3600000;
+  if (hours <= 0) return 'shortly';
+  return `within about ${Math.max(1, Math.round(hours))} hours`;
+}
+
 /**
  * Single-line “next step” copy for ticket detail (above the fold).
  */
@@ -13,9 +21,19 @@ export function getTicketNextStep(ticket) {
     };
   }
   if (s === 'escalated') {
+    if (ticket.claimed_at) {
+      return {
+        title: 'Being worked on',
+        body: `${ticket.assigned_to_name || 'A support specialist'} is now looking into this.`,
+        tone: 'info',
+      };
+    }
+    const eta = formatEta(ticket.sla_due_at);
     return {
       title: 'In review',
-      body: 'A support specialist will review this. You can add more details below while you wait — it helps us move faster.',
+      body: eta
+        ? `A support specialist will review this, typically ${eta}. You can add more details below while you wait — it helps us move faster.`
+        : 'A support specialist will review this. You can add more details below while you wait — it helps us move faster.',
       tone: 'warning',
     };
   }

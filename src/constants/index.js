@@ -143,6 +143,12 @@ export const NAVIGATION_ITEMS = [
     icon: 'Ticket',
   },
   {
+    id: 'escalation-queue',
+    label: 'Escalation Queue',
+    href: '/escalation-queue',
+    icon: 'AlertTriangle',
+  },
+  {
     id: 'analytics',
     label: 'Analytics',
     href: '/analytics',

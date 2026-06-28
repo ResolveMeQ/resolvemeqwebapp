@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { api, AgentQuotaExceededError, isAgentQuotaError } from '../services/api';
 import Button from './ui/Button';
+import ConfidenceBadge from './ui/ConfidenceBadge';
 import { cn } from '../utils/cn';
 import {
   normalizeSuggestedActionsList,
@@ -36,6 +37,24 @@ const PROSE_RESPONSE_STYLES = new Set([
 
 const CHAT_TEXTAREA_MAX_H = 180;
 const CHAT_COMPOSER_MIN_H = 44;
+
+/** Real priority/ETA from the escalate API response, instead of a hardcoded generic line. */
+function escalationMessageFromResponse(res) {
+  const eta = res?.eta;
+  if (!eta?.eta_text) {
+    return 'Escalated to human support. You’ll get updates here and by email when someone picks this up.';
+  }
+  const priority = (eta.priority || 'medium').toUpperCase();
+  return `Escalated to human support (${priority} priority). Expect a response ${eta.eta_text}. You’ll get updates here and by email when someone picks this up.`;
+}
+
+/** Map agent response_style to ConfidenceBadge's plain-language mode. */
+function confidenceModeFromResponseStyle(responseStyle) {
+  if (responseStyle === 'informational') return 'informational';
+  if (responseStyle === 'clarification_only') return 'clarification';
+  if (responseStyle === 'escalation_focus') return 'escalation';
+  return 'troubleshooting';
+}
 
 /**
  * Draft + auto-grow only re-render this chunk on each keypress, not the full message list
@@ -305,6 +324,7 @@ const AIChatPanel = ({
           estimated_time: PROSE_RESPONSE_STYLES.has(responseStyle) ? undefined : solution.estimated_time,
           success_probability: PROSE_RESPONSE_STYLES.has(responseStyle) ? undefined : solution.success_probability,
           quick_replies: quickRepliesFromAgentResponse(ar),
+          kb_article_citations: ar.kb_article_citations || [],
         },
         messageType:
           PROSE_RESPONSE_STYLES.has(responseStyle) ? 'text' : steps.length > 1 ? 'steps' : 'text',
@@ -697,7 +717,7 @@ const AIChatPanel = ({
             setMessages((prev) => [...prev, {
               id: `sys-${Date.now()}`,
               type: 'system',
-              text: 'Escalated to human support. You’ll get updates here and by email when someone picks this up.',
+              text: escalationMessageFromResponse(res),
               createdAt: new Date().toISOString(),
             }]);
             onAppToast?.('Ticket escalated. Support will review it.', 'info');
@@ -768,7 +788,7 @@ const AIChatPanel = ({
           setMessages((prev) => [...prev, {
             id: `sys-${Date.now()}`,
             type: 'system',
-            text: 'Escalated to human support. You’ll get updates here and by email when someone picks this up.',
+            text: escalationMessageFromResponse(res),
             createdAt: new Date().toISOString(),
           }]);
           onAppToast?.('Ticket escalated. Support will review it.', 'info');
@@ -935,6 +955,15 @@ const AIChatPanel = ({
                         </div>
                       )}
                       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 shadow-sm">
+                        {msg.confidence != null && (
+                          <div className="mb-3">
+                            <ConfidenceBadge
+                              confidence={msg.confidence}
+                              mode={confidenceModeFromResponseStyle(msg.metadata?.response_style)}
+                              size="sm"
+                            />
+                          </div>
+                        )}
                         {/*
                           Avoid duplicating content: Django/chat inject the same steps into `text` and metadata.steps.
                           When we render the numbered "Steps to follow" block below, skip the blob that repeats those steps.
@@ -1053,6 +1082,27 @@ const AIChatPanel = ({
                                 >
                                   {reply.label}
                                 </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Sources: KB articles the AI grounded this answer in */}
+                        {msg.metadata?.kb_article_citations?.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">
+                              Sources
+                            </p>
+                            <div className="flex flex-col gap-1.5">
+                              {msg.metadata.kb_article_citations.map((citation, cIdx) => (
+                                <Link
+                                  key={citation.kb_id ?? cIdx}
+                                  to={`/knowledge-base?kb=${encodeURIComponent(citation.kb_id)}`}
+                                  className="text-xs text-primary-600 dark:text-primary-400 hover:underline truncate"
+                                  title={citation.title}
+                                >
+                                  📄 {citation.title}
+                                </Link>
                               ))}
                             </div>
                           </div>
