@@ -50,6 +50,9 @@ function getMentionQuery(text, caretPos) {
   return { query, start, end };
 }
 
+const COMMUNITY_FILE_ACCEPT =
+  '.jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.md,.json,.log,image/*,application/pdf,text/*';
+
 function CommunityAttachmentLinks({ attachments }) {
   if (!attachments?.length) return null;
   return (
@@ -109,6 +112,74 @@ function renderTextWithMentions(text) {
   }
   if (last < value.length) parts.push(value.slice(last));
   return parts.length ? parts : value;
+}
+
+function CommentComposer({
+  commentKey,
+  targetType,
+  targetId,
+  placeholder,
+  commentDrafts,
+  setCommentDrafts,
+  commentFiles,
+  setCommentFiles,
+  onMaybeMention,
+  mentionDebounceTimer,
+  setMentionDebounceTimer,
+  onSubmit,
+  actionLoadingKey,
+  uploadingFiles,
+}) {
+  const files = commentFiles[commentKey] || [];
+  const loadingKey = `comment-${commentKey}`;
+  return (
+    <div className="space-y-1.5 min-w-0">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch min-w-0">
+        <input
+          value={commentDrafts[commentKey] || ''}
+          onChange={(e) => {
+            const v = e.target.value;
+            setCommentDrafts((p) => ({ ...p, [commentKey]: v }));
+            const caret = e.target.selectionStart;
+            if (mentionDebounceTimer) window.clearTimeout(mentionDebounceTimer);
+            const t = window.setTimeout(() => {
+              onMaybeMention({ fieldKey: `comment.${commentKey}`, text: v, caretPos: caret });
+            }, 160);
+            setMentionDebounceTimer(t);
+          }}
+          placeholder={placeholder}
+          className="w-full min-w-0 sm:flex-1 px-2 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"
+        />
+        <Button
+          size="sm"
+          variant="ghost"
+          className="w-full sm:w-auto shrink-0"
+          onClick={() => onSubmit(targetType, targetId)}
+          loading={actionLoadingKey === loadingKey}
+          disabled={Boolean(actionLoadingKey) || uploadingFiles}
+        >
+          Comment
+        </Button>
+      </div>
+      <input
+        type="file"
+        multiple
+        accept={COMMUNITY_FILE_ACCEPT}
+        onChange={(e) =>
+          setCommentFiles((p) => ({
+            ...p,
+            [commentKey]: Array.from(e.target.files || []),
+          }))
+        }
+        className="w-full text-[11px] text-gray-600 dark:text-gray-300"
+      />
+      {files.length > 0 && (
+        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+          {files.length} attachment{files.length === 1 ? '' : 's'} selected
+        </p>
+      )}
+    </div>
+  );
 }
 
 /** Shared article body for desktop side panel and mobile full-height sheet */
@@ -256,6 +327,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
   const [answerFiles, setAnswerFiles] = useState([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [commentDrafts, setCommentDrafts] = useState({});
+  const [commentFiles, setCommentFiles] = useState({});
   const [actionLoadingKey, setActionLoadingKey] = useState(null);
   const [openingQuestionId, setOpeningQuestionId] = useState(null);
 
@@ -937,19 +1009,31 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
     if (!requireAuthAction('comment')) return;
     const key = `${targetType}-${id}`;
     const text = (commentDrafts[key] || '').trim();
-    if (!text) {
-      showToast('Write a comment before posting.', 'error');
+    const files = commentFiles[key] || [];
+    if (!text && files.length === 0) {
+      showToast('Write a comment or attach a file before posting.', 'error');
       return;
     }
     const actionKey = `comment-${key}`;
     try {
       setActionLoadingKey(actionKey);
+      setUploadingFiles(true);
+      const uploadedAttachments = [];
+      for (const file of files) {
+        const uploaded = await api.knowledgeBase.uploadCommunityAttachment(file);
+        uploadedAttachments.push(uploaded);
+      }
+      const payload = {
+        body: text || '(attachment)',
+        attachment_ids: uploadedAttachments.map((a) => a.id),
+      };
       if (targetType === 'question') {
-        await api.knowledgeBase.addCommunityQuestionComment(id, { body: text });
+        await api.knowledgeBase.addCommunityQuestionComment(id, payload);
       } else {
-        await api.knowledgeBase.addCommunityAnswerComment(id, { body: text });
+        await api.knowledgeBase.addCommunityAnswerComment(id, payload);
       }
       setCommentDrafts((prev) => ({ ...prev, [key]: '' }));
+      setCommentFiles((prev) => ({ ...prev, [key]: [] }));
       await loadCommunityQuestionDetail(selectedQuestion.id);
       showToast('Comment posted.');
       window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
@@ -957,6 +1041,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
       showToast(error?.message || 'Unable to post comment.', 'error');
     } finally {
       setActionLoadingKey(null);
+      setUploadingFiles(false);
     }
   };
 
@@ -1113,33 +1198,22 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
           </Button>
         </div>
       )}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch min-w-0">
-        <input
-          value={commentDrafts[`question-${selectedQuestion.id}`] || ''}
-          onChange={(e) => {
-            const v = e.target.value;
-            setCommentDrafts((p) => ({ ...p, [`question-${selectedQuestion.id}`]: v }));
-            const caret = e.target.selectionStart;
-            if (mentionDebounceTimer) window.clearTimeout(mentionDebounceTimer);
-            const t = window.setTimeout(() => {
-              onMaybeMention({ fieldKey: `comment.question-${selectedQuestion.id}`, text: v, caretPos: caret });
-            }, 160);
-            setMentionDebounceTimer(t);
-          }}
-          placeholder="Add a comment to question"
-          className="w-full min-w-0 sm:flex-1 px-2 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"
-        />
-        <Button
-          size="sm"
-          variant="ghost"
-          className="w-full sm:w-auto shrink-0"
-          onClick={() => submitComment('question', selectedQuestion.id)}
-          loading={actionLoadingKey === `comment-question-${selectedQuestion.id}`}
-          disabled={Boolean(actionLoadingKey)}
-        >
-          Comment
-        </Button>
-      </div>
+      <CommentComposer
+        commentKey={`question-${selectedQuestion.id}`}
+        targetType="question"
+        targetId={selectedQuestion.id}
+        placeholder="Add a comment to question"
+        commentDrafts={commentDrafts}
+        setCommentDrafts={setCommentDrafts}
+        commentFiles={commentFiles}
+        setCommentFiles={setCommentFiles}
+        onMaybeMention={onMaybeMention}
+        mentionDebounceTimer={mentionDebounceTimer}
+        setMentionDebounceTimer={setMentionDebounceTimer}
+        onSubmit={submitComment}
+        actionLoadingKey={actionLoadingKey}
+        uploadingFiles={uploadingFiles}
+      />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-gray-200 dark:border-gray-800 pt-3 min-w-0">
         <p className="text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">
           Answers ({selectedQuestion.answer_count ?? selectedQuestion.answers?.length ?? 0})
@@ -1230,33 +1304,22 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
                 ))}
               </div>
             )}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch min-w-0">
-              <input
-                value={commentDrafts[`answer-${answer.id}`] || ''}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setCommentDrafts((p) => ({ ...p, [`answer-${answer.id}`]: v }));
-                  const caret = e.target.selectionStart;
-                  if (mentionDebounceTimer) window.clearTimeout(mentionDebounceTimer);
-                  const t = window.setTimeout(() => {
-                    onMaybeMention({ fieldKey: `comment.answer-${answer.id}`, text: v, caretPos: caret });
-                  }, 160);
-                  setMentionDebounceTimer(t);
-                }}
-                placeholder="Add a comment"
-                className="w-full min-w-0 sm:flex-1 px-2 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs"
-              />
-              <Button
-                size="sm"
-                variant="ghost"
-                className="w-full sm:w-auto shrink-0"
-                onClick={() => submitComment('answer', answer.id)}
-                loading={actionLoadingKey === `comment-answer-${answer.id}`}
-                disabled={Boolean(actionLoadingKey)}
-              >
-                Comment
-              </Button>
-            </div>
+            <CommentComposer
+              commentKey={`answer-${answer.id}`}
+              targetType="answer"
+              targetId={answer.id}
+              placeholder="Add a comment"
+              commentDrafts={commentDrafts}
+              setCommentDrafts={setCommentDrafts}
+              commentFiles={commentFiles}
+              setCommentFiles={setCommentFiles}
+              onMaybeMention={onMaybeMention}
+              mentionDebounceTimer={mentionDebounceTimer}
+              setMentionDebounceTimer={setMentionDebounceTimer}
+              onSubmit={submitComment}
+              actionLoadingKey={actionLoadingKey}
+              uploadingFiles={uploadingFiles}
+            />
           </div>
         ))}
       </div>
@@ -1277,13 +1340,13 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
           placeholder="Write your answer"
           className="w-full min-w-0 max-w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
         />
-              <input
-                type="file"
-                multiple
-                accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.md,.json,.log,image/*,application/pdf,text/*"
-                onChange={(e) => setAnswerFiles(Array.from(e.target.files || []))}
-                className="w-full text-xs text-gray-600 dark:text-gray-300"
-              />
+        <input
+          type="file"
+          multiple
+          accept={COMMUNITY_FILE_ACCEPT}
+          onChange={(e) => setAnswerFiles(Array.from(e.target.files || []))}
+          className="w-full text-xs text-gray-600 dark:text-gray-300"
+        />
         {answerFiles.length > 0 && (
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {answerFiles.length} attachment(s) selected
@@ -1502,7 +1565,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
               <input
                 type="file"
                 multiple
-                accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.md,.json,.log,image/*,application/pdf,text/*"
+                accept={COMMUNITY_FILE_ACCEPT}
                 onChange={(e) => setQuestionFiles(Array.from(e.target.files || []))}
                 className="w-full text-xs text-gray-600 dark:text-gray-300"
               />
