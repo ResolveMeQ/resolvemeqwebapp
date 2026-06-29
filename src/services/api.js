@@ -13,7 +13,11 @@ export function normalizeSessionUser(raw) {
   if (!raw || typeof raw !== 'object') return raw;
   const email = String(raw.email ?? raw.user_email ?? '').trim();
   const fullName = String(raw.full_name ?? raw.user_full_name ?? '').trim();
-  const id = raw.id ?? raw.user_id;
+  // user_id first: /api/auth/profile/ is UserProfileSerializer (Meta.model = Profile), so its
+  // own `id` field is the Profile's PK, not the User's -- `user_id` (source='user.id') is the
+  // real one. Preferring `raw.id` here silently sent the wrong id to any endpoint expecting an
+  // actual User pk (e.g. assign_ticket's agent_id), producing "No User matches the given query."
+  const id = raw.user_id ?? raw.id;
   return {
     ...raw,
     id,

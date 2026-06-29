@@ -146,6 +146,11 @@ const EscalationQueue = () => {
                     >
                       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                         #{ticket.ticket_id} · {ticket.issue_type || ticket.category}
+                        {ticket.team_name && (
+                          <span className="ml-2 text-xs font-normal px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                            {ticket.team_name}
+                          </span>
+                        )}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                         <Clock className="w-3 h-3" />
