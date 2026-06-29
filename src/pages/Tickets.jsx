@@ -28,15 +28,11 @@ import {
   IllustrationQuota,
 } from '../components/ui/ChatStateIllustrations';
 
-const API_ORIGIN = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+import { resolveMediaUrl } from '../utils/media';
 
 /** Turn relative media paths from the API into an absolute URL for <img src>. */
 function resolveTicketMediaUrl(url) {
-  if (!url || typeof url !== 'string') return '';
-  const u = url.trim();
-  if (u.startsWith('http://') || u.startsWith('https://')) return u;
-  if (u.startsWith('/')) return `${API_ORIGIN}${u}`;
-  return u;
+  return resolveMediaUrl(url);
 }
 
 const STATUS_OPTIONS = [

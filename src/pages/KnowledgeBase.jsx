@@ -27,6 +27,7 @@ import { api } from '../services/api';
 import { cn } from '../utils/cn';
 import { KnowledgeBaseArticlesSkeleton } from '../components/ui/Skeleton';
 import { renderMarkdown } from '../utils/markdown';
+import { formatFileSize, resolveMediaUrl } from '../utils/media';
 
 const MENTION_RE = /(?<![\\w@])@([A-Za-z0-9_.+-]{2,150})/g;
 
@@ -47,6 +48,43 @@ function getMentionQuery(text, caretPos) {
   const start = (lastBreak + 1) + at;
   const end = pos;
   return { query, start, end };
+}
+
+function CommunityAttachmentLinks({ attachments }) {
+  if (!attachments?.length) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {attachments.map((a) => {
+        const href = resolveMediaUrl(a.file_url);
+        const sizeLabel = formatFileSize(a.file_size);
+        if (!href) {
+          return (
+            <span
+              key={a.id}
+              className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-700 text-gray-500 dark:text-gray-400 max-w-full break-all inline-block"
+              title="Attachment unavailable"
+            >
+              {a.original_name}
+              {sizeLabel ? ` (${sizeLabel})` : ''}
+            </span>
+          );
+        }
+        return (
+          <a
+            key={a.id}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            download={a.original_name || undefined}
+            className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-700 text-primary-700 dark:text-primary-300 hover:underline max-w-full break-all inline-block"
+          >
+            {a.original_name}
+            {sizeLabel ? ` (${sizeLabel})` : ''}
+          </a>
+        );
+      })}
+    </div>
+  );
 }
 
 function renderTextWithMentions(text) {
@@ -1016,9 +1054,15 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
           {(selectedQuestion.comments || []).map((comment) => (
             <div
               key={`q-comment-${comment.id}`}
-              className="text-xs text-gray-700 dark:text-gray-300 break-words"
+              className="text-xs text-gray-700 dark:text-gray-300 break-words space-y-1"
             >
-              <span className="font-medium">{comment.author_name || 'User'}:</span> {renderTextWithMentions(comment.body)}
+              <div>
+                <span className="font-medium">{comment.author_name || 'User'}:</span>{' '}
+                {renderTextWithMentions(comment.body)}
+              </div>
+              {(comment.attachments || []).length > 0 && (
+                <CommunityAttachmentLinks attachments={comment.attachments} />
+              )}
             </div>
           ))}
         </div>
@@ -1048,19 +1092,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
       {(selectedQuestion.attachments || []).length > 0 && (
         <div className="space-y-1">
           <p className="text-xs font-medium text-gray-600 dark:text-gray-300">Attachments</p>
-          <div className="flex flex-wrap gap-2">
-            {selectedQuestion.attachments.map((a) => (
-              <a
-                key={a.id}
-                href={a.file_url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-700 text-primary-700 dark:text-primary-300 hover:underline max-w-full break-all inline-block"
-              >
-                {a.original_name}
-              </a>
-            ))}
-          </div>
+          <CommunityAttachmentLinks attachments={selectedQuestion.attachments} />
         </div>
       )}
       {selectedQuestion.has_accepted_answer && (
@@ -1178,28 +1210,22 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
               </div>
             </div>
             {(answer.attachments || []).length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {answer.attachments.map((a) => (
-                  <a
-                    key={a.id}
-                    href={a.file_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-700 text-primary-700 dark:text-primary-300 hover:underline max-w-full break-all inline-block"
-                  >
-                    {a.original_name}
-                  </a>
-                ))}
-              </div>
+              <CommunityAttachmentLinks attachments={answer.attachments} />
             )}
             {(answer.comments || []).length > 0 && (
               <div className="space-y-1.5 rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/30 p-2">
                 {(answer.comments || []).map((comment) => (
                   <div
                     key={`a-comment-${answer.id}-${comment.id}`}
-                    className="text-xs text-gray-700 dark:text-gray-300 break-words"
+                    className="text-xs text-gray-700 dark:text-gray-300 break-words space-y-1"
                   >
-                    <span className="font-medium">{comment.author_name || 'User'}:</span> {renderTextWithMentions(comment.body)}
+                    <div>
+                      <span className="font-medium">{comment.author_name || 'User'}:</span>{' '}
+                      {renderTextWithMentions(comment.body)}
+                    </div>
+                    {(comment.attachments || []).length > 0 && (
+                      <CommunityAttachmentLinks attachments={comment.attachments} />
+                    )}
                   </div>
                 ))}
               </div>
@@ -1251,12 +1277,13 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
           placeholder="Write your answer"
           className="w-full min-w-0 max-w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
         />
-        <input
-          type="file"
-          multiple
-          onChange={(e) => setAnswerFiles(Array.from(e.target.files || []))}
-          className="w-full text-xs text-gray-600 dark:text-gray-300"
-        />
+              <input
+                type="file"
+                multiple
+                accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.md,.json,.log,image/*,application/pdf,text/*"
+                onChange={(e) => setAnswerFiles(Array.from(e.target.files || []))}
+                className="w-full text-xs text-gray-600 dark:text-gray-300"
+              />
         {answerFiles.length > 0 && (
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {answerFiles.length} attachment(s) selected
@@ -1475,6 +1502,7 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
               <input
                 type="file"
                 multiple
+                accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.md,.json,.log,image/*,application/pdf,text/*"
                 onChange={(e) => setQuestionFiles(Array.from(e.target.files || []))}
                 className="w-full text-xs text-gray-600 dark:text-gray-300"
               />
@@ -1511,6 +1539,9 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
                       <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{question.title}</h3>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {question.answer_count ?? 0} answers · {question.views ?? 0} views · score {question.score ?? 0}
+                        {(question.attachments || []).length > 0
+                          ? ` · ${question.attachments.length} attachment${question.attachments.length === 1 ? '' : 's'}`
+                          : ''}
                       </p>
                       {(question.tags || []).length > 0 && (
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
