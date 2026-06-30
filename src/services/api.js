@@ -889,6 +889,35 @@ export const api = {
       }
       return data.authorize_url;
     },
+    slackDisconnect: async (teamId) => {
+      if (!teamId) {
+        throw new Error('team_id is required to disconnect Slack');
+      }
+      return apiFetch('/api/integrations/slack/disconnect/', {
+        method: 'POST',
+        body: JSON.stringify({ team_id: teamId }),
+      });
+    },
+    teamsStatus: async (teamId) => {
+      const q = teamId ? `?team_id=${encodeURIComponent(teamId)}` : '';
+      return apiFetch(`/api/integrations/teams/status/${q}`);
+    },
+    /** Generates a short-lived linking code (no OAuth redirect for Teams — see Settings UI). */
+    teamsLinkStart: async (teamId) => {
+      if (!teamId) {
+        throw new Error('team_id is required to connect Microsoft Teams');
+      }
+      return apiFetch(`/api/integrations/teams/link/start/?team_id=${encodeURIComponent(teamId)}`);
+    },
+    teamsDisconnect: async (teamId) => {
+      if (!teamId) {
+        throw new Error('team_id is required to disconnect Microsoft Teams');
+      }
+      return apiFetch('/api/integrations/teams/disconnect/', {
+        method: 'POST',
+        body: JSON.stringify({ team_id: teamId }),
+      });
+    },
   },
 
   // In-app notifications (header bell)
