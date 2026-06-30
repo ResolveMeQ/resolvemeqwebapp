@@ -11,8 +11,6 @@ import {
   Plus,
   Sparkles,
   MessageSquare,
-  Users,
-  RefreshCw,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -118,11 +116,6 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   const [slackStatusLoading, setSlackStatusLoading] = useState(false);
   const [slackConnecting, setSlackConnecting] = useState(false);
   const [slackDisconnecting, setSlackDisconnecting] = useState(false);
-  const [teamsStatus, setTeamsStatus] = useState(null);
-  const [teamsStatusLoading, setTeamsStatusLoading] = useState(false);
-  const [teamsLinking, setTeamsLinking] = useState(false);
-  const [teamsDisconnecting, setTeamsDisconnecting] = useState(false);
-  const [teamsLinkCode, setTeamsLinkCode] = useState(null);
 
   useEffect(() => {
     if (!theme) return;
@@ -152,25 +145,6 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
       setSlackStatus({ connected: false, error: true });
     } finally {
       setSlackStatusLoading(false);
-    }
-  }, [preferences?.active_team]);
-
-  const loadTeamsStatus = useCallback(async () => {
-    const teamId = preferences?.active_team;
-    if (!teamId) {
-      setTeamsStatus(null);
-      return;
-    }
-    try {
-      setTeamsStatusLoading(true);
-      const s = await api.integrations.teamsStatus(teamId);
-      setTeamsStatus(s);
-      if (s?.connected) setTeamsLinkCode(null);
-    } catch (e) {
-      console.error('Teams status:', e);
-      setTeamsStatus({ connected: false, error: true });
-    } finally {
-      setTeamsStatusLoading(false);
     }
   }, [preferences?.active_team]);
 
@@ -224,8 +198,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   useEffect(() => {
     if (activeTab !== 'integrations' || !preferences?.active_team) return;
     loadSlackStatus();
-    loadTeamsStatus();
-  }, [activeTab, preferences?.active_team, loadSlackStatus, loadTeamsStatus]);
+  }, [activeTab, preferences?.active_team, loadSlackStatus]);
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon },
@@ -309,39 +282,6 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     } catch (e) {
       showToast(e?.message || 'Could not start Slack connection.', 'error');
       setSlackConnecting(false);
-    }
-  };
-
-  const handleGenerateTeamsLinkCode = async () => {
-    const teamId = preferences?.active_team;
-    if (!teamId) {
-      showToast('Choose an active workspace in the sidebar, then try again.', 'error');
-      return;
-    }
-    try {
-      setTeamsLinking(true);
-      const data = await api.integrations.teamsLinkStart(teamId);
-      setTeamsLinkCode(data);
-    } catch (e) {
-      showToast(e?.message || 'Could not generate a Teams linking code.', 'error');
-    } finally {
-      setTeamsLinking(false);
-    }
-  };
-
-  const handleDisconnectTeams = async () => {
-    const teamId = preferences?.active_team;
-    if (!teamId) return;
-    try {
-      setTeamsDisconnecting(true);
-      await api.integrations.teamsDisconnect(teamId);
-      showToast('Microsoft Teams disconnected for this workspace.');
-      setTeamsLinkCode(null);
-      await loadTeamsStatus();
-    } catch (e) {
-      showToast(e?.message || 'Could not disconnect Microsoft Teams.', 'error');
-    } finally {
-      setTeamsDisconnecting(false);
     }
   };
 
@@ -728,126 +668,10 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
           </div>
         </Card>
 
-        <Card>
-          <div className="p-6 space-y-4">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div
-                  className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: '#5059C9' }}
-                >
-                  <Users className="w-5 h-5 text-white" aria-hidden />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Microsoft Teams</h4>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 max-w-md">
-                    Add the ResolveMeQ bot to a Teams team, then link it here with a short-lived code so your team can
-                    open tickets and get updates without leaving Teams.
-                  </p>
-                  {teamsStatusLoading && (
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">Checking connection…</p>
-                  )}
-                  {!teamsStatusLoading && teamsStatus?.error && (
-                    <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-                      Could not load Teams status. Try refreshing.
-                    </p>
-                  )}
-                  {teamsStatus?.connected && teamsStatus?.tenant_id && (
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-2 font-mono">
-                      Tenant {teamsStatus.tenant_id}
-                    </p>
-                  )}
-                  {teamsStatus?.connected && teamsStatus?.updated_at && (
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                      Last linked {new Date(teamsStatus.updated_at).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                {teamsStatusLoading ? (
-                  <Badge variant="warning">Checking…</Badge>
-                ) : teamsStatus?.connected ? (
-                  <Badge variant="success">Connected</Badge>
-                ) : (
-                  <Badge variant="warning">Not connected</Badge>
-                )}
-                <div className="flex flex-wrap gap-2 justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    type="button"
-                    disabled={!preferences?.active_team || teamsStatusLoading}
-                    onClick={loadTeamsStatus}
-                  >
-                    <RefreshCw size={14} className="mr-1" />
-                    Refresh status
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    type="button"
-                    disabled={!preferences?.active_team || teamsLinking || teamsDisconnecting}
-                    loading={teamsLinking}
-                    onClick={handleGenerateTeamsLinkCode}
-                  >
-                    {teamsStatus?.connected ? 'Generate new code' : 'Connect Microsoft Teams'}
-                  </Button>
-                  {teamsStatus?.connected && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      type="button"
-                      disabled={!preferences?.active_team || teamsLinking || teamsDisconnecting}
-                      loading={teamsDisconnecting}
-                      onClick={handleDisconnectTeams}
-                    >
-                      Disconnect
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {teamsLinkCode?.code && (
-              <div className="rounded-lg border border-primary-200 dark:border-primary-900/50 bg-primary-50/80 dark:bg-primary-950/30 p-4 space-y-2">
-                <p className="text-xs font-semibold text-primary-900 dark:text-primary-200 uppercase tracking-wide">
-                  Linking code
-                </p>
-                <p className="text-2xl font-mono font-bold text-primary-900 dark:text-primary-100 tracking-widest">
-                  {teamsLinkCode.code}
-                </p>
-                <p className="text-xs text-primary-800 dark:text-primary-300">
-                  1. Add the ResolveMeQ bot to your Teams team. 2. In that team or channel, message the bot:{' '}
-                  <code className="font-mono text-[11px]">link {teamsLinkCode.code}</code>. 3. Code expires{' '}
-                  {teamsLinkCode.expires_at ? new Date(teamsLinkCode.expires_at).toLocaleTimeString() : 'in 15 minutes'}.
-                </p>
-              </div>
-            )}
-
-            <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/40 p-4 space-y-2">
-              <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 uppercase tracking-wide">
-                Using Microsoft Teams
-              </p>
-              <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1.5 list-disc pl-4">
-                <li>
-                  Message the bot <code className="font-mono text-[11px]">new</code> in a connected team to open a
-                  ticket form.
-                </li>
-                <li>
-                  Message <code className="font-mono text-[11px]">status</code> to list your open tickets for this
-                  workspace.
-                </li>
-                <li>Ticket updates, AI replies, and escalations are sent to users via Teams DM when connected.</li>
-              </ul>
-            </div>
-          </div>
-        </Card>
-
         <Card className="p-6 border-dashed border-gray-300 dark:border-gray-600">
           <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
             <Plus size={16} className="shrink-0 opacity-70" />
-            <span>Discord, and more — planned next.</span>
+            <span>Microsoft Teams, Discord, and more — planned next.</span>
           </div>
         </Card>
       </div>
