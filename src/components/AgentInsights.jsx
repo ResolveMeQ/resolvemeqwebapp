@@ -314,7 +314,8 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket })
           <AlertCircle className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
           <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No AI Analysis Yet</h4>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Click "Analyze Now" to get AI-powered insights and recommendations for this ticket.
+            Open <strong>AI Chat</strong> to work through this with the assistant, or click
+            &quot;Analyze Now&quot; for a one-shot analysis on this page.
           </p>
         </Card>
       )}
