@@ -7,10 +7,12 @@ import GlobalSearchPanel from '../GlobalSearchPanel';
 import AppTour from '../AppTour';
 import AgentQuotaBanner from '../AgentQuotaBanner';
 import { cn } from '../../utils/cn';
+import { userCanAccessEscalationQueue } from '../../services/api';
 
 const PATH_TO_PAGE_ID = {
   '/': 'dashboard',
   '/tickets': 'tickets',
+  '/escalation-queue': 'escalation-queue',
   '/analytics': 'analytics',
   '/teams': 'teams',
   '/users': 'users',
@@ -87,6 +89,7 @@ const Layout = ({
         onNavigate={onNavigate}
         theme={theme}
         onThemeChange={onThemeChange}
+        canAccessEscalationQueue={userCanAccessEscalationQueue(user)}
         className="fixed left-0 top-0 h-full z-40"
         activeTeamId={activeTeamId}
         activeTeamName={activeTeamName}

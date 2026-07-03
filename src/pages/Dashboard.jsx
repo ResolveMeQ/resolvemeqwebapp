@@ -18,7 +18,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import AIRecommendationsPanel from '../components/AIRecommendationsPanel';
-import { api } from '../services/api';
+import { api, TokenService, userCanAccessEscalationQueue } from '../services/api';
 import { DashboardPageSkeleton } from '../components/ui/Skeleton';
 
 /**
@@ -26,6 +26,7 @@ import { DashboardPageSkeleton } from '../components/ui/Skeleton';
  */
 const Dashboard = ({ activeTeamId }) => {
   const navigate = useNavigate();
+  const showEscalationQueue = userCanAccessEscalationQueue(TokenService.getUser());
   const [analytics, setAnalytics] = useState(null);
   const [recentTickets, setRecentTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +40,7 @@ const Dashboard = ({ activeTeamId }) => {
   }, [activeTeamId]);
 
   const loadEscalationQueue = async () => {
+    if (!showEscalationQueue) return;
     setEscalatedLoading(true);
     try {
       const data = await api.tickets.getEscalationQueue({ limit: 10 });
@@ -56,7 +58,9 @@ const Dashboard = ({ activeTeamId }) => {
       const [analyticsData, ticketsData, escData] = await Promise.all([
         api.analytics.getTicketAnalytics(),
         api.tickets.list({ limit: 5 }),
-        api.tickets.getEscalationQueue({ limit: 10 }).catch(() => ({ tickets: [] })),
+        showEscalationQueue
+          ? api.tickets.getEscalationQueue({ limit: 10 }).catch(() => ({ tickets: [] }))
+          : Promise.resolve({ tickets: [] }),
       ]);
       
       setAnalytics(analyticsData);
@@ -313,6 +317,7 @@ const Dashboard = ({ activeTeamId }) => {
                 </div>
               )}
             </div>
+            {showEscalationQueue && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Escalated tickets</p>
@@ -329,6 +334,7 @@ const Dashboard = ({ activeTeamId }) => {
                 Refresh queue
               </Button>
             </div>
+            )}
           </div>
         </div>
       </section>
@@ -427,7 +433,7 @@ const Dashboard = ({ activeTeamId }) => {
       <AIRecommendationsPanel />
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-        <Card className="p-6 xl:col-span-3 rounded-xl">
+        <Card className={`p-6 rounded-xl ${showEscalationQueue ? 'xl:col-span-3' : 'xl:col-span-5'}`}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-semibold text-gray-900 dark:text-white">Recent Tickets</h2>
             <Button variant="ghost" size="sm" onClick={() => navigate('/tickets')}>
@@ -467,6 +473,7 @@ const Dashboard = ({ activeTeamId }) => {
           )}
         </Card>
 
+        {showEscalationQueue && (
         <Card className="p-6 xl:col-span-2 rounded-xl border-l-4 border-l-amber-500 dark:border-l-amber-600">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -481,7 +488,7 @@ const Dashboard = ({ activeTeamId }) => {
             </Button>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            Tickets created by you or assigned to you that require urgent follow-up.
+            Escalated tickets across your teams, sorted by priority.
           </p>
           {escalatedLoading && escalatedTickets.length === 0 ? (
             <div className="space-y-3 py-2">
@@ -517,6 +524,7 @@ const Dashboard = ({ activeTeamId }) => {
             </div>
           )}
         </Card>
+        )}
       </div>
 
       {/* Floating action: go to Tickets to create new ticket */}

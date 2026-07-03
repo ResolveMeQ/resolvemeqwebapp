@@ -20,7 +20,7 @@ import ResetPassword from './pages/auth/ResetPassword';
 import Verify from './pages/auth/Verify';
 import './index.css';
 import { THEME_MODES } from './constants';
-import { TokenService, api } from './services/api';
+import { TokenService, api, userCanAccessEscalationQueue } from './services/api';
 
 function safeNextPath(next) {
   const raw = String(next || '').trim();
@@ -36,6 +36,13 @@ function AuthGate({ isAuthenticated, children }) {
   if (isAuthenticated) return children;
   const next = `${location.pathname}${location.search || ''}`;
   return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />;
+}
+
+function EscalationQueueGate({ user, children }) {
+  if (!userCanAccessEscalationQueue(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
 }
 
 function App() {
@@ -325,7 +332,9 @@ function App() {
         path="/escalation-queue"
         element={
           <AuthGate isAuthenticated={isAuthenticated}>
-            <Layout {...layoutProps}><EscalationQueue /></Layout>
+            <EscalationQueueGate user={user}>
+              <Layout {...layoutProps}><EscalationQueue /></Layout>
+            </EscalationQueueGate>
           </AuthGate>
         }
       />

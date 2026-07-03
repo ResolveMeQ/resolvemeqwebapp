@@ -23,7 +23,15 @@ export function normalizeSessionUser(raw) {
     id,
     email: email || undefined,
     full_name: fullName || undefined,
+    is_platform_agent: Boolean(raw.is_platform_agent),
+    can_access_escalation_queue: Boolean(raw.can_access_escalation_queue),
   };
+}
+
+/** Platform support staff or team owners may use the escalation queue. */
+export function userCanAccessEscalationQueue(user) {
+  if (!user) return false;
+  return Boolean(user.can_access_escalation_queue);
 }
 
 function buildQueryString(params = {}) {

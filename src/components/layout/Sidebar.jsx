@@ -46,6 +46,7 @@ const Sidebar = ({
   activeTeamName,
   userTeams = [],
   onActiveTeamChange,
+  canAccessEscalationQueue = false,
 }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
@@ -103,7 +104,10 @@ const Sidebar = ({
   const navigationGroups = [
     {
       label: 'Operations',
-      items: NAVIGATION_ITEMS.filter(item => ['dashboard', 'tickets', 'escalation-queue'].includes(item.id))
+      items: NAVIGATION_ITEMS.filter((item) => {
+        if (item.id === 'escalation-queue') return canAccessEscalationQueue;
+        return ['dashboard', 'tickets', 'escalation-queue'].includes(item.id);
+      }),
     },
     {
       label: 'Intelligence',

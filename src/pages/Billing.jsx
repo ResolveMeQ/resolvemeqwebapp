@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Check,
@@ -25,6 +25,7 @@ import { api, isBillingRecoverableError } from '../services/api';
 import { BillingPageSkeleton } from '../components/ui/Skeleton';
 
 const Billing = ({ onRefreshUserData }) => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -735,15 +736,27 @@ const Billing = ({ onRefreshUserData }) => {
                   }
                   setSupportSubmitting(true);
                   try {
-                    await api.billing.submitSupportContact({
+                    const res = await api.billing.submitSupportContact({
                       message: msg,
                       subject: supportSubject.trim(),
                       page_context: 'billing',
                     });
-                    showToast('Message sent. Our team will get back to you soon.', 'success');
-                    setSupportOpen(false);
-                    setSupportSubject('');
-                    setSupportMessage('');
+                    const ticketId = res?.ticket_id;
+                    if (ticketId) {
+                      showToast(
+                        res?.message || `Ticket #${ticketId} opened. We will reply in Tickets and by email.`,
+                        'success',
+                      );
+                      setSupportOpen(false);
+                      setSupportSubject('');
+                      setSupportMessage('');
+                      navigate('/tickets', { state: { openTicketId: ticketId } });
+                    } else {
+                      showToast(res?.message || 'Message sent. Our team will get back to you soon.', 'success');
+                      setSupportOpen(false);
+                      setSupportSubject('');
+                      setSupportMessage('');
+                    }
                   } catch (err) {
                     const m = err?.message || 'Could not send message. Try again later.';
                     setSupportFormError(m);
