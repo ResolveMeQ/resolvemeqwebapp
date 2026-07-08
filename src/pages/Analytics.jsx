@@ -134,66 +134,74 @@ const Analytics = ({ activeTeamId }) => {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <div className="p-6">
-                <MessageSquare className="w-5 h-5 text-gray-400 dark:text-gray-500 mb-3" />
-                <div className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {totalTickets.toLocaleString()}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
+              <Card>
+                <div className="p-6">
+                  <MessageSquare className="w-5 h-5 text-gray-400 dark:text-gray-500 mb-3" />
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-white">
+                    {totalTickets.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Total Tickets
+                  </div>
+                  <div className="flex items-center text-xs text-gray-500 dark:text-gray-500 mt-2">
+                    <Activity className="w-3.5 h-3.5 mr-1" />
+                    {analytics.open_tickets} open · {analytics.closed_tickets} closed
+                  </div>
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Total Tickets
-                </div>
-                <div className="flex items-center text-xs text-gray-500 dark:text-gray-500 mt-2">
-                  <Activity className="w-3.5 h-3.5 mr-1" />
-                  {analytics.open_tickets} open · {analytics.closed_tickets} closed
-                </div>
-              </div>
-            </Card>
+              </Card>
+            </motion.div>
 
-            <Card>
-              <div className="p-6">
-                <CheckCircle className="w-5 h-5 text-gray-400 dark:text-gray-500 mb-3" />
-                <div className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {resolutionRate}%
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
+              <Card>
+                <div className="p-6">
+                  <CheckCircle className="w-5 h-5 text-gray-400 dark:text-gray-500 mb-3" />
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-white">
+                    {resolutionRate}%
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Resolution Rate
+                  </div>
+                  <div className="flex items-center text-xs text-gray-500 dark:text-gray-500 mt-2">
+                    {analytics.closed_tickets} resolved
+                  </div>
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Resolution Rate
-                </div>
-                <div className="flex items-center text-xs text-gray-500 dark:text-gray-500 mt-2">
-                  {analytics.closed_tickets} resolved
-                </div>
-              </div>
-            </Card>
+              </Card>
+            </motion.div>
 
-            <Card>
-              <div className="p-6">
-                <Clock className="w-5 h-5 text-gray-400 dark:text-gray-500 mb-3" />
-                <div className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {formatResolutionTime(analytics.avg_resolution_time_seconds)}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
+              <Card>
+                <div className="p-6">
+                  <Clock className="w-5 h-5 text-gray-400 dark:text-gray-500 mb-3" />
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-white">
+                    {formatResolutionTime(analytics.avg_resolution_time_seconds)}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Resolution Time
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                    Average duration
+                  </div>
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Resolution Time
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                  Average duration
-                </div>
-              </div>
-            </Card>
+              </Card>
+            </motion.div>
 
-            <Card>
-              <div className="p-6">
-                <Star className="w-5 h-5 text-gray-400 dark:text-gray-500 mb-3" />
-                <div className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {satisfactionScore != null ? `${satisfactionScore}/5` : 'N/A'}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.15 }}>
+              <Card>
+                <div className="p-6">
+                  <Star className="w-5 h-5 text-gray-400 dark:text-gray-500 mb-3" />
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-white">
+                    {satisfactionScore != null ? `${satisfactionScore}/5` : 'N/A'}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Satisfaction
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                    {satisfactionScore != null ? 'From feedback' : 'No data yet'}
+                  </div>
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Satisfaction
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                  {satisfactionScore != null ? 'From feedback' : 'No data yet'}
-                </div>
-              </div>
-            </Card>
+              </Card>
+            </motion.div>
           </div>
 
           <ResolutionAnalytics />

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
   Ticket,
   FolderOpen,
@@ -37,6 +38,13 @@ const Dashboard = ({ activeTeamId }) => {
   useEffect(() => {
     loadDashboardData();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when workspace (active team) changes
+  }, [activeTeamId]);
+
+  // Live-ish refresh so a newly escalated ticket or a claim shows up without a manual reload.
+  useEffect(() => {
+    const interval = setInterval(() => loadDashboardData(true), 15000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadDashboardData closes over activeTeamId-derived state via showEscalationQueue, stable per mount
   }, [activeTeamId]);
 
   const loadEscalationQueue = async () => {
@@ -349,61 +357,69 @@ const Dashboard = ({ activeTeamId }) => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-5 rounded-xl">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Total Tickets</p>
-              <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                {totalTickets}
-              </p>
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
+          <Card className="p-5 rounded-xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Total Tickets</p>
+                <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
+                  {totalTickets}
+                </p>
+              </div>
+              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                <Ticket className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
             </div>
-            <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-              <Ticket className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </motion.div>
 
-        <Card className="p-5 rounded-xl">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Open</p>
-              <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                {analytics?.open_tickets ?? 0}
-              </p>
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
+          <Card className="p-5 rounded-xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Open</p>
+                <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
+                  {analytics?.open_tickets ?? 0}
+                </p>
+              </div>
+              <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20">
+                <FolderOpen className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
             </div>
-            <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20">
-              <FolderOpen className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </motion.div>
 
-        <Card className="p-5 rounded-xl">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Resolved</p>
-              <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                {analytics?.closed_tickets ?? 0}
-              </p>
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
+          <Card className="p-5 rounded-xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Resolved</p>
+                <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
+                  {analytics?.closed_tickets ?? 0}
+                </p>
+              </div>
+              <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
+                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
             </div>
-            <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
-              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </motion.div>
 
-        <Card className="p-5 rounded-xl">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg. Resolution</p>
-              <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                {formatTime(analytics?.avg_resolution_time_seconds)}
-              </p>
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.15 }}>
+          <Card className="p-5 rounded-xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg. Resolution</p>
+                <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
+                  {formatTime(analytics?.avg_resolution_time_seconds)}
+                </p>
+              </div>
+              <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800">
+                <Clock className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              </div>
             </div>
-            <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800">
-              <Clock className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </motion.div>
       </div>
 
       <Card className="p-5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">

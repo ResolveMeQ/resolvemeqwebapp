@@ -54,21 +54,30 @@ const EscalationQueue = () => {
     setTimeout(() => setToast((t) => (t && t.id === id ? null : t)), 4000);
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    if (!silent) setError(null);
     try {
       const data = await api.tickets.getEscalationQueue();
       setTickets(data?.tickets || []);
     } catch (e) {
-      setError(e?.message || 'Could not load the escalation queue.');
+      // Silent polls are best-effort -- a missed tick just means the next one picks it up;
+      // don't flash an error banner over a queue the user isn't actively looking at.
+      if (!silent) setError(e?.message || 'Could not load the escalation queue.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  // Live-ish updates: someone claiming a ticket, or a new escalation landing, should show up
+  // without the user having to remember to hit Refresh.
+  useEffect(() => {
+    const interval = setInterval(() => load({ silent: true }), 15000);
+    return () => clearInterval(interval);
   }, [load]);
 
   const handleClaim = async (ticket) => {
@@ -100,7 +109,7 @@ const EscalationQueue = () => {
             Escalated tickets across your team, sorted by priority then how long they've waited.
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={load} loading={loading}>
+        <Button variant="ghost" size="sm" onClick={() => load()} loading={loading}>
           <RefreshCw className="w-4 h-4 mr-1.5" />
           Refresh
         </Button>
