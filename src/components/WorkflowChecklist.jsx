@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
-import { CheckCircle, Circle, Clock } from 'lucide-react';
+import { CheckCircle, Circle, Clock, AlertTriangle } from 'lucide-react';
 import Button from './ui/Button';
+import Badge from './ui/Badge';
 import { api } from '../services/api';
+
+const formatDue = (iso) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
 
 /**
  * Ordered step checklist for a Workflow -- reused on the ticket detail page and the
@@ -96,6 +104,19 @@ const WorkflowChecklist = ({ workflow, onUpdate }) => {
                 )}
                 {step.assignee_team && (
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{step.assignee_team}</p>
+                )}
+                {step.due_at && !isDone && (
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Due {formatDue(step.due_at)}
+                    </p>
+                    {step.is_overdue && (
+                      <Badge variant="error" className="text-[10px] px-1.5 py-0 gap-0.5">
+                        <AlertTriangle className="w-3 h-3" />
+                        Overdue
+                      </Badge>
+                    )}
+                  </div>
                 )}
                 {isDone && (
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">

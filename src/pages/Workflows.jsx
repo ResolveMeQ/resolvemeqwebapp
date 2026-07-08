@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ListChecks, Plus, X } from 'lucide-react';
+import { ListChecks, Plus, X, AlertTriangle } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -20,6 +20,7 @@ const Workflows = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [showOverdueOnly, setShowOverdueOnly] = useState(false);
   const [showStartModal, setShowStartModal] = useState(false);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
@@ -34,14 +35,14 @@ const Workflows = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.workflows.list();
+      const data = await api.workflows.list({ overdue: showOverdueOnly || undefined });
       setWorkflows(data?.workflows || []);
     } catch (e) {
       setError(e?.message || 'Could not load workflows.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showOverdueOnly]);
 
   useEffect(() => {
     load();
@@ -129,6 +130,17 @@ const Workflows = () => {
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <Button
+          variant={showOverdueOnly ? 'primary' : 'outline'}
+          size="sm"
+          onClick={() => setShowOverdueOnly((v) => !v)}
+        >
+          <AlertTriangle className="w-3.5 h-3.5 mr-1.5" />
+          {showOverdueOnly ? 'Showing overdue' : 'Overdue only'}
+        </Button>
+      </div>
+
       {error && (
         <Card className="p-4 mb-4 border-red-200 dark:border-red-900/50 text-sm text-red-700 dark:text-red-400">
           {error}
@@ -160,6 +172,12 @@ const Workflows = () => {
                       <Badge variant={STATUS_BADGE[wf.status] || 'secondary'}>
                         {wf.status.replace('_', ' ').toUpperCase()}
                       </Badge>
+                      {wf.has_overdue && (
+                        <Badge variant="error" className="gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          Overdue
+                        </Badge>
+                      )}
                       <div className="flex-1 min-w-[160px]">
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
                           {wf.template_name || 'Workflow'}

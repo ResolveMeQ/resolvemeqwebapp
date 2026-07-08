@@ -154,6 +154,7 @@ const AIChatPanel = ({
   const [conversationId, setConversationId] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [analysisPending, setAnalysisPending] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [typingElapsed, setTypingElapsed] = useState(0);
@@ -444,13 +445,26 @@ const AIChatPanel = ({
         if (!injected) {
           // Poll for agent_response when process may still be running (e.g. from Describe flow)
           const pollMs = 2000;
-          const pollMax = 15000;
+          let pollMax = 15000;
+          let ticketData = ticket;
+          try {
+            if (!ticketData?.agent_processed) {
+              ticketData = await api.tickets.get(ticketId);
+            }
+          } catch (_) {
+            ticketData = null;
+          }
+          const waitingForAnalysis = Boolean(ticketData && !ticketData.agent_processed);
+          if (waitingForAnalysis) {
+            pollMax = 60000;
+            setAnalysisPending(true);
+          }
           let elapsed = 0;
           while (elapsed < pollMax) {
             await new Promise((r) => setTimeout(r, pollMs));
             elapsed += pollMs;
             try {
-              const ticketData = await api.tickets.get(ticketId);
+              const freshTicket = await api.tickets.get(ticketId);
               let rated = initialRated;
               try {
                 const gh = await api.agent.getChatHistory(ticketId);
@@ -459,7 +473,7 @@ const AIChatPanel = ({
                   gh.conversation?.initial_solution_was_helpful ??
                   rated;
               } catch (_) {}
-              const built = buildMessagesFromAgentResponse(ticketData, rated);
+              const built = buildMessagesFromAgentResponse(freshTicket, rated);
               if (built?.length) {
                 setMessages(built);
                 injected = true;
@@ -467,6 +481,7 @@ const AIChatPanel = ({
               }
             } catch (_) {}
           }
+          setAnalysisPending(false);
         }
         if (!injected) startNewConversation();
       }
@@ -1006,6 +1021,17 @@ const AIChatPanel = ({
             </div>
             <div className="animate-spin rounded-full h-7 w-7 border-2 border-primary-600 border-t-transparent" aria-hidden />
           </div>
+        ) : analysisPending ? (
+          <div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center" role="status" aria-live="polite">
+            <IllustrationChatLoading className="max-w-[200px]" />
+            <div>
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Analyzing your ticket</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                The AI is reviewing your issue first — your chat will appear as soon as the analysis is ready.
+              </p>
+            </div>
+            <div className="animate-spin rounded-full h-7 w-7 border-2 border-primary-600 border-t-transparent" aria-hidden />
+          </div>
         ) : (
           <>
             {messages.map((msg, idx) => (
@@ -1542,7 +1568,7 @@ const AIChatPanel = ({
           <Button
             type="button"
             onClick={() => screenshotInputRef.current?.click()}
-            disabled={isTyping || isLoading || uploadingScreenshot || !ticketId}
+            disabled={isTyping || isLoading || analysisPending || uploadingScreenshot || !ticketId}
             variant="secondary"
             size="md"
             className="px-3 shrink-0 min-h-[44px]"
@@ -1551,7 +1577,7 @@ const AIChatPanel = ({
           >
             <ImagePlus className={`w-4 h-4 ${uploadingScreenshot ? 'opacity-50' : ''}`} />
           </Button>
-          <AIChatComposer onSend={sendMessage} isTyping={isTyping} isLoading={isLoading} />
+          <AIChatComposer onSend={sendMessage} isTyping={isTyping} isLoading={isLoading || analysisPending} />
         </div>
       </div>
     </motion.div>,

@@ -29,6 +29,7 @@ const Dashboard = ({ activeTeamId }) => {
   const navigate = useNavigate();
   const showEscalationQueue = userCanAccessEscalationQueue(TokenService.getUser());
   const [analytics, setAnalytics] = useState(null);
+  const [outcomeMetrics, setOutcomeMetrics] = useState(null);
   const [recentTickets, setRecentTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -63,15 +64,17 @@ const Dashboard = ({ activeTeamId }) => {
   const loadDashboardData = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [analyticsData, ticketsData, escData] = await Promise.all([
+      const [analyticsData, ticketsData, escData, outcomeData] = await Promise.all([
         api.analytics.getTicketAnalytics(),
         api.tickets.list({ limit: 5 }),
         showEscalationQueue
           ? api.tickets.getEscalationQueue({ limit: 10 }).catch(() => ({ tickets: [] }))
           : Promise.resolve({ tickets: [] }),
+        api.analytics.getOutcomeMetrics().catch(() => null),
       ]);
       
       setAnalytics(analyticsData);
+      setOutcomeMetrics(outcomeData);
       setRecentTickets(Array.isArray(ticketsData) ? ticketsData.slice(0, 5) : []);
       setEscalatedTickets(Array.isArray(escData?.tickets) ? escData.tickets : []);
       setError(null);
@@ -179,6 +182,11 @@ const Dashboard = ({ activeTeamId }) => {
   const resolvedRate = totalTickets > 0
     ? Math.round(((analytics?.closed_tickets ?? 0) / totalTickets) * 100)
     : 0;
+
+  const deflectionRate =
+    outcomeMetrics?.deflection_rate_percent != null
+      ? Math.round(outcomeMetrics.deflection_rate_percent)
+      : null;
 
   const highestTicketVolume = Math.max(...ticketVolumeSeries.map((item) => item.value), 1);
   const hasTicketVolume = ticketVolumeSeries.some((item) => item.value > 0);
@@ -292,6 +300,33 @@ const Dashboard = ({ activeTeamId }) => {
                 <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg. Time to Resolve</p>
                 <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
                   {formatTime(analytics?.avg_resolution_time_seconds)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-xl border border-primary-200/60 dark:border-primary-900/40 bg-primary-50/50 dark:bg-primary-950/20 p-3">
+                <p className="text-xs uppercase tracking-wide text-primary-700 dark:text-primary-300">AI deflection</p>
+                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
+                  {deflectionRate != null ? `${deflectionRate}%` : '—'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/50 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">AI processed</p>
+                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
+                  {outcomeMetrics?.agent_processed_count ?? '—'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/50 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Escalated</p>
+                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
+                  {outcomeMetrics?.escalated_count ?? '—'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/50 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Workflows done</p>
+                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
+                  {outcomeMetrics?.workflows_completed_count ?? '—'}
                 </p>
               </div>
             </div>

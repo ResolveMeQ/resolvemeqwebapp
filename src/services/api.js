@@ -481,9 +481,12 @@ export const api = {
 
   // Workflows endpoints
   workflows: {
-    /** GET /api/workflows/, optionally filtered to one ticket. */
-    list: async ({ ticket } = {}) => {
-      const qs = ticket ? `?ticket=${encodeURIComponent(ticket)}` : '';
+    /** GET /api/workflows/, optionally filtered to one ticket or overdue steps. */
+    list: async ({ ticket, overdue } = {}) => {
+      const params = new URLSearchParams();
+      if (ticket) params.set('ticket', ticket);
+      if (overdue) params.set('overdue', '1');
+      const qs = params.toString() ? `?${params.toString()}` : '';
       return apiFetch(`/api/workflows/${qs}`);
     },
 
@@ -518,6 +521,11 @@ export const api = {
     /** GET /api/tickets/resolution-analytics/ */
     getResolutionAnalytics: async () => {
       return apiFetch('/api/tickets/resolution-analytics/');
+    },
+
+    /** GET /api/tickets/outcome-metrics/ — deflection, escalated, workflow counts */
+    getOutcomeMetrics: async () => {
+      return apiFetch('/api/tickets/outcome-metrics/');
     },
 
     getDashboard: async () => {
