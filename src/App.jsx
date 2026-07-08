@@ -5,6 +5,7 @@ import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import Tickets from './pages/Tickets';
 import TicketRoute from './pages/TicketRoute';
+import Workflows from './pages/Workflows';
 import EscalationQueue from './pages/EscalationQueue';
 import Analytics from './pages/Analytics';
 import Teams from './pages/Teams';
@@ -331,6 +332,14 @@ function App() {
         element={
           <AuthGate isAuthenticated={isAuthenticated}>
             <Layout {...layoutProps}><TicketRoute /></Layout>
+          </AuthGate>
+        }
+      />
+      <Route
+        path="/workflows"
+        element={
+          <AuthGate isAuthenticated={isAuthenticated}>
+            <Layout {...layoutProps}><Workflows /></Layout>
           </AuthGate>
         }
       />

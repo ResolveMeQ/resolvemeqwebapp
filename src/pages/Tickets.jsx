@@ -14,6 +14,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import AgentInsights from '../components/AgentInsights';
+import WorkflowChecklist from '../components/WorkflowChecklist';
 import ActionHistory from '../components/ActionHistory';
 import ResolutionFeedback from '../components/ResolutionFeedback';
 import AIChatPanel from '../components/AIChatPanel';
@@ -74,6 +75,7 @@ const Tickets = ({ activeTeamId }) => {
   const [communityLoading, setCommunityLoading] = useState(false);
   const [detailTicket, setDetailTicket] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [ticketWorkflow, setTicketWorkflow] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [commentText, setCommentText] = useState('');
   const [editTicket, setEditTicket] = useState(null);
@@ -221,6 +223,7 @@ const Tickets = ({ activeTeamId }) => {
     if (ticket) {
       setDetailTicket(ticket);
       loadTicketDetail(want);
+      loadTicketWorkflow(want);
       if (focusComments) {
         pendingScrollToCommentsRef.current = want;
       }
@@ -280,10 +283,22 @@ const Tickets = ({ activeTeamId }) => {
     }
   };
 
+  const loadTicketWorkflow = async (ticketId) => {
+    if (!ticketId) return;
+    setTicketWorkflow(null);
+    try {
+      const data = await api.workflows.list({ ticket: ticketId });
+      setTicketWorkflow(data?.workflows?.[0] || null);
+    } catch {
+      setTicketWorkflow(null);
+    }
+  };
+
   const handleViewDetail = (ticket) => {
     const id = ticket.ticket_id ?? ticket.id;
     setDetailTicket(ticket);
     loadTicketDetail(id);
+    loadTicketWorkflow(id);
   };
 
   const handleUpdateStatus = async (ticketId, newStatus) => {
@@ -1348,6 +1363,15 @@ const Tickets = ({ activeTeamId }) => {
                             onOpenTicket={(id) => loadTicketDetail(id)}
                           />
                         </div>
+
+                        {ticketWorkflow && (
+                          <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
+                            <WorkflowChecklist
+                              workflow={ticketWorkflow}
+                              onUpdate={() => loadTicketWorkflow(detailTicket?.ticket_id ?? detailTicket?.id)}
+                            />
+                          </div>
+                        )}
 
                         {detailTicket?.status === 'escalated' && detailTicket?.claimed_at && (
                           <div className="pt-6 border-t border-gray-200 dark:border-gray-800">

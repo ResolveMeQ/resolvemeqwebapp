@@ -4,6 +4,7 @@ import {
   Home,
   Ticket,
   AlertTriangle,
+  ListChecks,
   BarChart3,
   Users,
   User,
@@ -64,6 +65,7 @@ const Sidebar = ({
     Home,
     Ticket,
     AlertTriangle,
+    ListChecks,
     BarChart3,
     Users,
     User,
@@ -106,7 +108,7 @@ const Sidebar = ({
       label: 'Operations',
       items: NAVIGATION_ITEMS.filter((item) => {
         if (item.id === 'escalation-queue') return canAccessEscalationQueue;
-        return ['dashboard', 'tickets', 'escalation-queue'].includes(item.id);
+        return ['dashboard', 'tickets', 'escalation-queue', 'workflows'].includes(item.id);
       }),
     },
     {

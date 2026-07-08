@@ -12,6 +12,7 @@ const PATH_TO_PAGE_ID = {
   '/': 'dashboard',
   '/tickets': 'tickets',
   '/escalation-queue': 'escalation-queue',
+  '/workflows': 'workflows',
   '/analytics': 'analytics',
   '/teams': 'teams',
   '/users': 'users',

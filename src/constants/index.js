@@ -149,6 +149,12 @@ export const NAVIGATION_ITEMS = [
     icon: 'AlertTriangle',
   },
   {
+    id: 'workflows',
+    label: 'Workflows',
+    href: '/workflows',
+    icon: 'ListChecks',
+  },
+  {
     id: 'analytics',
     label: 'Analytics',
     href: '/analytics',
@@ -340,6 +346,7 @@ export const TICKET_CATEGORY_FALLBACK = [
   { value: 'security', label: 'Security' },
   { value: 'cloud', label: 'Cloud' },
   { value: 'storage', label: 'Storage' },
+  { value: 'provisioning', label: 'Provisioning' },
   { value: 'other', label: 'Other' },
 ];
 

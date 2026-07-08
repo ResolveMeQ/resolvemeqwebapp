@@ -479,6 +479,36 @@ export const api = {
     },
   },
 
+  // Workflows endpoints
+  workflows: {
+    /** GET /api/workflows/, optionally filtered to one ticket. */
+    list: async ({ ticket } = {}) => {
+      const qs = ticket ? `?ticket=${encodeURIComponent(ticket)}` : '';
+      return apiFetch(`/api/workflows/${qs}`);
+    },
+
+    /** GET /api/workflows/templates/ */
+    templates: async () => {
+      return apiFetch('/api/workflows/templates/');
+    },
+
+    /** POST /api/workflows/ -- body: { template_id, ticket_id? } */
+    create: async ({ templateId, ticketId } = {}) => {
+      return apiFetch('/api/workflows/', {
+        method: 'POST',
+        body: JSON.stringify({ template_id: templateId, ticket_id: ticketId }),
+      });
+    },
+
+    claimStep: async (workflowId, stepId) => {
+      return apiFetch(`/api/workflows/${workflowId}/steps/${stepId}/claim/`, { method: 'POST' });
+    },
+
+    completeStep: async (workflowId, stepId) => {
+      return apiFetch(`/api/workflows/${workflowId}/steps/${stepId}/complete/`, { method: 'POST' });
+    },
+  },
+
   // Analytics endpoints
   analytics: {
     getTicketAnalytics: async () => {
