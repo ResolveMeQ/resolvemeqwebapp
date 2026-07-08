@@ -347,6 +347,8 @@ export const TICKET_CATEGORY_FALLBACK = [
   { value: 'cloud', label: 'Cloud' },
   { value: 'storage', label: 'Storage' },
   { value: 'provisioning', label: 'Provisioning' },
+  { value: 'onboarding', label: 'Onboarding' },
+  { value: 'offboarding', label: 'Offboarding' },
   { value: 'other', label: 'Other' },
 ];
 

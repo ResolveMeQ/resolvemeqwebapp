@@ -24,6 +24,9 @@ const Workflows = () => {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [linkTicketId, setLinkTicketId] = useState('');
+  const [ticketQuery, setTicketQuery] = useState('');
+  const [pickerTickets, setPickerTickets] = useState([]);
+  const [showTicketDropdown, setShowTicketDropdown] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState(null);
 
@@ -54,6 +57,35 @@ const Workflows = () => {
     } catch (e) {
       setStartError(e?.message || 'Could not load templates.');
     }
+    try {
+      const tickets = await api.tickets.list({ limit: 100 });
+      setPickerTickets(Array.isArray(tickets) ? tickets : []);
+    } catch {
+      setPickerTickets([]);
+    }
+  };
+
+  const ticketMatches = ticketQuery.trim()
+    ? pickerTickets
+        .filter((t) => {
+          const id = String(t.ticket_id ?? t.id);
+          const q = ticketQuery.trim().toLowerCase();
+          return id === q || id.includes(q) || (t.issue_type || '').toLowerCase().includes(q);
+        })
+        .slice(0, 8)
+    : [];
+
+  const handleTicketQueryChange = (value) => {
+    setTicketQuery(value);
+    setLinkTicketId(''); // typing again means the previous selection (if any) no longer applies
+    setShowTicketDropdown(true);
+  };
+
+  const handlePickTicket = (t) => {
+    const id = t.ticket_id ?? t.id;
+    setLinkTicketId(String(id));
+    setTicketQuery(`#${id} · ${t.issue_type || ''}`);
+    setShowTicketDropdown(false);
   };
 
   const handleStart = async () => {
@@ -61,12 +93,16 @@ const Workflows = () => {
     setStarting(true);
     setStartError(null);
     try {
+      // Prefer an explicit picker selection; otherwise treat the typed text as a raw ticket
+      // number (keeps this usable if the team has more than 100 tickets or the list hasn't loaded).
+      const ticketId = linkTicketId.trim() || ticketQuery.trim();
       await api.workflows.create({
         templateId: selectedTemplateId,
-        ticketId: linkTicketId.trim() || undefined,
+        ticketId: ticketId || undefined,
       });
       setShowStartModal(false);
       setLinkTicketId('');
+      setTicketQuery('');
       load();
     } catch (e) {
       setStartError(e?.message || 'Could not start this workflow.');
@@ -190,13 +226,35 @@ const Workflows = () => {
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
               Link an existing ticket (optional)
             </label>
-            <input
-              type="text"
-              value={linkTicketId}
-              onChange={(e) => setLinkTicketId(e.target.value)}
-              placeholder="Ticket #"
-              className="w-full mb-5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-            />
+            <div className="relative mb-5">
+              <input
+                type="text"
+                value={ticketQuery}
+                onChange={(e) => handleTicketQueryChange(e.target.value)}
+                onFocus={() => setShowTicketDropdown(true)}
+                onBlur={() => setTimeout(() => setShowTicketDropdown(false), 150)}
+                placeholder="Search by ticket # or title…"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+              />
+              {showTicketDropdown && ticketMatches.length > 0 && (
+                <div
+                  role="listbox"
+                  className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg"
+                >
+                  {ticketMatches.map((t) => (
+                    <button
+                      type="button"
+                      key={t.ticket_id ?? t.id}
+                      role="option"
+                      onClick={() => handlePickTicket(t)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    >
+                      #{t.ticket_id ?? t.id} · {t.issue_type || 'Untitled'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setShowStartModal(false)}>
