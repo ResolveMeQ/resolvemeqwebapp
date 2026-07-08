@@ -28,6 +28,7 @@ const Users = ({ activeTeamId }) => {
   const [deleteLoading, setDeleteLoading] = useState(null);
   const [toast, setToast] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
+  const [opsRoleOptions, setOpsRoleOptions] = useState([{ value: '', label: 'General' }]);
   const toastSeq = useRef(0);
   const [isDesktop, setIsDesktop] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
@@ -47,11 +48,20 @@ const Users = ({ activeTeamId }) => {
   }, []);
 
   useEffect(() => {
+    api.workflows.assigneeRoles().then((res) => {
+      if (res?.roles?.length) setOpsRoleOptions(res.roles);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     setSelectedUser(null);
     loadUsers();
     loadMyTeamsAsOwner();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when workspace (active team) changes
   }, [activeTeamId]);
+
+  const opsRoleLabel = (slug) => opsRoleOptions.find((r) => r.value === (slug || ''))?.label || 'General';
+  const canEditOpsRole = myTeamsAsOwner.length > 0;
 
   const loadMyTeamsAsOwner = async () => {
     try {
@@ -74,6 +84,7 @@ const Users = ({ activeTeamId }) => {
             role: USER_ROLES.USER,
             location: u.profile_location || '',
             department: u.profile_city || '',
+            opsRole: u.profile_ops_role || '',
             joinDate: u.date_joined,
           }))
         : [];
@@ -127,6 +138,7 @@ const Users = ({ activeTeamId }) => {
       email: user.email || '',
       department: user.department || '',
       location: user.location || '',
+      opsRole: user.opsRole || '',
     });
   };
 
@@ -165,8 +177,16 @@ const Users = ({ activeTeamId }) => {
         profile_location: editForm.location || '',
         profile_city: editForm.department || '',
       };
+      if (canEditOpsRole) {
+        userData.profile_ops_role = editForm.opsRole || '';
+      }
       await api.users.update(selectedUser.id, userData);
-      const updated = { ...selectedUser, ...editForm, name: editForm.name?.trim() || selectedUser.name };
+      const updated = {
+        ...selectedUser,
+        ...editForm,
+        name: editForm.name?.trim() || selectedUser.name,
+        opsRole: canEditOpsRole ? (editForm.opsRole || '') : selectedUser.opsRole,
+      };
       setUsers((prev) => prev.map((u) => (u.id === selectedUser.id ? { ...u, ...updated } : u)));
       setFilteredUsers((prev) => prev.map((u) => (u.id === selectedUser.id ? { ...u, ...updated } : u)));
       setSelectedUser(updated);
@@ -266,6 +286,25 @@ const Users = ({ activeTeamId }) => {
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
               />
             </div>
+            {canEditOpsRole && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Workflow ops role</label>
+                <select
+                  value={editForm.opsRole || ''}
+                  onChange={(e) => setEditForm((p) => ({ ...p, opsRole: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                >
+                  {opsRoleOptions.map((r) => (
+                    <option key={r.value || 'general'} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Controls which playbook steps this person can claim.
+                </p>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row gap-2">
               <Button type="submit" variant="primary" size="sm" disabled={saving} loading={saving}>
                 Save
@@ -297,6 +336,10 @@ const Users = ({ activeTeamId }) => {
               <div>
                 <span className="text-gray-500 dark:text-gray-400 block">Location</span>
                 <span className="text-gray-900 dark:text-white">{selectedUser.location || '—'}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400 block">Workflow ops role</span>
+                <span className="text-gray-900 dark:text-white">{opsRoleLabel(selectedUser.opsRole)}</span>
               </div>
               <div>
                 <span className="text-gray-500 dark:text-gray-400 block">Joined</span>

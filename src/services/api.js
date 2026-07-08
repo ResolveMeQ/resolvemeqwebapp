@@ -517,6 +517,10 @@ export const api = {
       return apiFetch(`/api/workflows/templates/${templateId}/`, { method: 'DELETE' });
     },
 
+    assigneeRoles: async () => {
+      return apiFetch('/api/workflows/assignee-roles/');
+    },
+
     /** POST /api/workflows/ -- body: { template_id, ticket_id? } */
     create: async ({ templateId, ticketId } = {}) => {
       return apiFetch('/api/workflows/', {

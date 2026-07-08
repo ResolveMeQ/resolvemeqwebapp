@@ -37,10 +37,14 @@ const EMPTY_STEP = () => ({
   title: '',
   description: '',
   assignee_team: '',
+  assignee_role: '',
   step_type: 'manual',
   due_days: 2,
   auto_complete: false,
   auto_assign: '',
+  skip_when: null,
+  skip_field: '',
+  skip_equals: '',
 });
 
 const STEP_TYPE_META = {
@@ -81,10 +85,10 @@ const STARTER_PLAYBOOKS = [
     trigger_category: 'onboarding',
     accent: 'from-emerald-500/15 to-teal-500/10',
     steps: [
-      { title: 'Provision accounts', description: 'Email, SSO, and core apps.', assignee_team: 'IT Support', step_type: 'manual', due_days: 1 },
-      { title: 'Assign hardware', description: 'Laptop and peripherals.', assignee_team: 'IT Support', step_type: 'manual', due_days: 2 },
-      { title: 'Manager sign-off', description: 'Confirm hire details and start date.', assignee_team: 'HR', step_type: 'approval', due_days: 2 },
-      { title: 'Schedule orientation', description: 'Book sessions and share week-one plan.', assignee_team: 'HR', step_type: 'manual', due_days: 3 },
+      { title: 'Provision accounts', description: 'Email, SSO, and core apps.', assignee_team: 'IT Support', assignee_role: 'it', step_type: 'manual', due_days: 1 },
+      { title: 'Assign hardware', description: 'Laptop and peripherals.', assignee_team: 'IT Support', assignee_role: 'it', step_type: 'manual', due_days: 2 },
+      { title: 'Manager sign-off', description: 'Confirm hire details and start date.', assignee_team: 'HR', assignee_role: 'hr', step_type: 'approval', due_days: 2 },
+      { title: 'Schedule orientation', description: 'Book sessions and share week-one plan.', assignee_team: 'HR', assignee_role: 'hr', step_type: 'manual', due_days: 3 },
     ],
   },
   {
@@ -194,6 +198,7 @@ function StepEditorCard({
   step,
   index,
   total,
+  assigneeRoles,
   onChange,
   onMove,
   onDuplicate,
@@ -304,6 +309,29 @@ function StepEditorCard({
                   />
                 </div>
                 <div>
+                  <label className={labelClass}>Claim role</label>
+                  <select
+                    value={step.assignee_role || ''}
+                    onChange={(e) => {
+                      const role = e.target.value;
+                      const label = assigneeRoles.find((r) => r.value === role)?.label;
+                      onChange({
+                        assignee_role: role,
+                        assignee_team: step.assignee_team || (label && label !== 'Anyone' ? label : step.assignee_team),
+                      });
+                    }}
+                    className={inputClass}
+                  >
+                    {assigneeRoles.map((r) => (
+                      <option key={r.value || 'anyone'} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
                   <label className={labelClass}>Due (days)</label>
                   <input
                     type="number"
@@ -369,6 +397,29 @@ function StepEditorCard({
                       ))}
                     </select>
                   </div>
+                  <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Branching (skip when ticket matches)</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelClass}>Ticket field</label>
+                        <input
+                          value={step.skip_field || ''}
+                          onChange={(e) => onChange({ skip_field: e.target.value })}
+                          className={inputClass}
+                          placeholder="category"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Skip if equals</label>
+                        <input
+                          value={step.skip_equals || ''}
+                          onChange={(e) => onChange({ skip_equals: e.target.value })}
+                          className={inputClass}
+                          placeholder="Leave empty to never skip"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </details>
             </div>
@@ -401,6 +452,7 @@ const WorkflowTemplates = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [showStarters, setShowStarters] = useState(false);
+  const [assigneeRoles, setAssigneeRoles] = useState([{ value: '', label: 'Anyone' }]);
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -411,13 +463,15 @@ const WorkflowTemplates = () => {
     setLoading(true);
     setError(null);
     try {
-      const [data, catsRes] = await Promise.all([
+      const [data, catsRes, rolesRes] = await Promise.all([
         api.workflows.listTemplatesManage(),
         api.tickets.getCategories().catch(() => ({ categories: [] })),
+        api.workflows.assigneeRoles().catch(() => ({ roles: [] })),
       ]);
       setTemplates(data?.templates || []);
       setCanManage(Boolean(data?.can_manage));
       setCategories(catsRes?.categories || []);
+      if (rolesRes?.roles?.length) setAssigneeRoles(rolesRes.roles);
     } catch (e) {
       setError(e?.message || 'Could not load templates.');
     } finally {
@@ -499,10 +553,13 @@ const WorkflowTemplates = () => {
         title: s.title || '',
         description: s.description || '',
         assignee_team: s.assignee_team || '',
+        assignee_role: s.assignee_role || '',
         step_type: s.step_type || 'manual',
         due_days: s.due_days ?? 2,
         auto_complete: Boolean(s.auto_complete),
         auto_assign: s.auto_assign || '',
+        skip_field: s.skip_when?.ticket_field || '',
+        skip_equals: s.skip_when?.equals ?? '',
       })),
     });
     setExpandedStepIdx(0);
@@ -521,10 +578,13 @@ const WorkflowTemplates = () => {
         title: s.title || '',
         description: s.description || '',
         assignee_team: s.assignee_team || '',
+        assignee_role: s.assignee_role || '',
         step_type: s.step_type || 'manual',
         due_days: s.due_days ?? 2,
         auto_complete: Boolean(s.auto_complete),
         auto_assign: s.auto_assign || '',
+        skip_field: s.skip_when?.ticket_field || '',
+        skip_equals: s.skip_when?.equals ?? '',
       })),
     });
     setExpandedStepIdx(0);
@@ -579,15 +639,24 @@ const WorkflowTemplates = () => {
       const payload = {
         name: form.name.trim(),
         trigger_category: form.trigger_category || '',
-        steps: form.steps.map((s) => ({
-          title: s.title.trim(),
-          description: s.description.trim(),
-          assignee_team: s.assignee_team.trim(),
-          step_type: s.step_type,
-          due_days: Number(s.due_days) || 2,
-          auto_complete: Boolean(s.auto_complete),
-          auto_assign: s.auto_assign || '',
-        })),
+        steps: form.steps.map((s) => {
+          const step = {
+            title: s.title.trim(),
+            description: s.description.trim(),
+            assignee_team: s.assignee_team.trim(),
+            assignee_role: s.assignee_role || '',
+            step_type: s.step_type,
+            due_days: Number(s.due_days) || 2,
+            auto_complete: Boolean(s.auto_complete),
+            auto_assign: s.auto_assign || '',
+          };
+          const field = (s.skip_field || '').trim();
+          const equals = (s.skip_equals ?? '').toString().trim();
+          if (field && equals) {
+            step.skip_when = { ticket_field: field, equals };
+          }
+          return step;
+        }),
       };
       if (editingId) {
         await api.workflows.updateTemplate(editingId, payload);
@@ -1070,6 +1139,7 @@ const WorkflowTemplates = () => {
                             step={step}
                             index={idx}
                             total={form.steps.length}
+                            assigneeRoles={assigneeRoles}
                             expanded={expandedStepIdx === idx}
                             onToggleExpand={() => setExpandedStepIdx((i) => (i === idx ? -1 : idx))}
                             onChange={(patch) => updateStep(idx, patch)}

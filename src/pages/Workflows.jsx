@@ -203,13 +203,18 @@ const Workflows = () => {
                       {wf.has_overdue && (
                         <Badge variant="error" className="gap-1">
                           <AlertTriangle className="w-3 h-3" />
-                          Overdue
+                          {wf.workflow_sla_breached ? 'SLA breached' : 'Overdue'}
                         </Badge>
                       )}
                       <div className="flex-1 min-w-[160px]">
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
                           {wf.template_name || 'Workflow'}
                         </p>
+                        {wf.due_at && wf.status === 'in_progress' && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            SLA due {new Date(wf.due_at).toLocaleString(undefined, { month: 'short', day: 'numeric' })}
+                          </p>
+                        )}
                         {wf.ticket_id && (
                           <button
                             type="button"

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle, Circle, Clock, AlertTriangle, Hand, ShieldCheck, Bot } from 'lucide-react';
+import { CheckCircle, Circle, Clock, AlertTriangle, Hand, ShieldCheck, Bot, SkipForward, Lock } from 'lucide-react';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
 import { api } from '../services/api';
@@ -35,6 +35,7 @@ const WorkflowChecklist = ({ workflow, onUpdate }) => {
   if (!workflow) return null;
 
   const handleClaim = async (step) => {
+    if (step.can_claim === false) return;
     setBusyStepId(step.id);
     setError(null);
     try {
@@ -62,13 +63,26 @@ const WorkflowChecklist = ({ workflow, onUpdate }) => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
           {workflow.template_name || 'Workflow'}
         </p>
-        <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
-          {workflow.steps_done}/{workflow.steps_total} done
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {workflow.due_at && workflow.status === 'in_progress' && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              SLA due {formatDue(workflow.due_at)}
+            </span>
+          )}
+          {workflow.workflow_sla_breached && (
+            <Badge variant="error" className="text-[10px] gap-0.5">
+              <AlertTriangle className="w-3 h-3" />
+              SLA breached
+            </Badge>
+          )}
+          <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+            {workflow.steps_done}/{workflow.steps_total} done
+          </span>
+        </div>
       </div>
 
       {error && (
@@ -78,10 +92,12 @@ const WorkflowChecklist = ({ workflow, onUpdate }) => {
       <div className="space-y-2">
         {workflow.steps.map((step) => {
           const isDone = step.status === 'done';
+          const isSkipped = step.status === 'skipped';
           const isActive = step.status === 'active';
           const isBusy = busyStepId === step.id;
           const stepType = step.step_type || 'manual';
           const TypeIcon = STEP_TYPE_ICON[stepType] || Hand;
+          const roleLabel = step.assignee_role_label || step.assignee_team;
 
           return (
             <div
@@ -96,6 +112,8 @@ const WorkflowChecklist = ({ workflow, onUpdate }) => {
               <div className="mt-0.5 flex-shrink-0">
                 {isDone ? (
                   <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                ) : isSkipped ? (
+                  <SkipForward className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                 ) : isActive ? (
                   <Clock className="w-4 h-4 text-primary-600 dark:text-primary-400" />
                 ) : (
@@ -106,14 +124,17 @@ const WorkflowChecklist = ({ workflow, onUpdate }) => {
                 <p
                   className={
                     'text-sm font-medium ' +
-                    (isDone
+                    (isDone || isSkipped
                       ? 'text-gray-500 dark:text-gray-500 line-through'
                       : 'text-gray-900 dark:text-gray-100')
                   }
                 >
                   {step.title}
                 </p>
-                {stepType !== 'manual' && (
+                {isSkipped && (
+                  <Badge variant="secondary" className="mt-1 text-[10px]">Skipped</Badge>
+                )}
+                {stepType !== 'manual' && !isSkipped && (
                   <Badge variant={STEP_TYPE_BADGE[stepType] || 'secondary'} className="mt-1.5 text-[10px] gap-1">
                     <TypeIcon className="w-3 h-3" />
                     {stepType === 'approval' ? 'Approval' : 'Auto check'}
@@ -122,10 +143,10 @@ const WorkflowChecklist = ({ workflow, onUpdate }) => {
                 {step.description && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{step.description}</p>
                 )}
-                {step.assignee_team && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{step.assignee_team}</p>
+                {roleLabel && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{roleLabel}</p>
                 )}
-                {step.due_at && !isDone && (
+                {step.due_at && !isDone && !isSkipped && (
                   <div className="flex flex-wrap items-center gap-2 mt-1.5">
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       Due {formatDue(step.due_at)}
@@ -147,9 +168,16 @@ const WorkflowChecklist = ({ workflow, onUpdate }) => {
               {isActive && (
                 <div className="flex-shrink-0">
                   {!step.claimed_by ? (
-                    <Button variant="primary" size="sm" loading={isBusy} onClick={() => handleClaim(step)}>
-                      Claim
-                    </Button>
+                    step.can_claim === false ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
+                        <Lock className="w-3.5 h-3.5" />
+                        {step.assignee_role_label || 'Restricted'}
+                      </span>
+                    ) : (
+                      <Button variant="primary" size="sm" loading={isBusy} onClick={() => handleClaim(step)}>
+                        Claim
+                      </Button>
+                    )
                   ) : (
                     <Button variant="secondary" size="sm" loading={isBusy} onClick={() => handleComplete(step)}>
                       {step.step_type === 'approval' ? 'Approve' : 'Mark done'}
