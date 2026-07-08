@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import GlobalSearchPanel from '../GlobalSearchPanel';
-import AppTour from '../AppTour';
 import AgentQuotaBanner from '../AgentQuotaBanner';
 import { cn } from '../../utils/cn';
 import { userCanAccessEscalationQueue } from '../../services/api';
@@ -44,14 +43,10 @@ const Layout = ({
   searchResults,
   searchLoading,
   searchError,
-  tourRun,
-  setTourRun,
-  tourNonce = 0,
 }) => {
   const location = useLocation();
   const activeItem = PATH_TO_PAGE_ID[location.pathname] ?? 'dashboard';
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const hasTeamSwitcher = userTeams.length > 0 || !!activeTeamId;
 
   const handleToggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
@@ -75,12 +70,6 @@ const Layout = ({
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <AppTour
-        key={tourNonce}
-        run={tourRun}
-        setRun={setTourRun}
-        hasTeamSwitcher={hasTeamSwitcher}
-      />
       {/* Sidebar */}
       <Sidebar
         collapsed={sidebarCollapsed}

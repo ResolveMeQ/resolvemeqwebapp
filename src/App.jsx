@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { TOUR_STORAGE_KEY } from './components/AppTour';
+import AppTour, { TOUR_STORAGE_KEY } from './components/AppTour';
 import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import Tickets from './pages/Tickets';
+import TicketRoute from './pages/TicketRoute';
 import EscalationQueue from './pages/EscalationQueue';
 import Analytics from './pages/Analytics';
 import Teams from './pages/Teams';
@@ -303,9 +304,6 @@ function App() {
     userTeams,
     onActiveTeamChange: handleActiveTeamChange,
     onRefreshUserData: loadUserData,
-    tourRun,
-    setTourRun,
-    tourNonce,
   };
 
   const renderMainRoutes = () => (
@@ -325,6 +323,14 @@ function App() {
         element={
           <AuthGate isAuthenticated={isAuthenticated}>
             <Layout {...layoutProps}><Tickets /></Layout>
+          </AuthGate>
+        }
+      />
+      <Route
+        path="/tickets/:id"
+        element={
+          <AuthGate isAuthenticated={isAuthenticated}>
+            <Layout {...layoutProps}><TicketRoute /></Layout>
           </AuthGate>
         }
       />
@@ -446,7 +452,21 @@ function App() {
     );
   }
 
-  return renderMainRoutes();
+  const hasTeamSwitcher = userTeams.length > 0 || !!preferences?.active_team;
+
+  return (
+    <>
+      {isAuthenticated && (
+        <AppTour
+          key={tourNonce}
+          run={tourRun}
+          setRun={setTourRun}
+          hasTeamSwitcher={hasTeamSwitcher}
+        />
+      )}
+      {renderMainRoutes()}
+    </>
+  );
 }
 
 export default App;
