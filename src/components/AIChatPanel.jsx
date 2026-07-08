@@ -12,6 +12,9 @@ import {
   AlertCircle,
   ImagePlus,
   UserCheck,
+  Terminal,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { api, AgentQuotaExceededError, isAgentQuotaError } from '../services/api';
 import Button from './ui/Button';
@@ -160,6 +163,8 @@ const AIChatPanel = ({
   const [memoryDismissedPromptIds, setMemoryDismissedPromptIds] = useState(() => new Set());
   const [agentUsage, setAgentUsage] = useState(null);
   const [expandedStepMsgIds, setExpandedStepMsgIds] = useState({});
+  const [revealedScriptMsgIds, setRevealedScriptMsgIds] = useState({});
+  const [copiedScriptMsgId, setCopiedScriptMsgId] = useState(null);
   const [thinkingStage, setThinkingStage] = useState(0);
   const messagesEndRef = useRef(null);
   const liveRef = useRef(null);
@@ -374,6 +379,7 @@ const AIChatPanel = ({
           success_probability: PROSE_RESPONSE_STYLES.has(responseStyle) ? undefined : solution.success_probability,
           quick_replies: quickRepliesFromAgentResponse(ar),
           kb_article_citations: ar.kb_article_citations || [],
+          remediation_script: PROSE_RESPONSE_STYLES.has(responseStyle) ? null : (solution.remediation_script || null),
         },
         messageType:
           PROSE_RESPONSE_STYLES.has(responseStyle) ? 'text' : steps.length > 1 ? 'steps' : 'text',
@@ -1103,6 +1109,79 @@ const AIChatPanel = ({
                                   )}
                                 </div>
                               )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Remediation script: exact copy-and-run commands, gated behind an explicit reveal click.
+                            The user always runs it themselves — ResolveMeQ never executes it. */}
+                        {(() => {
+                          const rs = msg.metadata?.remediation_script;
+                          if (!rs || !rs.script) return null;
+                          const mid = msg.id;
+                          const revealed = revealedScriptMsgIds[mid];
+                          const platformLabel =
+                            { windows: 'Windows', macos: 'macOS', linux: 'Linux' }[rs.platform] || rs.platform;
+                          return (
+                            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                              <div className="rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-900/10 p-3">
+                                <div className="flex items-center gap-2">
+                                  <Terminal className="w-4 h-4 text-amber-700 dark:text-amber-400 flex-shrink-0" />
+                                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                                    {platformLabel} script available
+                                  </p>
+                                </div>
+                                <p className="text-xs text-amber-800/90 dark:text-amber-300/80 mt-1">
+                                  {rs.summary}
+                                </p>
+
+                                {!revealed ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setRevealedScriptMsgIds((prev) => ({ ...prev, [mid]: true }))
+                                    }
+                                    className="mt-3 px-3 py-2 min-h-[36px] text-xs font-medium rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-800 text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-amber-900/30"
+                                  >
+                                    Show script
+                                  </button>
+                                ) : (
+                                  <>
+                                    <p className="text-xs text-amber-900/90 dark:text-amber-200/90 mt-3 font-medium">
+                                      Review this before running — you're responsible for running it on your device.
+                                    </p>
+                                    <pre className="mt-2 overflow-x-auto rounded-md bg-gray-900 text-gray-100 text-xs p-3 font-mono whitespace-pre-wrap break-words">
+                                      <code>{rs.script}</code>
+                                    </pre>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        try {
+                                          await navigator.clipboard.writeText(rs.script);
+                                          setCopiedScriptMsgId(mid);
+                                          setTimeout(
+                                            () => setCopiedScriptMsgId((cur) => (cur === mid ? null : cur)),
+                                            2000
+                                          );
+                                        } catch {
+                                          // clipboard unavailable — script is already visible to select/copy manually
+                                        }
+                                      }}
+                                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-2 min-h-[36px] text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                      {copiedScriptMsgId === mid ? (
+                                        <>
+                                          <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" /> Copied
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Copy className="w-3.5 h-3.5" /> Copy script
+                                        </>
+                                      )}
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           );
                         })()}

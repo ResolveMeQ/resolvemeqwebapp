@@ -6,6 +6,26 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 /**
+ * Best-effort OS detection from the browser so the AI can generate an accurate
+ * remediation_script instead of asking or guessing. Returns null (not "other") when
+ * unknown so the backend/agent can tell "unknown" apart from a real value.
+ */
+export function detectReportedPlatform() {
+  try {
+    const platform = String(
+      navigator?.userAgentData?.platform ?? navigator?.platform ?? ''
+    ).toLowerCase();
+    const ua = String(navigator?.userAgent ?? '').toLowerCase();
+    if (platform.includes('win') || ua.includes('windows')) return 'windows';
+    if (platform.includes('mac') || ua.includes('macintosh') || ua.includes('mac os')) return 'macos';
+    if (platform.includes('linux') || ua.includes('linux')) return 'linux';
+  } catch {
+    // navigator unavailable (SSR/tests) -- fall through to unknown
+  }
+  return null;
+}
+
+/**
  * GET /api/auth/profile/ returns UserProfileSerializer: user_email, user_full_name, user_id.
  * Map to the flat shape the UI expects (email, full_name, id).
  */
@@ -336,6 +356,10 @@ export const api = {
      */
     create: async (ticketData, options = {}) => {
       const { screenshotFile } = options;
+      if (ticketData.reported_platform === undefined) {
+        const detected = detectReportedPlatform();
+        if (detected) ticketData = { ...ticketData, reported_platform: detected };
+      }
       if (screenshotFile) {
         const fd = new FormData();
         Object.entries(ticketData).forEach(([k, v]) => {
