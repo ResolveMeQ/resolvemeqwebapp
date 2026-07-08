@@ -349,6 +349,10 @@ export const TICKET_CATEGORY_FALLBACK = [
   { value: 'provisioning', label: 'Provisioning' },
   { value: 'onboarding', label: 'Onboarding' },
   { value: 'offboarding', label: 'Offboarding' },
+  { value: 'license_renewal', label: 'License Renewal' },
+  { value: 'office_move', label: 'Office Move' },
+  { value: 'contractor_access', label: 'Contractor Access' },
+  { value: 'hardware_retirement', label: 'Hardware Retirement' },
   { value: 'other', label: 'Other' },
 ];
 

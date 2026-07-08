@@ -73,7 +73,7 @@ const Workflows = () => {
           return id === q || id.includes(q) || (t.issue_type || '').toLowerCase().includes(q);
         })
         .slice(0, 8)
-    : [];
+    : pickerTickets.slice(0, 8); // empty query: show recent tickets to pick from immediately
 
   const handleTicketQueryChange = (value) => {
     setTicketQuery(value);

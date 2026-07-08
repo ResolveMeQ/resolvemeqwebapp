@@ -97,9 +97,9 @@ const WorkflowChecklist = ({ workflow, onUpdate }) => {
                 {step.assignee_team && (
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{step.assignee_team}</p>
                 )}
-                {isDone && step.claimed_by && (
+                {isDone && (
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    Completed by {step.claimed_by.name}
+                    {step.claimed_by ? `Completed by ${step.claimed_by.name}` : 'Completed automatically'}
                   </p>
                 )}
               </div>
