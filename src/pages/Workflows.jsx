@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ListChecks, Plus, X, AlertTriangle } from 'lucide-react';
+import { ListChecks, Plus, X, AlertTriangle, Settings2, Zap, Play, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -16,6 +17,7 @@ const STATUS_BADGE = {
 
 const Workflows = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [workflows, setWorkflows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -48,13 +50,18 @@ const Workflows = () => {
     load();
   }, [load]);
 
-  const openStartModal = async () => {
+  const openStartModal = async (preferredTemplateId) => {
     setShowStartModal(true);
     setStartError(null);
     try {
-      const data = await api.workflows.templates();
-      setTemplates(data?.templates || []);
-      if (data?.templates?.[0]) setSelectedTemplateId(String(data.templates[0].id));
+      const data = await api.workflows.listTemplatesManage().catch(() => api.workflows.templates());
+      const list = data?.templates || [];
+      setTemplates(list);
+      if (preferredTemplateId != null) {
+        setSelectedTemplateId(String(preferredTemplateId));
+      } else if (list[0]) {
+        setSelectedTemplateId(String(list[0].id));
+      }
     } catch (e) {
       setStartError(e?.message || 'Could not load templates.');
     }
@@ -65,6 +72,14 @@ const Workflows = () => {
       setPickerTickets([]);
     }
   };
+
+  useEffect(() => {
+    const tid = location.state?.startTemplateId;
+    if (tid == null) return;
+    navigate(location.pathname, { replace: true, state: {} });
+    openStartModal(tid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot deep link from templates page
+  }, [location.state?.startTemplateId]);
 
   const ticketMatches = ticketQuery.trim()
     ? pickerTickets
@@ -112,6 +127,11 @@ const Workflows = () => {
     }
   };
 
+  const selectedTemplate = useMemo(
+    () => templates.find((t) => String(t.id) === String(selectedTemplateId)),
+    [templates, selectedTemplateId]
+  );
+
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -124,10 +144,18 @@ const Workflows = () => {
             Multi-step processes for your team — provisioning, and anything else that's more than one ticket's worth of steps.
           </p>
         </div>
-        <Button variant="primary" size="sm" onClick={openStartModal}>
-          <Plus className="w-4 h-4 mr-1.5" />
-          Start Workflow
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link to="/workflows/templates">
+            <Button variant="outline" size="sm">
+              <Settings2 className="w-4 h-4 mr-1.5" />
+              Templates
+            </Button>
+          </Link>
+          <Button variant="primary" size="sm" onClick={() => openStartModal()}>
+            <Plus className="w-4 h-4 mr-1.5" />
+            Start Workflow
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -214,75 +242,128 @@ const Workflows = () => {
       )}
 
       {showStartModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <Card className="w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold text-gray-900 dark:text-white">Start a workflow</h2>
-              <button type="button" onClick={() => setShowStartModal(false)} aria-label="Close">
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-lg"
+          >
+            <Card className="p-6 overflow-hidden">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Play className="w-4 h-4 text-primary-600" />
+                  Start a workflow
+                </h2>
+                <button type="button" onClick={() => setShowStartModal(false)} aria-label="Close">
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                Pick a playbook and optionally link an existing ticket.
+              </p>
 
-            {startError && <p className="text-sm text-red-600 dark:text-red-400 mb-3">{startError}</p>}
+              {startError && <p className="text-sm text-red-600 dark:text-red-400 mb-3">{startError}</p>}
 
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
-              Template
-            </label>
-            <select
-              value={selectedTemplateId}
-              onChange={(e) => setSelectedTemplateId(e.target.value)}
-              className="w-full mb-4 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-            >
-              {templates.length === 0 && <option value="">No templates available</option>}
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.step_count} steps)
-                </option>
-              ))}
-            </select>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+                Playbook
+              </label>
+              <select
+                value={selectedTemplateId}
+                onChange={(e) => setSelectedTemplateId(e.target.value)}
+                className="w-full mb-3 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+              >
+                {templates.length === 0 && <option value="">No templates available</option>}
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.step_count ?? t.steps?.length ?? 0} steps)
+                  </option>
+                ))}
+              </select>
 
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
-              Link an existing ticket (optional)
-            </label>
-            <div className="relative mb-5">
-              <input
-                type="text"
-                value={ticketQuery}
-                onChange={(e) => handleTicketQueryChange(e.target.value)}
-                onFocus={() => setShowTicketDropdown(true)}
-                onBlur={() => setTimeout(() => setShowTicketDropdown(false), 150)}
-                placeholder="Search by ticket # or title…"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-              />
-              {showTicketDropdown && ticketMatches.length > 0 && (
-                <div
-                  role="listbox"
-                  className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg"
-                >
-                  {ticketMatches.map((t) => (
-                    <button
-                      type="button"
-                      key={t.ticket_id ?? t.id}
-                      role="option"
-                      onClick={() => handlePickTicket(t)}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
-                    >
-                      #{t.ticket_id ?? t.id} · {t.issue_type || 'Untitled'}
-                    </button>
+              {selectedTemplate && (
+                <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40 p-3 mb-4">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    {selectedTemplate.trigger_category ? (
+                      <Badge variant="primary" className="gap-1 text-[10px]">
+                        <Zap className="w-3 h-3" />
+                        Auto on {selectedTemplate.trigger_category.replace(/_/g, ' ')}
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-[10px]">Manual start</Badge>
+                    )}
+                    <span className="text-[10px] text-gray-500">
+                      {selectedTemplate.step_count ?? selectedTemplate.steps?.length ?? 0} steps
+                    </span>
+                  </div>
+                  {(selectedTemplate.steps || []).slice(0, 4).map((step, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 py-0.5">
+                      <span className="w-5 h-5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-[10px] font-medium shrink-0">
+                        {i + 1}
+                      </span>
+                      <span className="truncate">{step.title}</span>
+                      <ChevronRight className="w-3 h-3 text-gray-300 shrink-0 ml-auto" aria-hidden />
+                    </div>
                   ))}
+                  {(selectedTemplate.steps?.length || 0) > 4 && (
+                    <p className="text-[10px] text-gray-400 mt-1 pl-7">
+                      +{selectedTemplate.steps.length - 4} more
+                    </p>
+                  )}
                 </div>
               )}
-            </div>
 
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setShowStartModal(false)}>
-                Cancel
-              </Button>
-              <Button variant="primary" size="sm" loading={starting} disabled={!selectedTemplateId} onClick={handleStart}>
-                Start
-              </Button>
-            </div>
-          </Card>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+                Link ticket (optional)
+              </label>
+              <div className="relative mb-5">
+                <input
+                  type="text"
+                  value={ticketQuery}
+                  onChange={(e) => handleTicketQueryChange(e.target.value)}
+                  onFocus={() => setShowTicketDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowTicketDropdown(false), 150)}
+                  placeholder="Search by ticket # or title…"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                />
+                {showTicketDropdown && ticketMatches.length > 0 && (
+                  <div
+                    role="listbox"
+                    className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg"
+                  >
+                    {ticketMatches.map((t) => (
+                      <button
+                        type="button"
+                        key={t.ticket_id ?? t.id}
+                        role="option"
+                        onClick={() => handlePickTicket(t)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      >
+                        #{t.ticket_id ?? t.id} · {t.issue_type || 'Untitled'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between items-center gap-2">
+                <Link
+                  to="/workflows/templates"
+                  className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+                  onClick={() => setShowStartModal(false)}
+                >
+                  Manage playbooks
+                </Link>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setShowStartModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="primary" size="sm" loading={starting} disabled={!selectedTemplateId} onClick={handleStart}>
+                    Start workflow
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
         </div>
       )}
     </div>

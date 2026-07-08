@@ -490,9 +490,31 @@ export const api = {
       return apiFetch(`/api/workflows/${qs}`);
     },
 
-    /** GET /api/workflows/templates/ */
     templates: async () => {
       return apiFetch('/api/workflows/templates/');
+    },
+
+    /** GET/POST /api/workflows/templates/manage/ — admin list + create */
+    listTemplatesManage: async () => {
+      return apiFetch('/api/workflows/templates/manage/');
+    },
+
+    createTemplate: async (payload) => {
+      return apiFetch('/api/workflows/templates/manage/', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+    updateTemplate: async (templateId, payload) => {
+      return apiFetch(`/api/workflows/templates/${templateId}/`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+    },
+
+    deleteTemplate: async (templateId) => {
+      return apiFetch(`/api/workflows/templates/${templateId}/`, { method: 'DELETE' });
     },
 
     /** POST /api/workflows/ -- body: { template_id, ticket_id? } */

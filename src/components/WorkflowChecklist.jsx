@@ -1,8 +1,20 @@
 import React, { useState } from 'react';
-import { CheckCircle, Circle, Clock, AlertTriangle } from 'lucide-react';
+import { CheckCircle, Circle, Clock, AlertTriangle, Hand, ShieldCheck, Bot } from 'lucide-react';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
 import { api } from '../services/api';
+
+const STEP_TYPE_ICON = {
+  manual: Hand,
+  approval: ShieldCheck,
+  auto_check: Bot,
+};
+
+const STEP_TYPE_BADGE = {
+  manual: 'secondary',
+  approval: 'warning',
+  auto_check: 'primary',
+};
 
 const formatDue = (iso) => {
   if (!iso) return null;
@@ -68,6 +80,8 @@ const WorkflowChecklist = ({ workflow, onUpdate }) => {
           const isDone = step.status === 'done';
           const isActive = step.status === 'active';
           const isBusy = busyStepId === step.id;
+          const stepType = step.step_type || 'manual';
+          const TypeIcon = STEP_TYPE_ICON[stepType] || Hand;
 
           return (
             <div
@@ -99,6 +113,12 @@ const WorkflowChecklist = ({ workflow, onUpdate }) => {
                 >
                   {step.title}
                 </p>
+                {stepType !== 'manual' && (
+                  <Badge variant={STEP_TYPE_BADGE[stepType] || 'secondary'} className="mt-1.5 text-[10px] gap-1">
+                    <TypeIcon className="w-3 h-3" />
+                    {stepType === 'approval' ? 'Approval' : 'Auto check'}
+                  </Badge>
+                )}
                 {step.description && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{step.description}</p>
                 )}
@@ -132,7 +152,7 @@ const WorkflowChecklist = ({ workflow, onUpdate }) => {
                     </Button>
                   ) : (
                     <Button variant="secondary" size="sm" loading={isBusy} onClick={() => handleComplete(step)}>
-                      Mark done
+                      {step.step_type === 'approval' ? 'Approve' : 'Mark done'}
                     </Button>
                   )}
                 </div>
