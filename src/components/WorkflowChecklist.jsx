@@ -236,7 +236,13 @@ function StepDetailCard({ workflowId, step, busy, onClaim, onComplete, onAutoChe
             Skipped
           </Badge>
         )}
-        {stepType !== 'manual' && !isSkipped && (
+        {isDone && stepType === 'auto_check' && step.auto_verified && (
+          <Badge variant="success" className="mt-1.5 text-[10px] gap-1">
+            <Bot className="w-3 h-3" />
+            Auto-verified
+          </Badge>
+        )}
+        {stepType !== 'manual' && !isSkipped && !isDone && (
           <Badge variant={STEP_TYPE_BADGE[stepType] || 'secondary'} className="mt-1.5 text-[10px] gap-1">
             <TypeIcon className="w-3 h-3" />
             {stepType === 'approval' ? 'Approval' : 'Auto check'}

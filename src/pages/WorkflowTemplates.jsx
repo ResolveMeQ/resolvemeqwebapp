@@ -1390,6 +1390,11 @@ const WorkflowTemplates = () => {
                       <span className="rounded-full px-2 py-0.5 bg-gray-100 dark:bg-gray-800">
                         Auto: {onboardingSku.trigger_category}
                       </span>
+                      {onboardingSku.connector_auto_steps > 0 && (
+                        <span className="rounded-full px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300">
+                          {onboardingSku.connector_auto_steps} connector checks
+                        </span>
+                      )}
                     </div>
                     {onboardingSku.metrics?.workflows_started > 0 && (
                       <p className="text-xs text-emerald-700 dark:text-emerald-400">
