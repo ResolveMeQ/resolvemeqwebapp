@@ -7,6 +7,7 @@ import Tickets from './pages/Tickets';
 import TicketRoute from './pages/TicketRoute';
 import Workflows from './pages/Workflows';
 import WorkflowTemplates from './pages/WorkflowTemplates';
+import AutomationRules from './pages/AutomationRules';
 import EscalationQueue from './pages/EscalationQueue';
 import Analytics from './pages/Analytics';
 import Teams from './pages/Teams';
@@ -349,6 +350,14 @@ function App() {
         element={
           <AuthGate isAuthenticated={isAuthenticated}>
             <Layout {...layoutProps}><WorkflowTemplates /></Layout>
+          </AuthGate>
+        }
+      />
+      <Route
+        path="/settings/automation"
+        element={
+          <AuthGate isAuthenticated={isAuthenticated}>
+            <Layout {...layoutProps}><AutomationRules /></Layout>
           </AuthGate>
         }
       />

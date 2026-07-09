@@ -151,6 +151,12 @@ const Workflows = () => {
               Templates
             </Button>
           </Link>
+          <Link to="/settings/automation">
+            <Button variant="outline" size="sm">
+              <Zap className="w-4 h-4 mr-1.5" />
+              Rules
+            </Button>
+          </Link>
           <Button variant="primary" size="sm" onClick={() => openStartModal()}>
             <Plus className="w-4 h-4 mr-1.5" />
             Start Workflow
@@ -235,7 +241,7 @@ const Workflows = () => {
 
                     {isExpanded && (
                       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
-                        <WorkflowChecklist workflow={wf} onUpdate={load} />
+                        <WorkflowChecklist workflow={wf} onUpdate={load} variant="embedded" />
                       </div>
                     )}
                   </Card>

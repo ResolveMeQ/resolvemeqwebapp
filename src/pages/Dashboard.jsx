@@ -304,11 +304,19 @@ const Dashboard = ({ activeTeamId }) => {
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
               <div className="rounded-xl border border-primary-200/60 dark:border-primary-900/40 bg-primary-50/50 dark:bg-primary-950/20 p-3">
                 <p className="text-xs uppercase tracking-wide text-primary-700 dark:text-primary-300">AI deflection</p>
                 <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
                   {deflectionRate != null ? `${deflectionRate}%` : '—'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-emerald-200/60 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20 p-3">
+                <p className="text-xs uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Onboarding done</p>
+                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
+                  {outcomeMetrics?.onboarding_playbook?.completion_rate_percent != null
+                    ? `${Math.round(outcomeMetrics.onboarding_playbook.completion_rate_percent)}%`
+                    : outcomeMetrics?.onboarding_playbook?.workflows_completed ?? '—'}
                 </p>
               </div>
               <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/50 p-3">

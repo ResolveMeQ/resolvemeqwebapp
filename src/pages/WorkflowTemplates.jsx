@@ -18,6 +18,7 @@ import {
   Play,
   Clock,
   Users,
+  UserPlus,
   ShieldCheck,
   Bot,
   Hand,
@@ -453,6 +454,8 @@ const WorkflowTemplates = () => {
   const [deleting, setDeleting] = useState(false);
   const [showStarters, setShowStarters] = useState(false);
   const [assigneeRoles, setAssigneeRoles] = useState([{ value: '', label: 'Anyone' }]);
+  const [onboardingSku, setOnboardingSku] = useState(null);
+  const [onboardingPanelOpen, setOnboardingPanelOpen] = useState(false);
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -463,15 +466,17 @@ const WorkflowTemplates = () => {
     setLoading(true);
     setError(null);
     try {
-      const [data, catsRes, rolesRes] = await Promise.all([
+      const [data, catsRes, rolesRes, skuRes] = await Promise.all([
         api.workflows.listTemplatesManage(),
         api.tickets.getCategories().catch(() => ({ categories: [] })),
         api.workflows.assigneeRoles().catch(() => ({ roles: [] })),
+        api.workflows.onboardingPlaybook().catch(() => null),
       ]);
       setTemplates(data?.templates || []);
       setCanManage(Boolean(data?.can_manage));
       setCategories(catsRes?.categories || []);
       if (rolesRes?.roles?.length) setAssigneeRoles(rolesRes.roles);
+      setOnboardingSku(skuRes?.playbook || null);
     } catch (e) {
       setError(e?.message || 'Could not load templates.');
     } finally {
@@ -1221,6 +1226,124 @@ const WorkflowTemplates = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Onboarding pack — FAB + slide-up panel (keeps library layout clean) */}
+      {onboardingSku && !editorOpen && !showStarters && !deleteTarget && (
+        <>
+          <AnimatePresence>
+            {onboardingPanelOpen && (
+              <>
+                <motion.button
+                  type="button"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[55] bg-black/30"
+                  aria-label="Close onboarding panel"
+                  onClick={() => setOnboardingPanelOpen(false)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                  transition={{ duration: 0.2 }}
+                  className="fixed z-[56] w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden"
+                  style={{
+                    bottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))',
+                    right: 'max(1.5rem, env(safe-area-inset-right, 0px))',
+                  }}
+                >
+                  <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                        Featured playbook
+                      </p>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">
+                        {onboardingSku.name}
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setOnboardingPanelOpen(false)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0"
+                      aria-label="Close"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{onboardingSku.tagline}</p>
+                    <div className="flex flex-wrap gap-1.5 text-[11px] text-gray-600 dark:text-gray-400">
+                      <span className="rounded-full px-2 py-0.5 bg-gray-100 dark:bg-gray-800">
+                        {onboardingSku.step_count} steps
+                      </span>
+                      <span className="rounded-full px-2 py-0.5 bg-gray-100 dark:bg-gray-800">
+                        {onboardingSku.workflow_sla_days}-day SLA
+                      </span>
+                      <span className="rounded-full px-2 py-0.5 bg-gray-100 dark:bg-gray-800">
+                        Auto: {onboardingSku.trigger_category}
+                      </span>
+                    </div>
+                    {onboardingSku.metrics?.workflows_started > 0 && (
+                      <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                        {onboardingSku.metrics.workflows_completed}/{onboardingSku.metrics.workflows_started} completed
+                        {onboardingSku.metrics.completion_rate_percent != null
+                          ? ` (${onboardingSku.metrics.completion_rate_percent}%)`
+                          : ''}
+                      </p>
+                    )}
+                    <div className="flex flex-col gap-2 pt-1">
+                      {onboardingSku.template_id && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => {
+                            setOnboardingPanelOpen(false);
+                            navigate('/workflows', { state: { startTemplateId: onboardingSku.template_id } });
+                          }}
+                        >
+                          <Play className="w-4 h-4 mr-1.5" />
+                          Run playbook
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => {
+                          setOnboardingPanelOpen(false);
+                          navigate('/tickets');
+                        }}
+                      >
+                        Create onboarding ticket
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+          <button
+            type="button"
+            onClick={() => setOnboardingPanelOpen((o) => !o)}
+            className={cn(
+              'fixed z-[54] flex items-center justify-center w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 touch-manipulation',
+              onboardingPanelOpen
+                ? 'bg-gray-700 dark:bg-gray-200 text-white dark:text-gray-900 focus:ring-gray-500'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white focus:ring-emerald-500'
+            )}
+            style={{
+              bottom: 'max(1.5rem, env(safe-area-inset-bottom))',
+              right: 'max(1.5rem, env(safe-area-inset-right))',
+            }}
+            aria-label={onboardingPanelOpen ? 'Close onboarding playbook' : 'Open onboarding playbook'}
+            title="Employee onboarding playbook"
+          >
+            {onboardingPanelOpen ? <X className="w-6 h-6" /> : <UserPlus className="w-6 h-6" />}
+          </button>
+        </>
+      )}
 
       {/* Toast */}
       <AnimatePresence>

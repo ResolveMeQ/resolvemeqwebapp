@@ -10,6 +10,7 @@ import {
   CheckCircle,
   Sparkles,
   MessageSquare,
+  Webhook,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -120,6 +121,14 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   const [teamsLinking, setTeamsLinking] = useState(false);
   const [teamsDisconnecting, setTeamsDisconnecting] = useState(false);
   const [teamsLinkInfo, setTeamsLinkInfo] = useState(null);
+  const [webhooks, setWebhooks] = useState([]);
+  const [webhookEvents, setWebhookEvents] = useState([]);
+  const [webhookCanManage, setWebhookCanManage] = useState(false);
+  const [webhooksLoading, setWebhooksLoading] = useState(false);
+  const [webhookSaving, setWebhookSaving] = useState(false);
+  const [webhookForm, setWebhookForm] = useState({ name: '', url: '', events: [] });
+  const [webhookSecret, setWebhookSecret] = useState(null);
+  const [webhookDeliveries, setWebhookDeliveries] = useState([]);
 
   useEffect(() => {
     if (!theme) return;
@@ -169,6 +178,31 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
       setTeamsStatusLoading(false);
     }
   }, [preferences?.active_team]);
+
+  const loadWebhooks = useCallback(async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) {
+      setWebhooks([]);
+      return;
+    }
+    try {
+      setWebhooksLoading(true);
+      const [listRes, metaRes, deliveriesRes] = await Promise.all([
+        api.integrations.listWebhooks(),
+        api.integrations.webhookMetadata().catch(() => ({ events: [] })),
+        api.integrations.webhookDeliveries().catch(() => ({ deliveries: [] })),
+      ]);
+      setWebhooks(listRes?.endpoints || []);
+      setWebhookCanManage(Boolean(listRes?.can_manage));
+      setWebhookEvents(metaRes?.events || []);
+      setWebhookDeliveries(deliveriesRes?.deliveries || []);
+    } catch (e) {
+      console.error('Webhooks:', e);
+      showToast(e?.message || 'Could not load webhooks.', 'error');
+    } finally {
+      setWebhooksLoading(false);
+    }
+  }, [preferences?.active_team, showToast]);
 
   useEffect(() => {
     const t = searchParams.get('tab');
@@ -221,7 +255,8 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     if (activeTab !== 'integrations' || !preferences?.active_team) return;
     loadSlackStatus();
     loadTeamsStatus();
-  }, [activeTab, preferences?.active_team, loadSlackStatus, loadTeamsStatus]);
+    loadWebhooks();
+  }, [activeTab, preferences?.active_team, loadSlackStatus, loadTeamsStatus, loadWebhooks]);
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon },
@@ -340,6 +375,60 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     } finally {
       setTeamsDisconnecting(false);
     }
+  };
+
+  const handleCreateWebhook = async () => {
+    if (!webhookForm.url?.trim()) {
+      showToast('Webhook URL is required.', 'error');
+      return;
+    }
+    try {
+      setWebhookSaving(true);
+      const res = await api.integrations.createWebhook({
+        name: webhookForm.name.trim(),
+        url: webhookForm.url.trim(),
+        events: webhookForm.events,
+      });
+      setWebhookSecret(res?.endpoint?.secret || null);
+      setWebhookForm({ name: '', url: '', events: [] });
+      showToast('Webhook endpoint created. Copy the signing secret now — it is shown once.');
+      await loadWebhooks();
+    } catch (e) {
+      showToast(e?.message || 'Could not create webhook.', 'error');
+    } finally {
+      setWebhookSaving(false);
+    }
+  };
+
+  const handleTestWebhook = async (endpointId) => {
+    try {
+      const res = await api.integrations.testWebhook(endpointId, { event_type: 'ticket.created' });
+      const status = res?.delivery?.status;
+      showToast(status === 'success' ? 'Test webhook delivered.' : 'Test webhook failed.', status === 'success' ? 'success' : 'error');
+      await loadWebhooks();
+    } catch (e) {
+      showToast(e?.message || 'Test delivery failed.', 'error');
+    }
+  };
+
+  const handleDeleteWebhook = async (endpointId) => {
+    if (!window.confirm('Delete this webhook endpoint?')) return;
+    try {
+      await api.integrations.deleteWebhook(endpointId);
+      showToast('Webhook deleted.');
+      await loadWebhooks();
+    } catch (e) {
+      showToast(e?.message || 'Could not delete webhook.', 'error');
+    }
+  };
+
+  const toggleWebhookEvent = (event) => {
+    setWebhookForm((prev) => {
+      const events = prev.events.includes(event)
+        ? prev.events.filter((e) => e !== event)
+        : [...prev.events, event];
+      return { ...prev, events };
+    });
   };
 
   const inputClass = 'input-enterprise';
@@ -826,6 +915,142 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                 <li>Use the link code above once per workspace to attach your Teams tenant.</li>
               </ul>
             </div>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="p-6 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-emerald-600">
+                  <Webhook className="w-5 h-5 text-white" aria-hidden />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Outbound webhooks</h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 max-w-md">
+                    HMAC-signed POSTs to Make, n8n, or your own endpoint when tickets and workflows change.
+                    Verify with headers <code className="font-mono text-[11px]">X-ResolveMeq-Signature</code> and{' '}
+                    <code className="font-mono text-[11px]">X-ResolveMeq-Timestamp</code>.
+                  </p>
+                </div>
+              </div>
+              {webhooksLoading && <Badge variant="warning">Loading…</Badge>}
+            </div>
+
+            {webhookSecret && (
+              <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/30 p-4">
+                <p className="text-xs font-semibold text-amber-900 dark:text-amber-200 uppercase tracking-wide">
+                  Signing secret (copy now)
+                </p>
+                <p className="text-sm font-mono break-all mt-1 text-amber-950 dark:text-amber-100">{webhookSecret}</p>
+                <Button variant="outline" size="sm" type="button" className="mt-2" onClick={() => setWebhookSecret(null)}>
+                  Dismiss
+                </Button>
+              </div>
+            )}
+
+            {webhookCanManage && (
+              <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 space-y-3">
+                <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 uppercase tracking-wide">
+                  Add endpoint
+                </p>
+                <input
+                  type="text"
+                  className={inputClass}
+                  placeholder="Name (optional)"
+                  value={webhookForm.name}
+                  onChange={(e) => setWebhookForm((p) => ({ ...p, name: e.target.value }))}
+                />
+                <input
+                  type="url"
+                  className={inputClass}
+                  placeholder="https://hooks.example.com/..."
+                  value={webhookForm.url}
+                  onChange={(e) => setWebhookForm((p) => ({ ...p, url: e.target.value }))}
+                />
+                <div className="flex flex-wrap gap-2">
+                  {webhookEvents.map((ev) => (
+                    <button
+                      key={ev}
+                      type="button"
+                      onClick={() => toggleWebhookEvent(ev)}
+                      className={cn(
+                        'px-2 py-1 rounded text-xs border',
+                        webhookForm.events.includes(ev)
+                          ? 'bg-primary-50 border-primary-300 text-primary-800 dark:bg-primary-900/30 dark:border-primary-700 dark:text-primary-300'
+                          : 'border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400'
+                      )}
+                    >
+                      {ev}
+                    </button>
+                  ))}
+                  <span className="text-xs text-gray-500 self-center">Leave empty for all events</span>
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="button"
+                  disabled={!preferences?.active_team || webhookSaving}
+                  loading={webhookSaving}
+                  onClick={handleCreateWebhook}
+                >
+                  Add webhook
+                </Button>
+              </div>
+            )}
+
+            {webhooks.length > 0 ? (
+              <ul className="space-y-2">
+                {webhooks.map((wh) => (
+                  <li
+                    key={wh.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 dark:border-gray-800 p-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {wh.name || wh.url}
+                      </p>
+                      <p className="text-xs text-gray-500 font-mono truncate">{wh.url}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {(wh.events?.length ? wh.events.join(', ') : 'All events')}
+                        {wh.is_active ? '' : ' · paused'}
+                      </p>
+                    </div>
+                    {webhookCanManage && (
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" type="button" onClick={() => handleTestWebhook(wh.id)}>
+                          Test
+                        </Button>
+                        <Button variant="outline" size="sm" type="button" onClick={() => handleDeleteWebhook(wh.id)}>
+                          Delete
+                        </Button>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              !webhooksLoading && (
+                <p className="text-xs text-gray-500">No webhook endpoints yet.</p>
+              )
+            )}
+
+            {webhookDeliveries.length > 0 && (
+              <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/40 p-4">
+                <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 uppercase tracking-wide mb-2">
+                  Recent deliveries
+                </p>
+                <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 max-h-32 overflow-y-auto">
+                  {webhookDeliveries.slice(0, 8).map((d) => (
+                    <li key={d.id} className="font-mono">
+                      {d.event_type} → {d.status}
+                      {d.response_code ? ` (${d.response_code})` : ''}
+                      {d.error_message ? ` — ${d.error_message}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </Card>
       </div>

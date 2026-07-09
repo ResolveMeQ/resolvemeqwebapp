@@ -521,6 +521,11 @@ export const api = {
       return apiFetch('/api/workflows/assignee-roles/');
     },
 
+    /** GET /api/workflows/playbooks/employee-onboarding/ — sellable onboarding SKU bundle */
+    onboardingPlaybook: async () => {
+      return apiFetch('/api/workflows/playbooks/employee-onboarding/');
+    },
+
     /** POST /api/workflows/ -- body: { template_id, ticket_id? } */
     create: async ({ templateId, ticketId } = {}) => {
       return apiFetch('/api/workflows/', {
@@ -966,6 +971,21 @@ export const api = {
     },
   },
 
+  /** Automation rules (Phase 2) */
+  automation: {
+    metadata: async () => apiFetch('/api/automation/metadata/'),
+    listRules: async () => apiFetch('/api/automation/rules/'),
+    createRule: async (payload) =>
+      apiFetch('/api/automation/rules/', { method: 'POST', body: JSON.stringify(payload) }),
+    updateRule: async (ruleId, payload) =>
+      apiFetch(`/api/automation/rules/${ruleId}/`, { method: 'PATCH', body: JSON.stringify(payload) }),
+    deleteRule: async (ruleId) =>
+      apiFetch(`/api/automation/rules/${ruleId}/`, { method: 'DELETE' }),
+    dryRunRule: async (ruleId, payload = {}) =>
+      apiFetch(`/api/automation/rules/${ruleId}/dry-run/`, { method: 'POST', body: JSON.stringify(payload) }),
+    logs: async () => apiFetch('/api/automation/logs/'),
+  },
+
   /** Slack & future channel integrations */
   integrations: {
     slackStatus: async (teamId) => {
@@ -1014,6 +1034,17 @@ export const api = {
         body: JSON.stringify({ team_id: teamId }),
       });
     },
+    webhookMetadata: async () => apiFetch('/api/integrations/webhooks/metadata/'),
+    listWebhooks: async () => apiFetch('/api/integrations/webhooks/'),
+    createWebhook: async (payload) =>
+      apiFetch('/api/integrations/webhooks/', { method: 'POST', body: JSON.stringify(payload) }),
+    updateWebhook: async (endpointId, payload) =>
+      apiFetch(`/api/integrations/webhooks/${endpointId}/`, { method: 'PATCH', body: JSON.stringify(payload) }),
+    deleteWebhook: async (endpointId) =>
+      apiFetch(`/api/integrations/webhooks/${endpointId}/`, { method: 'DELETE' }),
+    testWebhook: async (endpointId, payload = {}) =>
+      apiFetch(`/api/integrations/webhooks/${endpointId}/test/`, { method: 'POST', body: JSON.stringify(payload) }),
+    webhookDeliveries: async () => apiFetch('/api/integrations/webhooks/deliveries/'),
   },
 
   // In-app notifications (header bell)
