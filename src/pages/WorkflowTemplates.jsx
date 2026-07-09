@@ -49,6 +49,7 @@ const EMPTY_STEP = () => ({
   auto_check_connector: 'okta',
   auto_check_check: 'user_exists',
   auto_check_group_id: '',
+  auto_check_sku_id: '',
 });
 
 const STEP_TYPE_META = {
@@ -80,6 +81,21 @@ const AUTO_ASSIGN_OPTIONS = [
   { value: 'started_by', label: 'Who started the workflow' },
   { value: 'ticket_reporter', label: 'Ticket reporter' },
 ];
+
+const CONNECTOR_CHECK_OPTIONS = {
+  okta: [
+    { value: 'user_exists', label: 'User exists' },
+    { value: 'group_member', label: 'Group member' },
+  ],
+  google_workspace: [
+    { value: 'user_exists', label: 'User exists' },
+    { value: 'has_license', label: 'Has license SKU' },
+  ],
+  microsoft365: [
+    { value: 'user_exists', label: 'User exists' },
+    { value: 'has_license', label: 'Has license SKU' },
+  ],
+};
 
 const STARTER_PLAYBOOKS = [
   {
@@ -383,10 +399,19 @@ function StepEditorCard({
                       <label className={labelClass}>Connector</label>
                       <select
                         value={step.auto_check_connector || 'okta'}
-                        onChange={(e) => onChange({ auto_check_connector: e.target.value })}
+                        onChange={(e) => {
+                          const connector = e.target.value;
+                          const checks = CONNECTOR_CHECK_OPTIONS[connector] || [];
+                          onChange({
+                            auto_check_connector: connector,
+                            auto_check_check: checks[0]?.value || 'user_exists',
+                          });
+                        }}
                         className={inputClass}
                       >
                         <option value="okta">Okta</option>
+                        <option value="google_workspace">Google Workspace</option>
+                        <option value="microsoft365">Microsoft 365</option>
                       </select>
                     </div>
                     <div>
@@ -396,12 +421,15 @@ function StepEditorCard({
                         onChange={(e) => onChange({ auto_check_check: e.target.value })}
                         className={inputClass}
                       >
-                        <option value="user_exists">User exists</option>
-                        <option value="group_member">Group member</option>
+                        {(CONNECTOR_CHECK_OPTIONS[step.auto_check_connector || 'okta'] || []).map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
-                  {step.auto_check_check === 'group_member' && (
+                  {step.auto_check_connector === 'okta' && step.auto_check_check === 'group_member' && (
                     <div>
                       <label className={labelClass}>Okta group ID</label>
                       <input
@@ -412,8 +440,19 @@ function StepEditorCard({
                       />
                     </div>
                   )}
+                  {step.auto_check_check === 'has_license' && (
+                    <div>
+                      <label className={labelClass}>License SKU ID</label>
+                      <input
+                        value={step.auto_check_sku_id || ''}
+                        onChange={(e) => onChange({ auto_check_sku_id: e.target.value })}
+                        className={inputClass}
+                        placeholder="Google-Apps-For-Business or ENTERPRISEPACK"
+                      />
+                    </div>
+                  )}
                   <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                    Uses ticket reporter email. Connect Okta in Settings → Integrations.
+                    Uses ticket reporter email. Connect the IdP in Settings → Integrations.
                   </p>
                 </div>
               )}
@@ -615,6 +654,7 @@ const WorkflowTemplates = () => {
         auto_check_connector: s.auto_check?.connector || 'okta',
         auto_check_check: s.auto_check?.check || 'user_exists',
         auto_check_group_id: s.auto_check?.group_id || '',
+        auto_check_sku_id: s.auto_check?.sku_id || '',
       })),
     });
     setExpandedStepIdx(0);
@@ -643,6 +683,7 @@ const WorkflowTemplates = () => {
         auto_check_connector: s.auto_check?.connector || 'okta',
         auto_check_check: s.auto_check?.check || 'user_exists',
         auto_check_group_id: s.auto_check?.group_id || '',
+        auto_check_sku_id: s.auto_check?.sku_id || '',
       })),
     });
     setExpandedStepIdx(0);
@@ -721,6 +762,9 @@ const WorkflowTemplates = () => {
             };
             if (s.auto_check_check === 'group_member' && (s.auto_check_group_id || '').trim()) {
               step.auto_check.group_id = s.auto_check_group_id.trim();
+            }
+            if (s.auto_check_check === 'has_license' && (s.auto_check_sku_id || '').trim()) {
+              step.auto_check.sku_id = s.auto_check_sku_id.trim();
             }
           }
           return step;

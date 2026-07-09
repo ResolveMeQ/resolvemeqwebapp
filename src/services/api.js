@@ -1074,6 +1074,44 @@ export const api = {
         body: JSON.stringify({ team_id: teamId }),
       });
     },
+    googleWorkspaceStatus: async (teamId) => {
+      const q = teamId ? `?team_id=${encodeURIComponent(teamId)}` : '';
+      return apiFetch(`/api/integrations/google/status/${q}`);
+    },
+    googleWorkspaceAuthorizeUrl: async (teamId) => {
+      if (!teamId) throw new Error('team_id is required');
+      const data = await apiFetch(
+        `/api/integrations/google/oauth/start/?team_id=${encodeURIComponent(teamId)}&format=json`
+      );
+      if (!data?.authorize_url) throw new Error(data?.detail || 'Could not start Google OAuth');
+      return data.authorize_url;
+    },
+    googleWorkspaceDisconnect: async (teamId) => {
+      if (!teamId) throw new Error('team_id is required');
+      return apiFetch('/api/integrations/google/disconnect/', {
+        method: 'POST',
+        body: JSON.stringify({ team_id: teamId }),
+      });
+    },
+    microsoft365Status: async (teamId) => {
+      const q = teamId ? `?team_id=${encodeURIComponent(teamId)}` : '';
+      return apiFetch(`/api/integrations/microsoft/status/${q}`);
+    },
+    microsoft365AuthorizeUrl: async (teamId) => {
+      if (!teamId) throw new Error('team_id is required');
+      const data = await apiFetch(
+        `/api/integrations/microsoft/oauth/start/?team_id=${encodeURIComponent(teamId)}&format=json`
+      );
+      if (!data?.authorize_url) throw new Error(data?.detail || 'Could not start Microsoft OAuth');
+      return data.authorize_url;
+    },
+    microsoft365Disconnect: async (teamId) => {
+      if (!teamId) throw new Error('team_id is required');
+      return apiFetch('/api/integrations/microsoft/disconnect/', {
+        method: 'POST',
+        body: JSON.stringify({ team_id: teamId }),
+      });
+    },
   },
 
   // In-app notifications (header bell)

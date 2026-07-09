@@ -135,6 +135,14 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   const [oktaConnecting, setOktaConnecting] = useState(false);
   const [oktaDisconnecting, setOktaDisconnecting] = useState(false);
   const [oktaDomain, setOktaDomain] = useState('');
+  const [googleStatus, setGoogleStatus] = useState(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleConnecting, setGoogleConnecting] = useState(false);
+  const [googleDisconnecting, setGoogleDisconnecting] = useState(false);
+  const [microsoftStatus, setMicrosoftStatus] = useState(null);
+  const [microsoftLoading, setMicrosoftLoading] = useState(false);
+  const [microsoftConnecting, setMicrosoftConnecting] = useState(false);
+  const [microsoftDisconnecting, setMicrosoftDisconnecting] = useState(false);
 
   useEffect(() => {
     if (!theme) return;
@@ -229,6 +237,38 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     }
   }, [preferences?.active_team]);
 
+  const loadGoogleStatus = useCallback(async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) {
+      setGoogleStatus(null);
+      return;
+    }
+    try {
+      setGoogleLoading(true);
+      setGoogleStatus(await api.integrations.googleWorkspaceStatus(teamId));
+    } catch (e) {
+      setGoogleStatus({ connected: false, error: true });
+    } finally {
+      setGoogleLoading(false);
+    }
+  }, [preferences?.active_team]);
+
+  const loadMicrosoftStatus = useCallback(async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) {
+      setMicrosoftStatus(null);
+      return;
+    }
+    try {
+      setMicrosoftLoading(true);
+      setMicrosoftStatus(await api.integrations.microsoft365Status(teamId));
+    } catch (e) {
+      setMicrosoftStatus({ connected: false, error: true });
+    } finally {
+      setMicrosoftLoading(false);
+    }
+  }, [preferences?.active_team]);
+
   useEffect(() => {
     const t = searchParams.get('tab');
     if (t && ['general', 'notifications', 'integrations', 'appearance'].includes(t)) {
@@ -293,12 +333,29 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   }, [searchParams, setSearchParams, loadOktaStatus, showToast]);
 
   useEffect(() => {
+    const googleParam = searchParams.get('google');
+    if (googleParam === 'connected') {
+      showToast('Google Workspace connected successfully.');
+      loadGoogleStatus();
+      setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('google'); return n; }, { replace: true });
+    }
+    const msParam = searchParams.get('microsoft');
+    if (msParam === 'connected') {
+      showToast('Microsoft 365 connected successfully.');
+      loadMicrosoftStatus();
+      setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('microsoft'); return n; }, { replace: true });
+    }
+  }, [searchParams, setSearchParams, loadGoogleStatus, loadMicrosoftStatus, showToast]);
+
+  useEffect(() => {
     if (activeTab !== 'integrations' || !preferences?.active_team) return;
     loadSlackStatus();
     loadTeamsStatus();
     loadWebhooks();
     loadOktaStatus();
-  }, [activeTab, preferences?.active_team, loadSlackStatus, loadTeamsStatus, loadWebhooks, loadOktaStatus]);
+    loadGoogleStatus();
+    loadMicrosoftStatus();
+  }, [activeTab, preferences?.active_team, loadSlackStatus, loadTeamsStatus, loadWebhooks, loadOktaStatus, loadGoogleStatus, loadMicrosoftStatus]);
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon },
@@ -505,6 +562,66 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
       showToast(e?.message || 'Could not disconnect Okta.', 'error');
     } finally {
       setOktaDisconnecting(false);
+    }
+  };
+
+  const handleConnectGoogle = async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) {
+      showToast('Choose an active workspace first.', 'error');
+      return;
+    }
+    try {
+      setGoogleConnecting(true);
+      window.location.assign(await api.integrations.googleWorkspaceAuthorizeUrl(teamId));
+    } catch (e) {
+      showToast(e?.message || 'Could not start Google connection.', 'error');
+      setGoogleConnecting(false);
+    }
+  };
+
+  const handleDisconnectGoogle = async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) return;
+    try {
+      setGoogleDisconnecting(true);
+      await api.integrations.googleWorkspaceDisconnect(teamId);
+      showToast('Google Workspace disconnected.');
+      await loadGoogleStatus();
+    } catch (e) {
+      showToast(e?.message || 'Could not disconnect Google.', 'error');
+    } finally {
+      setGoogleDisconnecting(false);
+    }
+  };
+
+  const handleConnectMicrosoft = async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) {
+      showToast('Choose an active workspace first.', 'error');
+      return;
+    }
+    try {
+      setMicrosoftConnecting(true);
+      window.location.assign(await api.integrations.microsoft365AuthorizeUrl(teamId));
+    } catch (e) {
+      showToast(e?.message || 'Could not start Microsoft connection.', 'error');
+      setMicrosoftConnecting(false);
+    }
+  };
+
+  const handleDisconnectMicrosoft = async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) return;
+    try {
+      setMicrosoftDisconnecting(true);
+      await api.integrations.microsoft365Disconnect(teamId);
+      showToast('Microsoft 365 disconnected.');
+      await loadMicrosoftStatus();
+    } catch (e) {
+      showToast(e?.message || 'Could not disconnect Microsoft.', 'error');
+    } finally {
+      setMicrosoftDisconnecting(false);
     }
   };
 
@@ -1061,6 +1178,70 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
             </div>
           </div>
         </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card>
+            <div className="p-6 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Google Workspace</h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                    Directory + licensing read for auto_check steps.
+                  </p>
+                  {googleStatus?.admin_email && (
+                    <p className="text-xs text-gray-500 mt-1 font-mono">{googleStatus.admin_email}</p>
+                  )}
+                </div>
+                {googleLoading ? <Badge variant="warning">…</Badge> : googleStatus?.connected ? (
+                  <Badge variant="success">Connected</Badge>
+                ) : (
+                  <Badge variant="warning">Not connected</Badge>
+                )}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="primary" size="sm" type="button" loading={googleConnecting} disabled={googleDisconnecting || !preferences?.active_team} onClick={handleConnectGoogle}>
+                  {googleStatus?.connected ? 'Reconnect' : 'Connect'}
+                </Button>
+                {googleStatus?.connected && (
+                  <Button variant="outline" size="sm" type="button" loading={googleDisconnecting} disabled={googleConnecting} onClick={handleDisconnectGoogle}>
+                    Disconnect
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="p-6 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Microsoft 365</h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                    Graph read for user + license auto_check steps.
+                  </p>
+                  {microsoftStatus?.tenant_id && (
+                    <p className="text-xs text-gray-500 mt-1 font-mono">Tenant {microsoftStatus.tenant_id}</p>
+                  )}
+                </div>
+                {microsoftLoading ? <Badge variant="warning">…</Badge> : microsoftStatus?.connected ? (
+                  <Badge variant="success">Connected</Badge>
+                ) : (
+                  <Badge variant="warning">Not connected</Badge>
+                )}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="primary" size="sm" type="button" loading={microsoftConnecting} disabled={microsoftDisconnecting || !preferences?.active_team} onClick={handleConnectMicrosoft}>
+                  {microsoftStatus?.connected ? 'Reconnect' : 'Connect'}
+                </Button>
+                {microsoftStatus?.connected && (
+                  <Button variant="outline" size="sm" type="button" loading={microsoftDisconnecting} disabled={microsoftConnecting} onClick={handleDisconnectMicrosoft}>
+                    Disconnect
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
+        </div>
 
         <Card>
           <div className="p-6 space-y-4">
