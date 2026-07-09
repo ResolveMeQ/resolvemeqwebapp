@@ -11,6 +11,7 @@ import {
   Sparkles,
   MessageSquare,
   Webhook,
+  Shield,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -129,6 +130,11 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   const [webhookForm, setWebhookForm] = useState({ name: '', url: '', events: [] });
   const [webhookSecret, setWebhookSecret] = useState(null);
   const [webhookDeliveries, setWebhookDeliveries] = useState([]);
+  const [oktaStatus, setOktaStatus] = useState(null);
+  const [oktaStatusLoading, setOktaStatusLoading] = useState(false);
+  const [oktaConnecting, setOktaConnecting] = useState(false);
+  const [oktaDisconnecting, setOktaDisconnecting] = useState(false);
+  const [oktaDomain, setOktaDomain] = useState('');
 
   useEffect(() => {
     if (!theme) return;
@@ -204,6 +210,25 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     }
   }, [preferences?.active_team, showToast]);
 
+  const loadOktaStatus = useCallback(async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) {
+      setOktaStatus(null);
+      return;
+    }
+    try {
+      setOktaStatusLoading(true);
+      const s = await api.integrations.oktaStatus(teamId);
+      setOktaStatus(s);
+      if (s?.okta_domain) setOktaDomain(s.okta_domain);
+    } catch (e) {
+      console.error('Okta status:', e);
+      setOktaStatus({ connected: false, error: true });
+    } finally {
+      setOktaStatusLoading(false);
+    }
+  }, [preferences?.active_team]);
+
   useEffect(() => {
     const t = searchParams.get('tab');
     if (t && ['general', 'notifications', 'integrations', 'appearance'].includes(t)) {
@@ -252,11 +277,28 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   }, [searchParams, setSearchParams, loadSlackStatus, showToast]);
 
   useEffect(() => {
+    const oktaParam = searchParams.get('okta');
+    if (oktaParam === 'connected') {
+      showToast('Okta connected successfully.');
+      loadOktaStatus();
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('okta');
+          return next;
+        },
+        { replace: true }
+      );
+    }
+  }, [searchParams, setSearchParams, loadOktaStatus, showToast]);
+
+  useEffect(() => {
     if (activeTab !== 'integrations' || !preferences?.active_team) return;
     loadSlackStatus();
     loadTeamsStatus();
     loadWebhooks();
-  }, [activeTab, preferences?.active_team, loadSlackStatus, loadTeamsStatus, loadWebhooks]);
+    loadOktaStatus();
+  }, [activeTab, preferences?.active_team, loadSlackStatus, loadTeamsStatus, loadWebhooks, loadOktaStatus]);
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon },
@@ -429,6 +471,41 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
         : [...prev.events, event];
       return { ...prev, events };
     });
+  };
+
+  const handleConnectOkta = async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) {
+      showToast('Choose an active workspace in the sidebar, then try again.', 'error');
+      return;
+    }
+    if (!oktaDomain.trim()) {
+      showToast('Enter your Okta domain (e.g. dev-12345678).', 'error');
+      return;
+    }
+    try {
+      setOktaConnecting(true);
+      const url = await api.integrations.oktaAuthorizeUrl(teamId, oktaDomain.trim());
+      window.location.assign(url);
+    } catch (e) {
+      showToast(e?.message || 'Could not start Okta connection.', 'error');
+      setOktaConnecting(false);
+    }
+  };
+
+  const handleDisconnectOkta = async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) return;
+    try {
+      setOktaDisconnecting(true);
+      await api.integrations.oktaDisconnect(teamId);
+      showToast('Okta disconnected for this workspace.');
+      await loadOktaStatus();
+    } catch (e) {
+      showToast(e?.message || 'Could not disconnect Okta.', 'error');
+    } finally {
+      setOktaDisconnecting(false);
+    }
   };
 
   const inputClass = 'input-enterprise';
@@ -914,6 +991,73 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                 <li>AI replies, escalations, and workflow step alerts arrive in Teams DM when linked.</li>
                 <li>Use the link code above once per workspace to attach your Teams tenant.</li>
               </ul>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="p-6 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-sky-700">
+                  <Shield className="w-5 h-5 text-white" aria-hidden />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Okta</h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 max-w-md">
+                    OAuth read access for workflow auto_check steps (user exists, group membership).
+                    Requires an Okta OIDC app with redirect URI pointing to this API.
+                  </p>
+                  {oktaStatusLoading && (
+                    <p className="text-xs text-gray-500 mt-2">Checking connection…</p>
+                  )}
+                  {oktaStatus?.connected && oktaStatus?.okta_domain && (
+                    <p className="text-xs text-gray-500 mt-2 font-mono">{oktaStatus.okta_domain}.okta.com</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                {oktaStatusLoading ? (
+                  <Badge variant="warning">Checking…</Badge>
+                ) : oktaStatus?.connected ? (
+                  <Badge variant="success">Connected</Badge>
+                ) : (
+                  <Badge variant="warning">Not connected</Badge>
+                )}
+              </div>
+            </div>
+            {!oktaStatus?.connected && (
+              <input
+                type="text"
+                className={inputClass}
+                placeholder="Okta domain (e.g. dev-12345678)"
+                value={oktaDomain}
+                onChange={(e) => setOktaDomain(e.target.value)}
+              />
+            )}
+            <div className="flex flex-wrap gap-2 justify-end">
+              <Button
+                variant="primary"
+                size="sm"
+                type="button"
+                disabled={!preferences?.active_team || oktaConnecting || oktaDisconnecting}
+                loading={oktaConnecting}
+                onClick={handleConnectOkta}
+              >
+                {oktaStatus?.connected ? 'Reconnect Okta' : 'Connect Okta'}
+              </Button>
+              {oktaStatus?.connected && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  disabled={oktaDisconnecting}
+                  loading={oktaDisconnecting}
+                  onClick={handleDisconnectOkta}
+                >
+                  Disconnect
+                </Button>
+              )}
             </div>
           </div>
         </Card>

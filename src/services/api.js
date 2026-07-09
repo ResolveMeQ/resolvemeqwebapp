@@ -541,6 +541,10 @@ export const api = {
     completeStep: async (workflowId, stepId) => {
       return apiFetch(`/api/workflows/${workflowId}/steps/${stepId}/complete/`, { method: 'POST' });
     },
+
+    rerunAutoCheck: async (workflowId, stepId) => {
+      return apiFetch(`/api/workflows/${workflowId}/steps/${stepId}/auto-check/`, { method: 'POST' });
+    },
   },
 
   // Analytics endpoints
@@ -1045,6 +1049,31 @@ export const api = {
     testWebhook: async (endpointId, payload = {}) =>
       apiFetch(`/api/integrations/webhooks/${endpointId}/test/`, { method: 'POST', body: JSON.stringify(payload) }),
     webhookDeliveries: async () => apiFetch('/api/integrations/webhooks/deliveries/'),
+    oktaStatus: async (teamId) => {
+      const q = teamId ? `?team_id=${encodeURIComponent(teamId)}` : '';
+      return apiFetch(`/api/integrations/okta/status/${q}`);
+    },
+    oktaAuthorizeUrl: async (teamId, oktaDomain) => {
+      if (!teamId || !oktaDomain) {
+        throw new Error('team_id and okta_domain are required to connect Okta');
+      }
+      const data = await apiFetch(
+        `/api/integrations/okta/oauth/start/?team_id=${encodeURIComponent(teamId)}&okta_domain=${encodeURIComponent(oktaDomain)}&format=json`
+      );
+      if (!data?.authorize_url) {
+        throw new Error(data?.detail || 'Could not start Okta OAuth');
+      }
+      return data.authorize_url;
+    },
+    oktaDisconnect: async (teamId) => {
+      if (!teamId) {
+        throw new Error('team_id is required to disconnect Okta');
+      }
+      return apiFetch('/api/integrations/okta/disconnect/', {
+        method: 'POST',
+        body: JSON.stringify({ team_id: teamId }),
+      });
+    },
   },
 
   // In-app notifications (header bell)

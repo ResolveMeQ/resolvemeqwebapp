@@ -46,6 +46,9 @@ const EMPTY_STEP = () => ({
   skip_when: null,
   skip_field: '',
   skip_equals: '',
+  auto_check_connector: 'okta',
+  auto_check_check: 'user_exists',
+  auto_check_group_id: '',
 });
 
 const STEP_TYPE_META = {
@@ -68,7 +71,7 @@ const STEP_TYPE_META = {
     icon: Bot,
     color: 'text-violet-600 dark:text-violet-400',
     bg: 'bg-violet-50 dark:bg-violet-900/20',
-    hint: 'System verification (connectors coming — manual override for now).',
+    hint: 'Connector verifies automatically (Okta user exists, etc.).',
   },
 };
 
@@ -370,6 +373,50 @@ function StepEditorCard({
                   })}
                 </div>
               </div>
+              {step.step_type === 'auto_check' && (
+                <div className="rounded-lg border border-violet-200 dark:border-violet-900/40 bg-violet-50/40 dark:bg-violet-950/20 p-3 space-y-3">
+                  <p className="text-xs font-semibold text-violet-800 dark:text-violet-300 uppercase tracking-wide">
+                    Auto check (connector)
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelClass}>Connector</label>
+                      <select
+                        value={step.auto_check_connector || 'okta'}
+                        onChange={(e) => onChange({ auto_check_connector: e.target.value })}
+                        className={inputClass}
+                      >
+                        <option value="okta">Okta</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Check</label>
+                      <select
+                        value={step.auto_check_check || 'user_exists'}
+                        onChange={(e) => onChange({ auto_check_check: e.target.value })}
+                        className={inputClass}
+                      >
+                        <option value="user_exists">User exists</option>
+                        <option value="group_member">Group member</option>
+                      </select>
+                    </div>
+                  </div>
+                  {step.auto_check_check === 'group_member' && (
+                    <div>
+                      <label className={labelClass}>Okta group ID</label>
+                      <input
+                        value={step.auto_check_group_id || ''}
+                        onChange={(e) => onChange({ auto_check_group_id: e.target.value })}
+                        className={inputClass}
+                        placeholder="00g..."
+                      />
+                    </div>
+                  )}
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                    Uses ticket reporter email. Connect Okta in Settings → Integrations.
+                  </p>
+                </div>
+              )}
               <details className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30">
                 <summary className="px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 cursor-pointer select-none">
                   Advanced automation
@@ -565,6 +612,9 @@ const WorkflowTemplates = () => {
         auto_assign: s.auto_assign || '',
         skip_field: s.skip_when?.ticket_field || '',
         skip_equals: s.skip_when?.equals ?? '',
+        auto_check_connector: s.auto_check?.connector || 'okta',
+        auto_check_check: s.auto_check?.check || 'user_exists',
+        auto_check_group_id: s.auto_check?.group_id || '',
       })),
     });
     setExpandedStepIdx(0);
@@ -590,6 +640,9 @@ const WorkflowTemplates = () => {
         auto_assign: s.auto_assign || '',
         skip_field: s.skip_when?.ticket_field || '',
         skip_equals: s.skip_when?.equals ?? '',
+        auto_check_connector: s.auto_check?.connector || 'okta',
+        auto_check_check: s.auto_check?.check || 'user_exists',
+        auto_check_group_id: s.auto_check?.group_id || '',
       })),
     });
     setExpandedStepIdx(0);
@@ -659,6 +712,16 @@ const WorkflowTemplates = () => {
           const equals = (s.skip_equals ?? '').toString().trim();
           if (field && equals) {
             step.skip_when = { ticket_field: field, equals };
+          }
+          if (s.step_type === 'auto_check') {
+            step.auto_check = {
+              connector: s.auto_check_connector || 'okta',
+              check: s.auto_check_check || 'user_exists',
+              email_from: 'ticket_reporter',
+            };
+            if (s.auto_check_check === 'group_member' && (s.auto_check_group_id || '').trim()) {
+              step.auto_check.group_id = s.auto_check_group_id.trim();
+            }
           }
           return step;
         }),

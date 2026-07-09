@@ -102,13 +102,14 @@ function WorkflowProgressStepper({ steps }) {
   );
 }
 
-function StepDetailCard({ step, busy, onClaim, onComplete }) {
+function StepDetailCard({ step, busy, onClaim, onComplete, onAutoCheck }) {
   const isDone = step.status === 'done';
   const isSkipped = step.status === 'skipped';
   const isActive = step.status === 'active';
   const stepType = step.step_type || 'manual';
   const TypeIcon = STEP_TYPE_ICON[stepType] || Hand;
   const roleLabel = step.assignee_role_label || step.assignee_team;
+  const checkResult = step.auto_check_result;
 
   return (
     <div
@@ -180,6 +181,20 @@ function StepDetailCard({ step, busy, onClaim, onComplete }) {
             )}
           </div>
         )}
+        {checkResult?.message && !isDone && !isSkipped && (
+          <p
+            className={cn(
+              'text-xs mt-1.5',
+              checkResult.status === 'success'
+                ? 'text-green-600 dark:text-green-400'
+                : checkResult.status === 'skipped'
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-red-600 dark:text-red-400'
+            )}
+          >
+            {checkResult.message}
+          </p>
+        )}
         {isDone && (
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
             {step.claimed_by ? `Completed by ${step.claimed_by.name}` : 'Completed automatically'}
@@ -187,8 +202,17 @@ function StepDetailCard({ step, busy, onClaim, onComplete }) {
         )}
       </div>
       {isActive && (
-        <div className="flex-shrink-0">
-          {!step.claimed_by ? (
+        <div className="flex-shrink-0 flex flex-col gap-1.5 items-end">
+          {stepType === 'auto_check' ? (
+            <>
+              <Button variant="primary" size="sm" loading={busy} onClick={() => onAutoCheck?.(step)}>
+                Run check
+              </Button>
+              <Button variant="outline" size="sm" loading={busy} onClick={() => onComplete(step)}>
+                Mark done
+              </Button>
+            </>
+          ) : !step.claimed_by ? (
             step.can_claim === false ? (
               <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
                 <Lock className="w-3.5 h-3.5" />
@@ -249,6 +273,22 @@ const WorkflowChecklist = ({ workflow, onUpdate, variant = 'standalone' }) => {
     }
   };
 
+  const handleAutoCheck = async (step) => {
+    setBusyStepId(step.id);
+    setError(null);
+    try {
+      const res = await api.workflows.rerunAutoCheck(workflow.id, step.id);
+      if (!res?.passed) {
+        setError(res?.message || 'Auto check did not pass.');
+      }
+      onUpdate?.();
+    } catch (e) {
+      setError(e?.message || 'Could not run auto check.');
+    } finally {
+      setBusyStepId(null);
+    }
+  };
+
   const activeStep = workflow.steps.find((s) => s.status === 'active');
 
   return (
@@ -300,6 +340,7 @@ const WorkflowChecklist = ({ workflow, onUpdate, variant = 'standalone' }) => {
             busy={busyStepId === step.id}
             onClaim={handleClaim}
             onComplete={handleComplete}
+            onAutoCheck={handleAutoCheck}
           />
         ))}
       </div>
