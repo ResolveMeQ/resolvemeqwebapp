@@ -515,7 +515,7 @@ const Teams = () => {
           <p className="text-gray-500 dark:text-gray-400 mt-1">Manage your support teams</p>
           {activeTeamContext && (
             <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-              Using: <strong>{activeTeamContext.name}</strong> — switch in the sidebar to change which team&apos;s plan applies to your usage.
+              Using: <strong>{activeTeamContext.name}</strong>. Switch in the sidebar to change which team’s plan applies to your usage.
             </p>
           )}
         </div>

@@ -660,7 +660,7 @@ const Billing = ({ onRefreshUserData }) => {
             <Receipt className="w-5 h-5 text-gray-400 dark:text-gray-500" />
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">Need Help?</h3>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Questions about your bill or plan? Send us a message — we&apos;ll email you back.</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Questions about your bill or plan? Send us a message and we’ll email you back.</p>
           <Button
             type="button"
             variant="outline"

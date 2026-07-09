@@ -831,7 +831,7 @@ const WorkflowTemplates = () => {
                 Workflow templates
               </h1>
               <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-2 max-w-xl">
-                Curated multi-step playbooks your team runs every day — onboarding, provisioning, offboarding.
+                Curated multi-step playbooks your team runs every day: onboarding, provisioning, offboarding.
                 Auto-start from ticket categories or launch manually.
               </p>
             </div>
@@ -883,7 +883,7 @@ const WorkflowTemplates = () => {
               1
             </span>
             <span>
-              <strong className="text-gray-800 dark:text-gray-200">Define steps</strong> — sequential tasks with owners, SLAs, and approval gates.
+              <strong className="text-gray-800 dark:text-gray-200">Define steps</strong>: sequential tasks with owners, SLAs, and approval gates.
             </span>
           </div>
           <div className="flex gap-2">
@@ -891,7 +891,7 @@ const WorkflowTemplates = () => {
               2
             </span>
             <span>
-              <strong className="text-gray-800 dark:text-gray-200">Auto-start or manual</strong> — match a ticket category or start from Workflows.
+              <strong className="text-gray-800 dark:text-gray-200">Auto-start or manual</strong>: match a ticket category or start from Workflows.
             </span>
           </div>
           <div className="flex gap-2">
@@ -899,7 +899,7 @@ const WorkflowTemplates = () => {
               3
             </span>
             <span>
-              <strong className="text-gray-800 dark:text-gray-200">Notify & track</strong> — Slack/Teams alerts, overdue badges, ticket resolves on completion.
+              <strong className="text-gray-800 dark:text-gray-200">Notify & track</strong>: Slack/Teams alerts, overdue badges, ticket resolves on completion.
             </span>
           </div>
         </div>

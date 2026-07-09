@@ -326,7 +326,7 @@ const Tickets = ({ activeTeamId }) => {
         if (canonicalStatus === 'resolved') {
           showToast('Ticket marked resolved.', 'success');
         } else if (canonicalStatus === 'escalated') {
-          showToast('Ticket escalated. Support will review it — updates appear here and by email.', 'info');
+          showToast('Ticket escalated. Support will review it. Updates appear here and by email.', 'info');
         } else {
           showToast(`Status updated to ${canonicalStatus.replace(/_/g, ' ')}.`, 'info');
         }
@@ -619,7 +619,7 @@ const Tickets = ({ activeTeamId }) => {
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Tickets</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Your active team&apos;s queue plus your personal tickets — search also surfaces similar resolved examples.
+            Your active team’s queue plus your personal tickets. Search also surfaces similar resolved examples.
           </p>
         </div>
         <Button
@@ -777,7 +777,7 @@ const Tickets = ({ activeTeamId }) => {
                       className="input-enterprise text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-sm file:font-medium dark:file:bg-primary-950"
                     />
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Drag and drop an image here, or choose a file — JPEG, PNG, GIF, or WebP, up to 5 MB
+                      Drag and drop an image here, or choose a file (JPEG, PNG, GIF, or WebP, up to 5 MB).
                     </p>
                     {screenshotPreviewUrl && (
                       <div className="mt-3 flex items-start gap-3">
@@ -951,7 +951,7 @@ const Tickets = ({ activeTeamId }) => {
               <>
                 <p className="text-base font-semibold text-gray-900 dark:text-white">No tickets yet</p>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 max-w-sm">
-                  When something breaks or you need help, open a ticket — our AI assistant will walk through fixes with you.
+                  When something breaks or you need help, open a ticket. The assistant will walk through fixes with you.
                 </p>
                 <Button onClick={() => setShowCreateForm(true)} variant="primary" size="md" className="mt-6">
                   <Plus className="w-4 h-4 mr-2" />

@@ -129,7 +129,7 @@ const EscalationQueue = () => {
         </div>
       ) : tickets.length === 0 ? (
         <Card className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-          Nothing escalated right now — the queue is empty.
+          Nothing escalated right now. The queue is empty.
         </Card>
       ) : (
         <div className="space-y-3">

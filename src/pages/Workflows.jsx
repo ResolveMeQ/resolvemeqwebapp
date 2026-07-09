@@ -141,7 +141,7 @@ const Workflows = () => {
             Workflows
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Multi-step processes for your team — provisioning, and anything else that's more than one ticket's worth of steps.
+            Multi-step processes for your team: provisioning, and anything else that’s more than one ticket’s worth of steps.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -189,7 +189,7 @@ const Workflows = () => {
         </div>
       ) : workflows.length === 0 ? (
         <Card className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-          No workflows yet — start one, or create a ticket in a category that triggers one (e.g. Provisioning).
+          No workflows yet. Start one, or create a ticket in a category that triggers one (e.g. Provisioning).
         </Card>
       ) : (
         <div className="space-y-3">

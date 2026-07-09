@@ -74,7 +74,7 @@ const EnhancedKBSearch = ({ onSelectArticle }) => {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search with AI-powered insights..."
+              placeholder="Search with context-aware results..."
               className="w-full pl-10 pr-4 py-3 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white"
             />
           </div>
@@ -92,7 +92,7 @@ const EnhancedKBSearch = ({ onSelectArticle }) => {
             <div className="flex items-center gap-2 text-purple-700">
               <Sparkles className="h-4 w-4" />
               <span className="font-medium">
-                AI-Enhanced: {results.sources_used?.join(', ') || 'Multiple sources'}
+                Sources: {results.sources_used?.join(', ') || 'Multiple sources'}
               </span>
             </div>
             {results.search_time_ms && (
@@ -178,9 +178,9 @@ const EnhancedKBSearch = ({ onSelectArticle }) => {
       {!results && !loading && (
         <Card className="p-12 text-center">
           <Brain className="h-16 w-16 text-purple-400 mx-auto mb-4" />
-          <h4 className="text-lg font-semibold text-gray-900 mb-2">AI-Powered Knowledge Search</h4>
+          <h4 className="text-lg font-semibold text-gray-900 mb-2">Knowledge search</h4>
           <p className="text-gray-600 max-w-md mx-auto">
-            Search our knowledge base with advanced AI that understands context and finds the most relevant solutions.
+            Search the knowledge base with context-aware matching to surface the most relevant articles.
           </p>
         </Card>
       )}

@@ -265,7 +265,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
       const res = await api.integrations.createPartnerKey({ name: partnerKeyName.trim() });
       setPartnerKeySecret(res?.key?.api_key || null);
       setPartnerKeyName('');
-      showToast('Partner API key created. Copy it now — it is shown once.');
+      showToast('Partner API key created. Copy it now (it is shown once).');
       await loadPartnerKeys();
     } catch (e) {
       showToast(e?.message || 'Could not create partner API key.', 'error');
@@ -595,7 +595,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
       setTeamsLinking(true);
       const data = await api.integrations.teamsLinkStart(teamId);
       setTeamsLinkInfo(data);
-      showToast('Link code generated — follow the steps in Teams.', 'success');
+      showToast('Link code generated. Follow the steps in Teams.', 'success');
     } catch (e) {
       showToast(e?.message || 'Could not start Teams linking.', 'error');
     } finally {
@@ -633,7 +633,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
       });
       setWebhookSecret(res?.endpoint?.secret || null);
       setWebhookForm({ name: '', url: '', events: [] });
-      showToast('Webhook endpoint created. Copy the signing secret now — it is shown once.');
+      showToast('Webhook endpoint created. Copy the signing secret now (it is shown once).');
       await loadWebhooks();
     } catch (e) {
       showToast(e?.message || 'Could not create webhook.', 'error');
