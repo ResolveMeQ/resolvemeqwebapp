@@ -1399,6 +1399,19 @@ const WorkflowTemplates = () => {
                           : ''}
                       </p>
                     )}
+                    {onboardingSku.resolution_templates?.length > 0 && (
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Resolution template:{' '}
+                        <span className="font-medium text-gray-800 dark:text-gray-200">
+                          {onboardingSku.resolution_templates[0].name}
+                        </span>
+                      </p>
+                    )}
+                    {onboardingSku.install_command && (
+                      <p className="text-[10px] font-mono text-gray-500 dark:text-gray-500 break-all">
+                        {onboardingSku.install_command}
+                      </p>
+                    )}
                     <div className="flex flex-col gap-2 pt-1">
                       {onboardingSku.template_id && (
                         <Button

@@ -545,6 +545,17 @@ export const api = {
     rerunAutoCheck: async (workflowId, stepId) => {
       return apiFetch(`/api/workflows/${workflowId}/steps/${stepId}/auto-check/`, { method: 'POST' });
     },
+
+    stepAssistant: async (workflowId, stepId) => {
+      return apiFetch(`/api/workflows/${workflowId}/steps/${stepId}/assistant/`);
+    },
+
+    acceptStepAssistant: async (workflowId, stepId, note) => {
+      return apiFetch(`/api/workflows/${workflowId}/steps/${stepId}/assistant/accept/`, {
+        method: 'POST',
+        body: JSON.stringify({ note }),
+      });
+    },
   },
 
   // Analytics endpoints

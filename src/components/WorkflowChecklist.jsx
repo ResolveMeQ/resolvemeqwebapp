@@ -11,6 +11,7 @@ import {
   SkipForward,
   Lock,
   BookOpen,
+  Sparkles,
 } from 'lucide-react';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
@@ -102,7 +103,100 @@ function WorkflowProgressStepper({ steps }) {
   );
 }
 
-function StepDetailCard({ step, busy, onClaim, onComplete, onAutoCheck }) {
+function StepAssistantPanel({ workflowId, step, disabled, onAccepted }) {
+  const [loading, setLoading] = useState(false);
+  const [accepting, setAccepting] = useState(false);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  const loadSuggestions = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.workflows.stepAssistant(workflowId, step.id);
+      setData(res?.suggestions || null);
+    } catch (e) {
+      setError(e?.message || 'Could not load step guidance.');
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAccept = async () => {
+    if (!data) return;
+    const note = [
+      data.summary,
+      ...(data.actions || []).length ? ['', 'Actions:', ...(data.actions || []).map((a) => `- ${a}`)] : [],
+    ].join('\n');
+    setAccepting(true);
+    setError(null);
+    try {
+      await api.workflows.acceptStepAssistant(workflowId, step.id, note);
+      onAccepted?.();
+    } catch (e) {
+      setError(e?.message || 'Could not save guidance to ticket notes.');
+    } finally {
+      setAccepting(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 rounded-lg border border-violet-200 dark:border-violet-900/50 bg-violet-50/70 dark:bg-violet-950/20 p-3 space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-200 flex items-center gap-1">
+          <Sparkles className="w-3.5 h-3.5" />
+          Step assistant
+        </p>
+        {!data && (
+          <Button variant="outline" size="sm" type="button" loading={loading} disabled={disabled} onClick={loadSuggestions}>
+            Get AI guidance
+          </Button>
+        )}
+      </div>
+      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {data && (
+        <>
+          <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{data.summary}</p>
+          {data.actions?.length > 0 && (
+            <ul className="text-xs text-gray-600 dark:text-gray-400 list-disc pl-4 space-y-0.5">
+              {data.actions.map((action) => (
+                <li key={action}>{action}</li>
+              ))}
+            </ul>
+          )}
+          {data.kb_citations?.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {data.kb_citations.map((kb) => (
+                <Link
+                  key={kb.kb_id || kb.title}
+                  to={`/knowledge-base?kb=${encodeURIComponent(kb.kb_id)}`}
+                  className="inline-flex items-center gap-1 text-[10px] text-primary-600 dark:text-primary-400 hover:underline"
+                >
+                  <BookOpen className="w-3 h-3" />
+                  {kb.title}
+                </Link>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button variant="secondary" size="sm" type="button" loading={accepting} disabled={disabled} onClick={handleAccept}>
+              Add to ticket notes
+            </Button>
+            <Button variant="ghost" size="sm" type="button" disabled={loading || disabled} onClick={loadSuggestions}>
+              Refresh
+            </Button>
+          </div>
+          {data.source === 'fallback' && (
+            <p className="text-[10px] text-amber-700 dark:text-amber-400">AI unavailable — showing linked playbook content.</p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function StepDetailCard({ workflowId, step, busy, onClaim, onComplete, onAutoCheck, onAssistantAccepted }) {
   const isDone = step.status === 'done';
   const isSkipped = step.status === 'skipped';
   const isActive = step.status === 'active';
@@ -194,6 +288,14 @@ function StepDetailCard({ step, busy, onClaim, onComplete, onAutoCheck }) {
           >
             {checkResult.message}
           </p>
+        )}
+        {isActive && workflowId && (stepType === 'manual' || stepType === 'approval') && (
+          <StepAssistantPanel
+            workflowId={workflowId}
+            step={step}
+            disabled={busy}
+            onAccepted={onAssistantAccepted}
+          />
         )}
         {isDone && (
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
@@ -336,11 +438,13 @@ const WorkflowChecklist = ({ workflow, onUpdate, variant = 'standalone' }) => {
         {workflow.steps.map((step) => (
           <StepDetailCard
             key={step.id}
+            workflowId={workflow.id}
             step={step}
             busy={busyStepId === step.id}
             onClaim={handleClaim}
             onComplete={handleComplete}
             onAutoCheck={handleAutoCheck}
+            onAssistantAccepted={onUpdate}
           />
         ))}
       </div>
