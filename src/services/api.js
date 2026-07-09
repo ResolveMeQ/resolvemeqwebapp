@@ -558,6 +558,22 @@ export const api = {
     },
   },
 
+  msp: {
+    status: async () => apiFetch('/api/msp/status/'),
+    enable: async (teamId) =>
+      apiFetch('/api/msp/enable/', { method: 'POST', body: JSON.stringify({ team_id: teamId }) }),
+    dashboard: async (teamId) => {
+      const q = teamId ? `?team_id=${encodeURIComponent(teamId)}` : '';
+      return apiFetch(`/api/msp/dashboard/${q}`);
+    },
+    createClient: async (teamId, payload) =>
+      apiFetch('/api/msp/clients/', {
+        method: 'POST',
+        body: JSON.stringify({ team_id: teamId, ...payload }),
+      }),
+    clientUsage: async (clientId) => apiFetch(`/api/msp/clients/${clientId}/usage/`),
+  },
+
   // Analytics endpoints
   analytics: {
     getTicketAnalytics: async () => {

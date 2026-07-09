@@ -268,6 +268,15 @@ function StepDetailCard({ workflowId, step, busy, onClaim, onComplete, onAutoChe
             ))}
           </div>
         )}
+        {step.child_ticket?.ticket_id && (
+          <Link
+            to={`/tickets?highlight=${step.child_ticket.ticket_id}`}
+            className="inline-flex items-center gap-1.5 mt-1.5 text-xs font-medium text-sky-700 dark:text-sky-300 hover:underline"
+          >
+            Child ticket #{step.child_ticket.ticket_id}
+            <span className="text-[10px] font-normal text-gray-500 capitalize">({step.child_ticket.status})</span>
+          </Link>
+        )}
         {step.due_at && !isDone && !isSkipped && (
           <div className="flex flex-wrap items-center gap-2 mt-1.5">
             <p className="text-xs text-gray-500 dark:text-gray-400">

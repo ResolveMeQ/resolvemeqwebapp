@@ -59,12 +59,36 @@ const Teams = () => {
   }, []);
 
   const [activeTeamContext, setActiveTeamContext] = useState(null);
+  const [mspStatus, setMspStatus] = useState(null);
+  const [mspDashboard, setMspDashboard] = useState(null);
+  const [mspClientName, setMspClientName] = useState('');
+  const [mspLoading, setMspLoading] = useState(false);
+  const [mspSaving, setMspSaving] = useState(false);
+
+  const loadMsp = useCallback(async (hubId) => {
+    try {
+      setMspLoading(true);
+      const status = await api.msp.status();
+      setMspStatus(status);
+      if (status?.enabled && status?.hub?.id) {
+        setMspDashboard(await api.msp.dashboard(hubId || status.hub.id));
+      } else {
+        setMspDashboard(null);
+      }
+    } catch {
+      setMspStatus(null);
+      setMspDashboard(null);
+    } finally {
+      setMspLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadTeams();
     loadLimits();
     loadInvitations();
-  }, []);
+    loadMsp();
+  }, [loadMsp]);
 
   useEffect(() => {
     api.settings.getPreferences().then((p) => {
@@ -126,7 +150,8 @@ const Teams = () => {
         members_details: team.members_details || [],
         lead_name: team.lead_name || 'No lead assigned',
         lead_id: team.lead,
-        is_owner: team.is_owner === true
+        is_owner: team.is_owner === true,
+        team_kind: team.team_kind || 'workspace',
       })) : [];
       setTeams(mappedTeams);
       setFilteredTeams(mappedTeams);
@@ -149,6 +174,47 @@ const Teams = () => {
     );
     setFilteredTeams(filtered);
   }, [searchQuery, teams]);
+
+  const handleEnableMsp = async (teamId) => {
+    try {
+      setMspSaving(true);
+      await api.msp.enable(teamId);
+      showToast('MSP mode enabled for this workspace.');
+      await loadMsp(teamId);
+      await loadTeams();
+    } catch (e) {
+      showToast(e?.message || 'Could not enable MSP mode.', 'error');
+    } finally {
+      setMspSaving(false);
+    }
+  };
+
+  const handleCreateMspClient = async () => {
+    const hubId = mspStatus?.hub?.id;
+    if (!hubId || !mspClientName.trim()) return;
+    try {
+      setMspSaving(true);
+      await api.msp.createClient(hubId, { name: mspClientName.trim() });
+      setMspClientName('');
+      showToast('Client workspace created.');
+      await loadMsp(hubId);
+      await loadTeams();
+    } catch (e) {
+      showToast(e?.message || 'Could not create client workspace.', 'error');
+    } finally {
+      setMspSaving(false);
+    }
+  };
+
+  const handleSwitchToClient = async (clientId, clientName) => {
+    try {
+      await api.settings.updatePreferences({ active_team: clientId });
+      setActiveTeamContext({ id: clientId, name: clientName });
+      showToast(`Switched to ${clientName}.`);
+    } catch (e) {
+      showToast(e?.message || 'Could not switch workspace.', 'error');
+    }
+  };
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -481,6 +547,81 @@ const Teams = () => {
               </li>
             ))}
           </ul>
+        </Card>
+      )}
+
+      {mspStatus?.enabled && mspDashboard && (
+        <Card className="p-5 border border-violet-200 dark:border-violet-900/50 bg-violet-50/40 dark:bg-violet-950/20">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-sm font-semibold text-violet-900 dark:text-violet-200">MSP clients</h2>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                Hub: {mspDashboard.msp_team?.name} — each client has isolated templates, connectors, and tickets.
+              </p>
+            </div>
+            {mspLoading && <Badge variant="warning">Updating…</Badge>}
+          </div>
+          <div className="flex flex-wrap gap-2 mb-4">
+            <input
+              type="text"
+              className="input-enterprise max-w-xs"
+              placeholder="New client name"
+              value={mspClientName}
+              onChange={(e) => setMspClientName(e.target.value)}
+            />
+            <Button variant="primary" size="sm" loading={mspSaving} disabled={!mspClientName.trim()} onClick={handleCreateMspClient}>
+              Add client
+            </Button>
+          </div>
+          {mspDashboard.clients?.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                    <th className="py-2 pr-3">Client</th>
+                    <th className="py-2 pr-3">Tickets (period)</th>
+                    <th className="py-2 pr-3">Open</th>
+                    <th className="py-2 pr-3">Workflows</th>
+                    <th className="py-2 pr-3">Integrations</th>
+                    <th className="py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mspDashboard.clients.map((c) => (
+                    <tr key={c.id} className="border-b border-gray-100 dark:border-gray-800">
+                      <td className="py-2 pr-3 font-medium text-gray-900 dark:text-white">{c.name}</td>
+                      <td className="py-2 pr-3 tabular-nums">{c.usage?.tickets_created_period ?? 0}</td>
+                      <td className="py-2 pr-3 tabular-nums">{c.usage?.tickets_open ?? 0}</td>
+                      <td className="py-2 pr-3 tabular-nums">{c.usage?.workflows_started_period ?? 0}</td>
+                      <td className="py-2 pr-3 text-xs">{(c.usage?.integrations_connected || []).join(', ') || '—'}</td>
+                      <td className="py-2">
+                        <Button variant="outline" size="sm" type="button" onClick={() => handleSwitchToClient(c.id, c.name)}>
+                          Switch
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-600 dark:text-gray-400">No client workspaces yet. Add your first client above.</p>
+          )}
+        </Card>
+      )}
+
+      {!mspStatus?.enabled && teams.some((t) => t.is_owner && t.team_kind !== 'msp_client') && (
+        <Card className="p-4 border border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+            Manage multiple customer workspaces as an MSP? Enable MSP mode on one of your owned teams.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {teams.filter((t) => t.is_owner && (!t.team_kind || t.team_kind === 'workspace')).slice(0, 3).map((t) => (
+              <Button key={t.id} variant="outline" size="sm" loading={mspSaving} onClick={() => handleEnableMsp(t.id)}>
+                Enable MSP on {t.name}
+              </Button>
+            ))}
+          </div>
         </Card>
       )}
 
