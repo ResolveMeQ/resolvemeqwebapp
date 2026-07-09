@@ -574,6 +574,33 @@ export const api = {
     clientUsage: async (clientId) => apiFetch(`/api/msp/clients/${clientId}/usage/`),
   },
 
+  audit: {
+    events: async (params = {}) => {
+      const q = buildQueryString(params);
+      return apiFetch(`/api/audit/events/${q ? `?${q}` : ''}`);
+    },
+    export: async (params = {}) => {
+      const q = buildQueryString({ export_format: params.export_format || params.format || 'csv', ...params });
+      const token = TokenService.getAccessToken();
+      const response = await fetch(`${API_URL}/api/audit/export/?${q}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || err.detail || 'Audit export failed');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = params.format === 'json' ? 'resolvemeq-audit-export.json' : 'resolvemeq-audit-export.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    },
+  },
+
   // Analytics endpoints
   analytics: {
     getTicketAnalytics: async () => {
@@ -588,6 +615,11 @@ export const api = {
     /** GET /api/tickets/outcome-metrics/ — deflection, escalated, workflow counts */
     getOutcomeMetrics: async () => {
       return apiFetch('/api/tickets/outcome-metrics/');
+    },
+
+    /** GET /api/tickets/advanced-analytics/ — deflection by category, calibration, bottlenecks */
+    getAdvancedAnalytics: async () => {
+      return apiFetch('/api/tickets/advanced-analytics/');
     },
 
     getDashboard: async () => {
@@ -1076,6 +1108,12 @@ export const api = {
     testWebhook: async (endpointId, payload = {}) =>
       apiFetch(`/api/integrations/webhooks/${endpointId}/test/`, { method: 'POST', body: JSON.stringify(payload) }),
     webhookDeliveries: async () => apiFetch('/api/integrations/webhooks/deliveries/'),
+    partnerKeyMetadata: async () => apiFetch('/api/public/keys/metadata/'),
+    listPartnerKeys: async () => apiFetch('/api/public/keys/'),
+    createPartnerKey: async (payload) =>
+      apiFetch('/api/public/keys/', { method: 'POST', body: JSON.stringify(payload) }),
+    revokePartnerKey: async (keyId) =>
+      apiFetch(`/api/public/keys/${keyId}/`, { method: 'DELETE' }),
     oktaStatus: async (teamId) => {
       const q = teamId ? `?team_id=${encodeURIComponent(teamId)}` : '';
       return apiFetch(`/api/integrations/okta/status/${q}`);

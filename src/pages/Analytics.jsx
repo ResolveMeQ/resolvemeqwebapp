@@ -32,15 +32,17 @@ const Analytics = ({ activeTeamId }) => {
     tickets_per_week: []
   });
   const [resolutionAnalytics, setResolutionAnalytics] = useState(null);
+  const [advancedAnalytics, setAdvancedAnalytics] = useState(null);
 
   const loadAnalytics = async (isRefresh = false) => {
     if (isRefresh) setRefreshLoading(true);
     else setLoading(true);
     setError(null);
     try {
-      const [ticketData, resolutionData] = await Promise.all([
+      const [ticketData, resolutionData, advancedData] = await Promise.all([
         api.analytics.getTicketAnalytics(),
-        api.analytics.getResolutionAnalytics().catch(() => null)
+        api.analytics.getResolutionAnalytics().catch(() => null),
+        api.analytics.getAdvancedAnalytics().catch(() => null),
       ]);
       const raw = ticketData || {};
       setAnalytics({
@@ -50,6 +52,7 @@ const Analytics = ({ activeTeamId }) => {
         tickets_per_week: Array.isArray(raw.tickets_per_week) ? raw.tickets_per_week : []
       });
       setResolutionAnalytics(resolutionData || null);
+      setAdvancedAnalytics(advancedData || null);
     } catch (err) {
       console.error('Error loading analytics:', err);
       setError(err?.message || 'Failed to load analytics');
@@ -87,8 +90,15 @@ const Analytics = ({ activeTeamId }) => {
       ['Closed tickets', analytics.closed_tickets],
       ['Resolution rate (%)', resolutionRate],
       ['Avg resolution time', formatResolutionTime(analytics.avg_resolution_time_seconds)],
-      ['Avg satisfaction (from feedback)', satisfactionScore ?? 'N/A']
+      ['Avg satisfaction (from feedback)', satisfactionScore ?? 'N/A'],
     ];
+    if (advancedAnalytics?.deflection_by_category?.length) {
+      rows.push(['', '']);
+      rows.push(['Category', 'Deflection rate (%)']);
+      advancedAnalytics.deflection_by_category.forEach((row) => {
+        rows.push([row.category, row.deflection_rate_percent ?? 'N/A']);
+      });
+    }
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -206,21 +216,96 @@ const Analytics = ({ activeTeamId }) => {
 
           <ResolutionAnalytics />
 
+          {advancedAnalytics && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <Card>
+                <div className="p-6">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-gray-400" />
+                    Deflection by category
+                  </h3>
+                  {advancedAnalytics.deflection_by_category?.length ? (
+                    <ul className="mt-4 space-y-2">
+                      {advancedAnalytics.deflection_by_category.slice(0, 8).map((row) => (
+                        <li key={row.category} className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400 capitalize">{row.category}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {row.deflection_rate_percent != null ? `${row.deflection_rate_percent}%` : '—'}
+                            <span className="text-xs text-gray-500 ml-1">({row.agent_processed_count})</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">No agent-processed tickets yet</p>
+                  )}
+                </div>
+              </Card>
+
+              <Card>
+                <div className="p-6">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-gray-400" />
+                    Confidence calibration
+                  </h3>
+                  {advancedAnalytics.confidence_calibration?.length ? (
+                    <ul className="mt-4 space-y-2">
+                      {advancedAnalytics.confidence_calibration.map((row) => (
+                        <li key={row.confidence_bucket} className="text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-400">{row.confidence_bucket}</span>
+                            <span className="text-xs text-gray-500">{row.samples} samples</span>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
+                            Resolved w/o escalation: {row.resolved_without_escalation_rate_percent ?? '—'}%
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">No confidence logs yet</p>
+                  )}
+                </div>
+              </Card>
+
+              <Card>
+                <div className="p-6">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-gray-400" />
+                    Workflow bottlenecks
+                  </h3>
+                  {advancedAnalytics.workflow_bottlenecks?.length ? (
+                    <ul className="mt-4 space-y-2">
+                      {advancedAnalytics.workflow_bottlenecks.slice(0, 6).map((row) => (
+                        <li key={row.step_title} className="text-sm">
+                          <div className="flex justify-between gap-2">
+                            <span className="text-gray-600 dark:text-gray-400 truncate">{row.step_title}</span>
+                            <span className="text-xs text-amber-600 dark:text-amber-400 shrink-0">
+                              {row.overdue_now > 0 ? `${row.overdue_now} overdue` : `${row.active_now} active`}
+                            </span>
+                          </div>
+                          {row.median_hours_from_workflow_start != null && (
+                            <div className="text-xs text-gray-500 dark:text-gray-500">
+                              Median {row.median_hours_from_workflow_start}h from start
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">No workflow steps yet</p>
+                  )}
+                </div>
+              </Card>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="border border-dashed border-gray-300 dark:border-gray-600">
               <div className="p-6">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Performance Tracking</h3>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
                   Real-time metrics and KPIs for resolution times and agent performance
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">Coming soon</p>
-              </div>
-            </Card>
-            <Card className="border border-dashed border-gray-300 dark:border-gray-600">
-              <div className="p-6">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Category Analysis</h3>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                  Breakdown of tickets by category, priority, and resolution patterns
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">Coming soon</p>
               </div>

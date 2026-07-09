@@ -170,6 +170,16 @@ const EscalationQueue = () => {
                           </span>
                         )}
                       </p>
+                      {ticket.routing_suggestion?.assignee_name && !claimed && (
+                        <p className="text-xs text-violet-600 dark:text-violet-400 mt-1">
+                          Suggested: {ticket.routing_suggestion.assignee_name}
+                          {ticket.routing_suggestion.confidence != null && (
+                            <span className="text-gray-500 dark:text-gray-400">
+                              {' '}({Math.round(ticket.routing_suggestion.confidence * 100)}% match)
+                            </span>
+                          )}
+                        </p>
+                      )}
                     </div>
 
                     {claimed ? (

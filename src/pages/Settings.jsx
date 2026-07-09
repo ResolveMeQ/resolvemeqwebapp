@@ -11,8 +11,9 @@ import {
   Sparkles,
   MessageSquare,
   Webhook,
-  Shield,
   ExternalLink,
+  Key,
+  Shield,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -131,6 +132,11 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   const [webhookForm, setWebhookForm] = useState({ name: '', url: '', events: [] });
   const [webhookSecret, setWebhookSecret] = useState(null);
   const [webhookDeliveries, setWebhookDeliveries] = useState([]);
+  const [partnerKeys, setPartnerKeys] = useState([]);
+  const [partnerKeysLoading, setPartnerKeysLoading] = useState(false);
+  const [partnerKeySaving, setPartnerKeySaving] = useState(false);
+  const [partnerKeyName, setPartnerKeyName] = useState('');
+  const [partnerKeySecret, setPartnerKeySecret] = useState(null);
   const [oktaStatus, setOktaStatus] = useState(null);
   const [oktaStatusLoading, setOktaStatusLoading] = useState(false);
   const [oktaConnecting, setOktaConnecting] = useState(false);
@@ -148,6 +154,11 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   const [jiraLoading, setJiraLoading] = useState(false);
   const [jiraSaving, setJiraSaving] = useState(false);
   const [jiraDisconnecting, setJiraDisconnecting] = useState(false);
+  const [auditEvents, setAuditEvents] = useState([]);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditExporting, setAuditExporting] = useState(false);
+  const [auditFilter, setAuditFilter] = useState('');
   const [jiraForm, setJiraForm] = useState({
     site_url: '',
     user_email: '',
@@ -232,6 +243,47 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     }
   }, [preferences?.active_team, showToast]);
 
+  const loadPartnerKeys = useCallback(async () => {
+    try {
+      setPartnerKeysLoading(true);
+      const res = await api.integrations.listPartnerKeys();
+      setPartnerKeys(res?.keys || []);
+    } catch (e) {
+      setPartnerKeys([]);
+    } finally {
+      setPartnerKeysLoading(false);
+    }
+  }, []);
+
+  const handleCreatePartnerKey = async () => {
+    if (!partnerKeyName.trim()) {
+      showToast('Key name is required.', 'error');
+      return;
+    }
+    try {
+      setPartnerKeySaving(true);
+      const res = await api.integrations.createPartnerKey({ name: partnerKeyName.trim() });
+      setPartnerKeySecret(res?.key?.api_key || null);
+      setPartnerKeyName('');
+      showToast('Partner API key created. Copy it now — it is shown once.');
+      await loadPartnerKeys();
+    } catch (e) {
+      showToast(e?.message || 'Could not create partner API key.', 'error');
+    } finally {
+      setPartnerKeySaving(false);
+    }
+  };
+
+  const handleRevokePartnerKey = async (keyId) => {
+    try {
+      await api.integrations.revokePartnerKey(keyId);
+      showToast('Partner API key revoked.');
+      await loadPartnerKeys();
+    } catch (e) {
+      showToast(e?.message || 'Could not revoke key.', 'error');
+    }
+  };
+
   const loadOktaStatus = useCallback(async () => {
     const teamId = preferences?.active_team;
     if (!teamId) {
@@ -312,9 +364,49 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     }
   }, [preferences?.active_team]);
 
+  const loadAuditEvents = useCallback(async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) {
+      setAuditEvents([]);
+      setAuditTotal(0);
+      return;
+    }
+    try {
+      setAuditLoading(true);
+      const params = { limit: 50 };
+      if (auditFilter) params.event_type = auditFilter;
+      const data = await api.audit.events(params);
+      setAuditEvents(data?.events || []);
+      setAuditTotal(data?.total ?? 0);
+    } catch (e) {
+      setAuditEvents([]);
+      setAuditTotal(0);
+      if (e?.message && !e.message.includes('403')) {
+        showToast(e.message, 'error');
+      }
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [preferences?.active_team, auditFilter, showToast]);
+
+  const handleExportAudit = async () => {
+    try {
+      setAuditExporting(true);
+      const params = { export_format: 'csv' };
+      if (auditFilter) params.event_type = auditFilter;
+      await api.audit.export(params);
+      showToast('Audit log exported.');
+      await loadAuditEvents();
+    } catch (e) {
+      showToast(e?.message || 'Could not export audit log.', 'error');
+    } finally {
+      setAuditExporting(false);
+    }
+  };
+
   useEffect(() => {
     const t = searchParams.get('tab');
-    if (t && ['general', 'notifications', 'integrations', 'appearance'].includes(t)) {
+    if (t && ['general', 'notifications', 'integrations', 'appearance', 'security'].includes(t)) {
       setActiveTab(t);
     }
   }, [searchParams]);
@@ -395,16 +487,23 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     loadSlackStatus();
     loadTeamsStatus();
     loadWebhooks();
+    loadPartnerKeys();
     loadOktaStatus();
     loadGoogleStatus();
     loadMicrosoftStatus();
     loadJiraStatus();
-  }, [activeTab, preferences?.active_team, loadSlackStatus, loadTeamsStatus, loadWebhooks, loadOktaStatus, loadGoogleStatus, loadMicrosoftStatus, loadJiraStatus]);
+  }, [activeTab, preferences?.active_team, loadSlackStatus, loadTeamsStatus, loadWebhooks, loadPartnerKeys, loadOktaStatus, loadGoogleStatus, loadMicrosoftStatus, loadJiraStatus]);
+
+  useEffect(() => {
+    if (activeTab !== 'security' || !preferences?.active_team) return;
+    loadAuditEvents();
+  }, [activeTab, preferences?.active_team, loadAuditEvents]);
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'integrations', label: 'Integrations', icon: Database },
+    { id: 'security', label: 'Security', icon: Shield },
     { id: 'appearance', label: 'Appearance', icon: Palette }
   ];
 
@@ -1460,6 +1559,75 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
           <div className="p-6 space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-indigo-600">
+                  <Key className="w-5 h-5 text-white" aria-hidden />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Partner API</h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 max-w-md">
+                    Issue API keys for external intake (Make, n8n, custom portals). Base URL: <code className="text-xs">/api/public/v1/</code>
+                  </p>
+                  <a
+                    href="https://github.com/ResolveMeQ/ResolveMeQ/blob/main/docs/PUBLIC_API.md"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 mt-2"
+                  >
+                    API docs <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+              {partnerKeysLoading && <Badge variant="warning">Loading…</Badge>}
+            </div>
+            {partnerKeySecret && (
+              <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/20 p-3">
+                <p className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-1">Copy this key now</p>
+                <p className="font-mono text-xs break-all">{partnerKeySecret}</p>
+                <Button variant="outline" size="sm" type="button" className="mt-2" onClick={() => setPartnerKeySecret(null)}>
+                  Dismiss
+                </Button>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <input
+                type="text"
+                className={inputClass}
+                placeholder="Key name (e.g. Make.com intake)"
+                value={partnerKeyName}
+                onChange={(e) => setPartnerKeyName(e.target.value)}
+              />
+              <Button variant="primary" size="sm" type="button" loading={partnerKeySaving} onClick={handleCreatePartnerKey}>
+                Create key
+              </Button>
+            </div>
+            {partnerKeys.length > 0 ? (
+              <ul className="space-y-2 text-sm">
+                {partnerKeys.map((k) => (
+                  <li key={k.id} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-gray-100 dark:border-gray-800">
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">{k.name}</p>
+                      <p className="text-xs text-gray-500 font-mono">{k.key_prefix}… · {k.is_active ? 'active' : 'revoked'}</p>
+                    </div>
+                    {k.is_active && (
+                      <Button variant="outline" size="sm" type="button" onClick={() => handleRevokePartnerKey(k.id)}>
+                        Revoke
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              !partnerKeysLoading && (
+                <p className="text-xs text-gray-500">No partner API keys yet.</p>
+              )
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <div className="p-6 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
                 <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-emerald-600">
                   <Webhook className="w-5 h-5 text-white" aria-hidden />
                 </div>
@@ -1595,6 +1763,92 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     );
   };
 
+  const renderSecuritySettings = () => (
+    <div className="space-y-4">
+      <Card>
+        <div className="p-6 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">Compliance audit log</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 max-w-2xl">
+                Append-only record of security-relevant actions for your workspace. Available to workspace owners for SOC2 and security reviews.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" type="button" loading={auditLoading} onClick={loadAuditEvents}>
+                Refresh
+              </Button>
+              <Button variant="primary" size="sm" type="button" loading={auditExporting} onClick={handleExportAudit}>
+                Export CSV
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <label className={labelClass}>Event type</label>
+              <select
+                className={inputClass}
+                value={auditFilter}
+                onChange={(e) => setAuditFilter(e.target.value)}
+              >
+                <option value="">All events</option>
+                <option value="ticket.created">Ticket created</option>
+                <option value="ticket.escalated">Ticket escalated</option>
+                <option value="ticket.resolved">Ticket resolved</option>
+                <option value="workflow.step.completed">Workflow step completed</option>
+                <option value="rule.executed">Rule executed</option>
+                <option value="rule.created">Rule created</option>
+                <option value="rule.updated">Rule updated</option>
+                <option value="rule.deleted">Rule deleted</option>
+                <option value="msp.enabled">MSP enabled</option>
+                <option value="msp.client_created">MSP client created</option>
+                <option value="audit.exported">Audit exported</option>
+              </select>
+            </div>
+            <Button variant="outline" size="sm" type="button" onClick={loadAuditEvents}>
+              Apply filter
+            </Button>
+          </div>
+          {!preferences?.active_team ? (
+            <p className="text-sm text-gray-600 dark:text-gray-400">Select an active workspace in Teams to view its audit log.</p>
+          ) : auditLoading ? (
+            <p className="text-sm text-gray-500">Loading audit events…</p>
+          ) : auditEvents.length ? (
+            <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                    <th className="py-2 px-3">Time</th>
+                    <th className="py-2 px-3">Event</th>
+                    <th className="py-2 px-3">Actor</th>
+                    <th className="py-2 px-3">Summary</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditEvents.map((event) => (
+                    <tr key={event.id} className="border-b border-gray-100 dark:border-gray-800">
+                      <td className="py-2 px-3 text-xs text-gray-500 whitespace-nowrap">
+                        {event.created_at ? new Date(event.created_at).toLocaleString() : '—'}
+                      </td>
+                      <td className="py-2 px-3 font-mono text-xs">{event.event_type}</td>
+                      <td className="py-2 px-3 text-xs">{event.actor_email || 'system'}</td>
+                      <td className="py-2 px-3">{event.summary}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-600 dark:text-gray-400">No audit events yet for this workspace.</p>
+          )}
+          {auditTotal > auditEvents.length && (
+            <p className="text-xs text-gray-500">Showing {auditEvents.length} of {auditTotal} events. Export CSV for the full set (up to 10,000).</p>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+
   const renderContent = () => {
     switch (activeTab) {
       case 'general':
@@ -1603,6 +1857,8 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
         return renderNotificationSettings();
       case 'integrations':
         return renderIntegrations();
+      case 'security':
+        return renderSecuritySettings();
       case 'appearance':
         return renderAppearance();
       default:
