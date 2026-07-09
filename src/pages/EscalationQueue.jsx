@@ -171,7 +171,7 @@ const EscalationQueue = () => {
                         )}
                       </p>
                       {ticket.routing_suggestion?.assignee_name && !claimed && (
-                        <p className="text-xs text-violet-600 dark:text-violet-400 mt-1">
+                        <p className="text-xs text-primary-600 dark:text-primary-400 mt-1">
                           Suggested: {ticket.routing_suggestion.assignee_name}
                           {ticket.routing_suggestion.confidence != null && (
                             <span className="text-gray-500 dark:text-gray-400">

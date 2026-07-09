@@ -22,6 +22,7 @@ import {
   Share2,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
+import EmptyState from '../components/ui/EmptyState';
 import Button from '../components/ui/Button';
 import { api } from '../services/api';
 import { cn } from '../utils/cn';
@@ -1898,14 +1899,8 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
       {loading && articles.length === 0 ? (
         <KnowledgeBaseArticlesSkeleton />
       ) : filteredArticles.length === 0 ? (
-        <Card className="p-12 text-center">
-          <BookOpen className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
-            No articles found
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Try a different search or clear filters
-          </p>
+        <Card className="p-12">
+          <EmptyState icon={BookOpen} title="No articles found" description="Try a different search or clear filters." />
         </Card>
       ) : (
         <>

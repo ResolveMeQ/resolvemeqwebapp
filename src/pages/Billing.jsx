@@ -699,7 +699,7 @@ const Billing = ({ onRefreshUserData }) => {
               aria-label="Close"
               onClick={() => !supportSubmitting && setSupportOpen(false)}
             />
-            <div className="relative w-full max-w-lg rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl p-6">
+            <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl p-6">
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2">
                   <Mail className="w-5 h-5 text-primary-600 dark:text-primary-400 shrink-0" />

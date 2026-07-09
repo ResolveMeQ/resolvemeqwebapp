@@ -13,7 +13,6 @@ import {
   Search,
   Globe,
   Building2,
-  Sparkles,
   Copy,
   Play,
   Clock,
@@ -31,6 +30,8 @@ import {
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import StatCard from '../components/ui/StatCard';
+import EmptyState from '../components/ui/EmptyState';
 import { api } from '../services/api';
 import { cn } from '../utils/cn';
 
@@ -70,8 +71,8 @@ const STEP_TYPE_META = {
   auto_check: {
     label: 'Auto check',
     icon: Bot,
-    color: 'text-violet-600 dark:text-violet-400',
-    bg: 'bg-violet-50 dark:bg-violet-900/20',
+    color: 'text-gray-600 dark:text-gray-400',
+    bg: 'bg-gray-100 dark:bg-gray-800',
     hint: 'Connector verifies automatically (Okta user exists, etc.).',
   },
 };
@@ -103,7 +104,7 @@ const STARTER_PLAYBOOKS = [
     name: 'Employee onboarding',
     description: 'Accounts, hardware, orientation — day-one ready.',
     trigger_category: 'onboarding',
-    accent: 'from-emerald-500/15 to-teal-500/10',
+    accent: 'border-l-emerald-400 dark:border-l-emerald-600',
     steps: [
       { title: 'Provision accounts', description: 'Email, SSO, and core apps.', assignee_team: 'IT Support', assignee_role: 'it', step_type: 'manual', due_days: 1 },
       { title: 'Assign hardware', description: 'Laptop and peripherals.', assignee_team: 'IT Support', assignee_role: 'it', step_type: 'manual', due_days: 2 },
@@ -116,7 +117,7 @@ const STARTER_PLAYBOOKS = [
     name: 'Employee offboarding',
     description: 'Revoke access, collect gear, close accounts.',
     trigger_category: 'offboarding',
-    accent: 'from-orange-500/15 to-red-500/10',
+    accent: 'border-l-orange-400 dark:border-l-orange-600',
     steps: [
       { title: 'Revoke system access', description: 'Disable SSO and SaaS accounts.', assignee_team: 'IT Support', step_type: 'manual', due_days: 1 },
       { title: 'Collect hardware', description: 'Laptop, badge, keys.', assignee_team: 'IT Support', step_type: 'manual', due_days: 2 },
@@ -128,7 +129,7 @@ const STARTER_PLAYBOOKS = [
     name: 'Equipment provisioning',
     description: 'Software, licenses, and device delivery.',
     trigger_category: 'provisioning',
-    accent: 'from-primary-500/15 to-indigo-500/10',
+    accent: 'border-l-primary-400 dark:border-l-primary-600',
     steps: [
       { title: 'Confirm request details', description: 'What is needed and by when.', assignee_team: 'IT Support', step_type: 'manual', due_days: 1 },
       { title: 'Provision access', description: 'Licenses and permissions.', assignee_team: 'IT Support', step_type: 'manual', due_days: 2 },
@@ -390,8 +391,8 @@ function StepEditorCard({
                 </div>
               </div>
               {step.step_type === 'auto_check' && (
-                <div className="rounded-lg border border-violet-200 dark:border-violet-900/40 bg-violet-50/40 dark:bg-violet-950/20 p-3 space-y-3">
-                  <p className="text-xs font-semibold text-violet-800 dark:text-violet-300 uppercase tracking-wide">
+                <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3 space-y-3">
+                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                     Auto check (connector)
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -812,7 +813,7 @@ const WorkflowTemplates = () => {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto pb-16">
       {/* Hero */}
-      <section className="relative overflow-hidden rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-gradient-to-br from-white via-primary-50/30 to-white dark:from-gray-900 dark:via-primary-950/20 dark:to-gray-900 shadow-sm mb-6">
+      <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm mb-6">
         <div className="p-6 md:p-8">
           <Link
             to="/workflows"
@@ -838,7 +839,7 @@ const WorkflowTemplates = () => {
             {canManage && (
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={() => setShowStarters(true)}>
-                  <Sparkles className="w-4 h-4 mr-1.5" />
+                  <Copy className="w-4 h-4 mr-1.5" />
                   Start from template
                 </Button>
                 <Button variant="primary" size="sm" onClick={openCreateBlank}>
@@ -850,59 +851,31 @@ const WorkflowTemplates = () => {
           </div>
           {!loading && (
             <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { label: 'Total playbooks', value: stats.total, icon: ListChecks },
-                { label: 'Team-owned', value: stats.team, icon: Building2 },
-                { label: 'Auto-triggered', value: stats.auto, icon: Zap },
-                { label: 'You can edit', value: stats.editable, icon: Pencil },
-              ].map(({ label, value, icon: Icon }) => (
-                <div
-                  key={label}
-                  className="rounded-xl border border-gray-200/80 dark:border-gray-800 bg-white/70 dark:bg-gray-950/50 px-3 py-2.5"
-                >
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    <Icon className="w-3.5 h-3.5" />
-                    {label}
-                  </div>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white tabular-nums mt-0.5">{value}</p>
-                </div>
-              ))}
+              <StatCard label="Total playbooks" value={stats.total} icon={ListChecks} tone="primary" />
+              <StatCard label="Team-owned" value={stats.team} icon={Building2} tone="blue" />
+              <StatCard label="Auto-triggered" value={stats.auto} icon={Zap} tone="amber" />
+              <StatCard label="You can edit" value={stats.editable} icon={Pencil} tone="gray" />
             </div>
           )}
         </div>
       </section>
 
       {/* How it works */}
-      <Card className="p-4 mb-6 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-900/30">
-        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">
+      <Card className="p-4 mb-6 bg-gray-50 dark:bg-gray-900/30">
+        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3">
           How playbooks work
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-600 dark:text-gray-400">
-          <div className="flex gap-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-semibold">
-              1
-            </span>
-            <span>
-              <strong className="text-gray-800 dark:text-gray-200">Define steps</strong>: sequential tasks with owners, SLAs, and approval gates.
-            </span>
-          </div>
-          <div className="flex gap-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-semibold">
-              2
-            </span>
-            <span>
-              <strong className="text-gray-800 dark:text-gray-200">Auto-start or manual</strong>: match a ticket category or start from Workflows.
-            </span>
-          </div>
-          <div className="flex gap-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-semibold">
-              3
-            </span>
-            <span>
-              <strong className="text-gray-800 dark:text-gray-200">Notify & track</strong>: Slack/Teams alerts, overdue badges, ticket resolves on completion.
-            </span>
-          </div>
-        </div>
+        <ol className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-600 dark:text-gray-400 list-none">
+          <li>
+            <strong className="text-gray-800 dark:text-gray-200">1. Define steps</strong> — sequential tasks with owners, SLAs, and approval gates.
+          </li>
+          <li>
+            <strong className="text-gray-800 dark:text-gray-200">2. Auto-start or manual</strong> — match a ticket category or start from Workflows.
+          </li>
+          <li>
+            <strong className="text-gray-800 dark:text-gray-200">3. Notify & track</strong> — Slack/Teams alerts, overdue badges, ticket resolves on completion.
+          </li>
+        </ol>
       </Card>
 
       {error && (
@@ -956,30 +929,30 @@ const WorkflowTemplates = () => {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <Card className="p-10 text-center">
-          <div className="mx-auto w-14 h-14 rounded-2xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center mb-4">
-            <LayoutTemplate className="w-7 h-7 text-primary-600 dark:text-primary-400" />
-          </div>
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            {search || scopeFilter !== 'all' ? 'No playbooks match your filters' : 'No playbooks yet'}
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-md mx-auto">
-            {canManage
-              ? 'Start from a proven template or build a custom playbook for your team.'
-              : 'Ask your workspace owner to create playbooks for common IT processes.'}
-          </p>
-          {canManage && (
-            <div className="flex flex-wrap justify-center gap-2 mt-6">
-              <Button variant="outline" size="sm" onClick={() => setShowStarters(true)}>
-                <Sparkles className="w-4 h-4 mr-1.5" />
-                Browse starters
-              </Button>
-              <Button variant="primary" size="sm" onClick={openCreateBlank}>
-                <Plus className="w-4 h-4 mr-1.5" />
-                Create playbook
-              </Button>
-            </div>
-          )}
+        <Card className="p-10">
+          <EmptyState
+            icon={LayoutTemplate}
+            title={search || scopeFilter !== 'all' ? 'No playbooks match your filters' : 'No playbooks yet'}
+            description={
+              canManage
+                ? 'Start from a proven template or build a custom playbook for your team.'
+                : 'Ask your workspace owner to create playbooks for common IT processes.'
+            }
+            action={
+              canManage && (
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setShowStarters(true)}>
+                    <Copy className="w-4 h-4 mr-1.5" />
+                    Browse starters
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={openCreateBlank}>
+                    <Plus className="w-4 h-4 mr-1.5" />
+                    Create playbook
+                  </Button>
+                </div>
+              )
+            }
+          />
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
@@ -1107,7 +1080,7 @@ const WorkflowTemplates = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.96, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-2xl"
+              className="w-full max-w-2xl max-h-[90vh] overflow-y-auto"
             >
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-1">
@@ -1126,7 +1099,7 @@ const WorkflowTemplates = () => {
                       type="button"
                       onClick={() => openCreateFromStarter(starter)}
                       className={cn(
-                        'rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-left hover:border-primary-400 dark:hover:border-primary-600 transition-all hover:shadow-sm bg-gradient-to-br',
+                        'rounded-xl border border-l-4 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 text-left hover:shadow-sm transition-shadow',
                         starter.accent
                       )}
                     >

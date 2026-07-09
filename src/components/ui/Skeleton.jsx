@@ -103,7 +103,7 @@ export function TicketsPageSkeleton() {
 export function DashboardPageSkeleton() {
   return (
     <div className="space-y-6">
-      <Card className="p-6 md:p-8 border-2 border-primary-200 dark:border-primary-900/50 bg-gradient-to-br from-primary-50/80 to-white dark:from-primary-950/30 dark:to-gray-950">
+      <Card className="p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div className="min-w-0 flex-1 space-y-4">
             <Skeleton className="h-8 w-56 max-w-full" />

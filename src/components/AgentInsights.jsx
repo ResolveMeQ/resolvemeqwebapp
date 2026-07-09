@@ -130,11 +130,11 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket })
         </div>
       )}
       {/* Agent Status Header */}
-      <Card className="p-6 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/30 dark:to-blue-900/30 dark:border-gray-700">
+      <Card className="p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl shadow-lg">
-              <Brain className="h-6 w-6 text-white" />
+            <div className="p-3 bg-primary-50 dark:bg-primary-900/30 rounded-xl">
+              <Brain className="h-6 w-6 text-primary-600 dark:text-primary-400" />
             </div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">AI Agent Analysis</h3>
@@ -263,18 +263,18 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket })
       {(assignment?.team || assignment?.reason) && (
         <Card className="p-6">
           <h4 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+            <Users className="h-5 w-5 text-primary-600 dark:text-primary-400" />
             Assignment Recommendation
           </h4>
           <div className="space-y-3">
             <button
               type="button"
               onClick={handleCopyAssignment}
-              className="w-full text-left p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors cursor-pointer group"
+              className="w-full text-left p-3 bg-primary-50 dark:bg-primary-900/30 rounded-lg border border-primary-200 dark:border-primary-800 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors cursor-pointer group"
             >
               <div className="font-medium text-gray-900 dark:text-white">Suggested Team: {assignment.team || '—'}</div>
               <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{assignment.reason}</div>
-              <span className="text-xs text-purple-600 dark:text-purple-400 mt-2 inline-block opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="text-xs text-primary-600 dark:text-primary-400 mt-2 inline-block opacity-0 group-hover:opacity-100 transition-opacity">
                 Click to copy
               </span>
             </button>

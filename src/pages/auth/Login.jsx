@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Mail, 
-  Lock, 
-  Eye, 
-  EyeOff, 
-  Zap, 
-  Shield, 
-  Users, 
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
   ArrowRight,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
@@ -325,24 +322,6 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
                 Sign up
               </button>
             </p>
-          </div>
-        </div>
-
-        <div className="mt-8 grid grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
-            <Zap className="w-6 h-6 text-primary-600 mx-auto mb-2" />
-            <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-1">AI-Powered</h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400">Intelligent automation</p>
-          </div>
-          <div className="text-center p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
-            <Shield className="w-6 h-6 text-green-600 mx-auto mb-2" />
-            <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-1">Secure</h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400">Enterprise-grade</p>
-          </div>
-          <div className="text-center p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
-            <Users className="w-6 h-6 text-purple-600 mx-auto mb-2" />
-            <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-1">Team Ready</h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400">Collaborative</p>
           </div>
         </div>
       </div>

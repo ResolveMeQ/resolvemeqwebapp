@@ -232,7 +232,7 @@ const AutomationRules = () => {
         <Card className="p-6 animate-pulse h-24" />
       ) : rules.length === 0 ? (
         <Card className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-          No rules yet. Run <code className="text-xs">python manage.py seed_automation_rules</code> on the server or create one above.
+          No rules yet. Create one above to automate what happens when a ticket matches a condition.
         </Card>
       ) : (
         <div className="space-y-3">

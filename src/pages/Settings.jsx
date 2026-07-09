@@ -8,7 +8,7 @@ import {
   Database,
   Save,
   CheckCircle,
-  Sparkles,
+  PlayCircle,
   MessageSquare,
   Webhook,
   ExternalLink,
@@ -1089,7 +1089,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
               showToast('Starting product tour…', 'success');
             }}
           >
-            <Sparkles size={16} className="mr-2" />
+            <PlayCircle size={16} className="mr-2" />
             Replay product tour
           </Button>
         </div>
@@ -1559,7 +1559,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
           <div className="p-6 space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-start gap-3">
-                <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-indigo-600">
+                <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-primary-600">
                   <Key className="w-5 h-5 text-white" aria-hidden />
                 </div>
                 <div>

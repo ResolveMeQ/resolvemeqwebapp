@@ -55,7 +55,7 @@ function WorkflowProgressStepper({ steps }) {
 
   return (
     <div
-      className="flex items-center w-full mb-4"
+      className="flex items-center w-full mb-4 overflow-x-auto"
       role="progressbar"
       aria-valuenow={steps.filter((s) => s.status === 'done').length}
       aria-valuemin={0}
@@ -142,9 +142,9 @@ function StepAssistantPanel({ workflowId, step, disabled, onAccepted }) {
   };
 
   return (
-    <div className="mt-2 rounded-lg border border-violet-200 dark:border-violet-900/50 bg-violet-50/70 dark:bg-violet-950/20 p-3 space-y-2">
+    <div className="mt-2 rounded-lg border border-primary-200 dark:border-primary-900/50 bg-primary-50/70 dark:bg-primary-950/20 p-3 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-200 flex items-center gap-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-primary-800 dark:text-primary-200 flex items-center gap-1">
           <Sparkles className="w-3.5 h-3.5" />
           Step assistant
         </p>

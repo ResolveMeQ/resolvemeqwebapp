@@ -551,10 +551,10 @@ const Teams = () => {
       )}
 
       {mspStatus?.enabled && mspDashboard && (
-        <Card className="p-5 border border-violet-200 dark:border-violet-900/50 bg-violet-50/40 dark:bg-violet-950/20">
+        <Card className="p-5 border border-primary-200 dark:border-primary-900/50 bg-primary-50/40 dark:bg-primary-950/20">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
-              <h2 className="text-sm font-semibold text-violet-900 dark:text-violet-200">MSP clients</h2>
+              <h2 className="text-sm font-semibold text-primary-900 dark:text-primary-200">MSP clients</h2>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                 Hub: {mspDashboard.msp_team?.name} — each client has isolated templates, connectors, and tickets.
               </p>
@@ -655,7 +655,7 @@ const Teams = () => {
           exit={{ opacity: 0, height: 0 }}
           className="mb-6"
         >
-          <Card className="p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-2 border-blue-200 dark:border-blue-700">
+          <Card className="p-6 border border-primary-200 dark:border-primary-800">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Create new team</h2>
             <form onSubmit={handleSubmitForm} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

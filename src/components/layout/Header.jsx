@@ -335,7 +335,7 @@ const Header = ({
           {planName && (
             <>
               <div
-                className="md:hidden max-w-[8.5rem] px-2.5 py-1.5 rounded-full border border-primary-300/70 dark:border-primary-700/70 bg-gradient-to-r from-primary-600/10 via-violet-500/10 to-indigo-500/10 dark:from-primary-500/20 dark:via-violet-500/20 dark:to-indigo-500/20 shadow-sm"
+                className="md:hidden max-w-[8.5rem] px-2.5 py-1.5 rounded-full border border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-900/20"
                 title={planName}
               >
                 <span className="flex items-center gap-1.5">
@@ -345,7 +345,7 @@ const Header = ({
                   </span>
                 </span>
               </div>
-              <div className="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-primary-300/70 dark:border-primary-700/70 bg-gradient-to-r from-primary-600/10 via-violet-500/10 to-indigo-500/10 dark:from-primary-500/20 dark:via-violet-500/20 dark:to-indigo-500/20 shadow-sm">
+              <div className="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-900/20">
                 <Gem className="w-3.5 h-3.5 text-primary-600 dark:text-primary-300" />
                 <span className="text-xs font-semibold text-primary-700 dark:text-primary-200 uppercase tracking-[0.08em]">{planName}</span>
               </div>
@@ -508,7 +508,7 @@ const Header = ({
                 className="flex items-center space-x-2.5 px-1.5 sm:px-2 py-1.5 min-h-[40px] sm:min-h-0 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
                 aria-label="User menu"
               >
-                <div className="w-7 h-7 bg-gradient-to-br from-primary-600 to-primary-700 rounded-full flex items-center justify-center">
+                <div className="w-7 h-7 bg-primary-600 rounded-full flex items-center justify-center">
                   {user?.avatar || user?.profile_image_url ? (
                     <img src={user.avatar || user.profile_image_url} alt={accountMenuName} className="w-full h-full rounded-full object-cover" />
                   ) : (

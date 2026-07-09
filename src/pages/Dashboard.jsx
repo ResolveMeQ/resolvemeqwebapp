@@ -11,13 +11,15 @@ import {
   ChevronRight,
   AlertCircle,
   ArrowUpRight,
-  Bot,
+  TrendingUp,
   Activity,
   ShieldCheck,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import StatCard from '../components/ui/StatCard';
+import EmptyState from '../components/ui/EmptyState';
 import AIRecommendationsPanel from '../components/AIRecommendationsPanel';
 import { api, TokenService, userCanAccessEscalationQueue } from '../services/api';
 import { DashboardPageSkeleton } from '../components/ui/Skeleton';
@@ -249,18 +251,15 @@ const Dashboard = ({ activeTeamId }) => {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-        <div className="relative p-6 md:p-8 grid grid-cols-1 xl:grid-cols-[1.65fr_1fr] gap-6 items-start">
+      <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+        <div className="p-6 md:p-8 grid grid-cols-1 xl:grid-cols-[1.65fr_1fr] gap-6 items-start">
           <div>
-            <Badge variant="primary" className="mb-4">
-              Workspace Command Center
-            </Badge>
             <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">
-              Resolve issues faster with AI-assisted workflows
+              Ticket queue
             </h1>
             <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-3 max-w-2xl">
-              Create a ticket, get guided recommendations, and close issues with confidence.
-              Your dashboard keeps priority queues, outcomes, and action history in one place.
+              Create a ticket, follow the recommended next steps, and track resolution
+              across your team from one place.
             </p>
 
             <div className="flex flex-wrap items-center gap-3 mt-6">
@@ -282,65 +281,9 @@ const Dashboard = ({ activeTeamId }) => {
                 <ArrowUpRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
-
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/50 p-3">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Open Queue</p>
-                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
-                  {analytics?.open_tickets ?? 0}
-                </p>
-              </div>
-              <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/50 p-3">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Resolution Rate</p>
-                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
-                  {resolvedRate}%
-                </p>
-              </div>
-              <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/50 p-3">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg. Time to Resolve</p>
-                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
-                  {formatTime(analytics?.avg_resolution_time_seconds)}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
-              <div className="rounded-xl border border-primary-200/60 dark:border-primary-900/40 bg-primary-50/50 dark:bg-primary-950/20 p-3">
-                <p className="text-xs uppercase tracking-wide text-primary-700 dark:text-primary-300">AI deflection</p>
-                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
-                  {deflectionRate != null ? `${deflectionRate}%` : '—'}
-                </p>
-              </div>
-              <div className="rounded-xl border border-emerald-200/60 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20 p-3">
-                <p className="text-xs uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Onboarding done</p>
-                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
-                  {outcomeMetrics?.onboarding_playbook?.completion_rate_percent != null
-                    ? `${Math.round(outcomeMetrics.onboarding_playbook.completion_rate_percent)}%`
-                    : outcomeMetrics?.onboarding_playbook?.workflows_completed ?? '—'}
-                </p>
-              </div>
-              <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/50 p-3">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">AI processed</p>
-                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
-                  {outcomeMetrics?.agent_processed_count ?? '—'}
-                </p>
-              </div>
-              <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/50 p-3">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Escalated</p>
-                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
-                  {outcomeMetrics?.escalated_count ?? '—'}
-                </p>
-              </div>
-              <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/50 p-3">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Workflows done</p>
-                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white tabular-nums">
-                  {outcomeMetrics?.workflows_completed_count ?? '—'}
-                </p>
-              </div>
-            </div>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/70 p-5">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950/50 p-5">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">This week</p>
               <Badge variant="success" className="gap-1">
@@ -353,7 +296,7 @@ const Dashboard = ({ activeTeamId }) => {
                 ticketVolumeSeries.map((item, idx) => (
                   <div key={`${item.label}-${idx}`} className="flex-1 h-full flex flex-col items-center justify-end gap-2 min-w-0">
                     <div
-                      className="w-full rounded-md bg-gradient-to-t from-primary-600 to-cyan-400/90 dark:from-primary-500 dark:to-cyan-400 shadow-sm"
+                      className="w-full rounded-md bg-primary-600 dark:bg-primary-500"
                       style={{ height: `${Math.max(12, (item.value / highestTicketVolume) * 100)}%` }}
                       title={`${item.label}: ${item.value}`}
                     />
@@ -399,70 +342,37 @@ const Dashboard = ({ activeTeamId }) => {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-          <Card className="p-5 rounded-xl">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Total Tickets</p>
-                <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                  {totalTickets}
-                </p>
-              </div>
-              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-                <Ticket className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-            </div>
-          </Card>
-        </motion.div>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25 }}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
+      >
+        <StatCard label="Total Tickets" value={totalTickets} icon={Ticket} tone="blue" />
+        <StatCard label="Open" value={analytics?.open_tickets ?? 0} icon={FolderOpen} tone="amber" />
+        <StatCard label="Resolved" value={analytics?.closed_tickets ?? 0} icon={CheckCircle} tone="green" />
+        <StatCard label="Avg. Resolution" value={formatTime(analytics?.avg_resolution_time_seconds)} icon={Clock} tone="gray" />
+        <StatCard label="Resolution Rate" value={`${resolvedRate}%`} icon={TrendingUp} tone="primary" />
+      </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-          <Card className="p-5 rounded-xl">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Open</p>
-                <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                  {analytics?.open_tickets ?? 0}
-                </p>
-              </div>
-              <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20">
-                <FolderOpen className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
-          <Card className="p-5 rounded-xl">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Resolved</p>
-                <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                  {analytics?.closed_tickets ?? 0}
-                </p>
-              </div>
-              <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
-                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.15 }}>
-          <Card className="p-5 rounded-xl">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg. Resolution</p>
-                <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2 tabular-nums">
-                  {formatTime(analytics?.avg_resolution_time_seconds)}
-                </p>
-              </div>
-              <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800">
-                <Clock className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              </div>
-            </div>
-          </Card>
-        </motion.div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <StatCard
+          label="AI Deflection"
+          value={deflectionRate != null ? `${deflectionRate}%` : '—'}
+          tone="primary"
+        />
+        <StatCard
+          label="Onboarding Done"
+          value={
+            outcomeMetrics?.onboarding_playbook?.completion_rate_percent != null
+              ? `${Math.round(outcomeMetrics.onboarding_playbook.completion_rate_percent)}%`
+              : outcomeMetrics?.onboarding_playbook?.workflows_completed ?? '—'
+          }
+          tone="green"
+        />
+        <StatCard label="AI Processed" value={outcomeMetrics?.agent_processed_count ?? '—'} tone="gray" />
+        <StatCard label="Escalated" value={outcomeMetrics?.escalated_count ?? '—'} tone="amber" />
+        <StatCard label="Workflows Done" value={outcomeMetrics?.workflows_completed_count ?? '—'} tone="gray" />
       </div>
 
       <Card className="p-5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -473,17 +383,13 @@ const Dashboard = ({ activeTeamId }) => {
               Keep resolution quality high as volume scales
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              AI-assisted workflows are strongest when priority tickets are handled quickly and escalations stay low.
+              Resolution stays strongest when priority tickets are handled quickly and escalations stay low.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="success" className="gap-1.5">
+            <Badge variant={resolvedRate >= 60 ? 'success' : 'warning'} className="gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5" />
               {resolvedRate >= 60 ? 'Healthy throughput' : 'Needs attention'}
-            </Badge>
-            <Badge variant="secondary" className="gap-1.5">
-              <Bot className="w-3.5 h-3.5" />
-              AI recommendations enabled
             </Badge>
           </div>
         </div>
@@ -500,10 +406,7 @@ const Dashboard = ({ activeTeamId }) => {
             </Button>
           </div>
           {recentTickets.length === 0 ? (
-            <div className="py-12 text-center">
-              <ListTodo className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">No recent tickets</p>
-            </div>
+            <EmptyState icon={ListTodo} title="No recent tickets" description="New tickets will show up here as they come in." />
           ) : (
             <div className="space-y-2">
               {recentTickets.map((ticket) => (

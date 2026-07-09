@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { api, TokenService } from '../../services/api';
 import { isGoogleAuthEnabled } from '../../utils/googleAuth';
@@ -7,6 +8,22 @@ import { isGoogleAuthEnabled } from '../../utils/googleAuth';
  * On success: stores JWTs and session user, then calls onSignedIn({ user }).
  */
 export default function GoogleSignInButton({ onSignedIn, onError, disabled }) {
+  const containerRef = useRef(null);
+  // GoogleLogin only accepts a fixed pixel width (no responsive/% units), so we
+  // measure the container and clamp it — otherwise it overflows narrow phone screens.
+  const [width, setWidth] = useState(384);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      const measured = entry.contentRect.width;
+      if (measured > 0) setWidth(Math.round(Math.min(384, measured)));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   if (!isGoogleAuthEnabled()) {
     return null;
   }
@@ -29,6 +46,7 @@ export default function GoogleSignInButton({ onSignedIn, onError, disabled }) {
 
   return (
     <div
+      ref={containerRef}
       className={`flex w-full justify-center ${disabled ? 'pointer-events-none opacity-50' : ''}`}
       aria-busy={disabled}
     >
@@ -38,7 +56,7 @@ export default function GoogleSignInButton({ onSignedIn, onError, disabled }) {
         text="continue_with"
         shape="rectangular"
         size="large"
-        width="384"
+        width={width}
         locale="en"
       />
     </div>

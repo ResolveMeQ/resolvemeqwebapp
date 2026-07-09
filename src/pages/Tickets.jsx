@@ -673,7 +673,7 @@ const Tickets = ({ activeTeamId }) => {
               exit={{ opacity: 0, scale: 0.95 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
             >
-              <Card className="w-full max-w-lg p-6">
+              <Card className="w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white">New Ticket</h2>
@@ -1528,7 +1528,7 @@ const Tickets = ({ activeTeamId }) => {
               aria-label="Close"
               onClick={() => !escalateLoading && setEscalateModal({ open: false, ticketId: null })}
             />
-            <div className="relative w-full max-w-lg rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl p-6">
+            <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl p-6">
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Request human help</h2>
