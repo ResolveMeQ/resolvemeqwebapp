@@ -9,6 +9,7 @@ import {
   Sparkles,
   X,
   Lightbulb,
+  ExternalLink,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -1261,6 +1262,35 @@ const Tickets = ({ activeTeamId }) => {
                             <p className="text-sm font-medium text-gray-900 dark:text-white">{formatTicketTime(detailTicket?.created_at)}</p>
                           </div>
                         </div>
+
+                        {(() => {
+                          const jiraRef = (detailTicket?.external_references || []).find(
+                            (r) => r.system === 'jira'
+                          );
+                          if (!jiraRef) return null;
+                          return (
+                            <div className="rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/80 dark:bg-indigo-950/25 px-4 py-3">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-800 dark:text-indigo-200 mb-1">
+                                Linked in Jira
+                              </p>
+                              {jiraRef.external_url ? (
+                                <a
+                                  href={jiraRef.external_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-700 dark:text-indigo-300 hover:underline"
+                                >
+                                  <ExternalLink className="w-4 h-4 shrink-0" aria-hidden />
+                                  {jiraRef.external_id}
+                                </a>
+                              ) : (
+                                <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
+                                  {jiraRef.external_id}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {(() => {
                           const next = getTicketNextStep(detailTicket);

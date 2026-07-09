@@ -1112,6 +1112,31 @@ export const api = {
         body: JSON.stringify({ team_id: teamId }),
       });
     },
+    jiraStatus: async (teamId) => {
+      const q = teamId ? `?team_id=${encodeURIComponent(teamId)}` : '';
+      return apiFetch(`/api/integrations/jira/status/${q}`);
+    },
+    jiraConfigure: async (teamId, payload) => {
+      if (!teamId) throw new Error('team_id is required');
+      return apiFetch('/api/integrations/jira/configure/', {
+        method: 'POST',
+        body: JSON.stringify({ team_id: teamId, ...payload }),
+      });
+    },
+    jiraUpdate: async (teamId, payload) => {
+      if (!teamId) throw new Error('team_id is required');
+      return apiFetch('/api/integrations/jira/update/', {
+        method: 'PATCH',
+        body: JSON.stringify({ team_id: teamId, ...payload }),
+      });
+    },
+    jiraDisconnect: async (teamId) => {
+      if (!teamId) throw new Error('team_id is required');
+      return apiFetch('/api/integrations/jira/disconnect/', {
+        method: 'POST',
+        body: JSON.stringify({ team_id: teamId }),
+      });
+    },
   },
 
   // In-app notifications (header bell)

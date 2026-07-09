@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Webhook,
   Shield,
+  ExternalLink,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -143,6 +144,19 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   const [microsoftLoading, setMicrosoftLoading] = useState(false);
   const [microsoftConnecting, setMicrosoftConnecting] = useState(false);
   const [microsoftDisconnecting, setMicrosoftDisconnecting] = useState(false);
+  const [jiraStatus, setJiraStatus] = useState(null);
+  const [jiraLoading, setJiraLoading] = useState(false);
+  const [jiraSaving, setJiraSaving] = useState(false);
+  const [jiraDisconnecting, setJiraDisconnecting] = useState(false);
+  const [jiraForm, setJiraForm] = useState({
+    site_url: '',
+    user_email: '',
+    api_token: '',
+    project_key: 'SUP',
+    sync_on_escalate: true,
+    sync_on_resolve: true,
+    resolve_transition: 'Done',
+  });
 
   useEffect(() => {
     if (!theme) return;
@@ -269,6 +283,35 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     }
   }, [preferences?.active_team]);
 
+  const loadJiraStatus = useCallback(async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) {
+      setJiraStatus(null);
+      return;
+    }
+    try {
+      setJiraLoading(true);
+      const s = await api.integrations.jiraStatus(teamId);
+      setJiraStatus(s);
+      const inst = s?.installation;
+      if (inst) {
+        setJiraForm((prev) => ({
+          ...prev,
+          site_url: inst.site_url || prev.site_url,
+          user_email: inst.user_email || prev.user_email,
+          project_key: inst.project_key || prev.project_key,
+          sync_on_escalate: inst.sync_on_escalate ?? prev.sync_on_escalate,
+          sync_on_resolve: inst.sync_on_resolve ?? prev.sync_on_resolve,
+          resolve_transition: inst.resolve_transition || prev.resolve_transition,
+        }));
+      }
+    } catch (e) {
+      setJiraStatus({ connected: false, error: true });
+    } finally {
+      setJiraLoading(false);
+    }
+  }, [preferences?.active_team]);
+
   useEffect(() => {
     const t = searchParams.get('tab');
     if (t && ['general', 'notifications', 'integrations', 'appearance'].includes(t)) {
@@ -355,7 +398,8 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     loadOktaStatus();
     loadGoogleStatus();
     loadMicrosoftStatus();
-  }, [activeTab, preferences?.active_team, loadSlackStatus, loadTeamsStatus, loadWebhooks, loadOktaStatus, loadGoogleStatus, loadMicrosoftStatus]);
+    loadJiraStatus();
+  }, [activeTab, preferences?.active_team, loadSlackStatus, loadTeamsStatus, loadWebhooks, loadOktaStatus, loadGoogleStatus, loadMicrosoftStatus, loadJiraStatus]);
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon },
@@ -622,6 +666,64 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
       showToast(e?.message || 'Could not disconnect Microsoft.', 'error');
     } finally {
       setMicrosoftDisconnecting(false);
+    }
+  };
+
+  const handleSaveJira = async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) {
+      showToast('Choose an active workspace first.', 'error');
+      return;
+    }
+    if (!jiraForm.site_url.trim() || !jiraForm.user_email.trim()) {
+      showToast('Jira site URL and email are required.', 'error');
+      return;
+    }
+    if (!jiraStatus?.connected && !jiraForm.api_token.trim()) {
+      showToast('API token is required to connect Jira.', 'error');
+      return;
+    }
+    try {
+      setJiraSaving(true);
+      const payload = {
+        site_url: jiraForm.site_url.trim(),
+        user_email: jiraForm.user_email.trim(),
+        project_key: jiraForm.project_key.trim() || 'SUP',
+        sync_on_escalate: jiraForm.sync_on_escalate,
+        sync_on_resolve: jiraForm.sync_on_resolve,
+        resolve_transition: jiraForm.resolve_transition.trim() || 'Done',
+      };
+      if (jiraForm.api_token.trim()) {
+        payload.api_token = jiraForm.api_token.trim();
+      }
+      if (jiraStatus?.connected) {
+        await api.integrations.jiraUpdate(teamId, payload);
+        showToast('Jira settings updated.');
+      } else {
+        await api.integrations.jiraConfigure(teamId, payload);
+        showToast('Jira connected.');
+      }
+      setJiraForm((p) => ({ ...p, api_token: '' }));
+      await loadJiraStatus();
+    } catch (e) {
+      showToast(e?.message || 'Could not save Jira settings.', 'error');
+    } finally {
+      setJiraSaving(false);
+    }
+  };
+
+  const handleDisconnectJira = async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) return;
+    try {
+      setJiraDisconnecting(true);
+      await api.integrations.jiraDisconnect(teamId);
+      showToast('Jira disconnected.');
+      await loadJiraStatus();
+    } catch (e) {
+      showToast(e?.message || 'Could not disconnect Jira.', 'error');
+    } finally {
+      setJiraDisconnecting(false);
     }
   };
 
@@ -1242,6 +1344,117 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
             </div>
           </Card>
         </div>
+
+        <Card>
+          <div className="p-6 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-indigo-600">
+                  <ExternalLink className="w-5 h-5 text-white" aria-hidden />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Jira Cloud</h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 max-w-md">
+                    Create a Jira issue when tickets escalate and transition it when resolved.
+                    Uses API token auth (Atlassian account email + token).
+                  </p>
+                  {jiraStatus?.installation?.site_url && (
+                    <p className="text-xs text-gray-500 mt-2 font-mono">
+                      {jiraStatus.installation.project_key} @ {jiraStatus.installation.site_url}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {jiraLoading ? (
+                <Badge variant="warning">Checking…</Badge>
+              ) : jiraStatus?.connected ? (
+                <Badge variant="success">Connected</Badge>
+              ) : (
+                <Badge variant="warning">Not connected</Badge>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="url"
+                className={inputClass}
+                placeholder="https://your-org.atlassian.net"
+                value={jiraForm.site_url}
+                onChange={(e) => setJiraForm((p) => ({ ...p, site_url: e.target.value }))}
+              />
+              <input
+                type="text"
+                className={inputClass}
+                placeholder="Project key (e.g. SUP)"
+                value={jiraForm.project_key}
+                onChange={(e) => setJiraForm((p) => ({ ...p, project_key: e.target.value }))}
+              />
+              <input
+                type="email"
+                className={inputClass}
+                placeholder="Atlassian account email"
+                value={jiraForm.user_email}
+                onChange={(e) => setJiraForm((p) => ({ ...p, user_email: e.target.value }))}
+              />
+              <input
+                type="password"
+                className={inputClass}
+                placeholder={jiraStatus?.connected ? 'API token (leave blank to keep)' : 'API token'}
+                value={jiraForm.api_token}
+                onChange={(e) => setJiraForm((p) => ({ ...p, api_token: e.target.value }))}
+                autoComplete="off"
+              />
+              <input
+                type="text"
+                className={inputClass}
+                placeholder="Resolve transition name (e.g. Done)"
+                value={jiraForm.resolve_transition}
+                onChange={(e) => setJiraForm((p) => ({ ...p, resolve_transition: e.target.value }))}
+              />
+            </div>
+            <div className="flex flex-wrap gap-4 text-sm text-gray-700 dark:text-gray-300">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={jiraForm.sync_on_escalate}
+                  onChange={(e) => setJiraForm((p) => ({ ...p, sync_on_escalate: e.target.checked }))}
+                />
+                Sync on escalate
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={jiraForm.sync_on_resolve}
+                  onChange={(e) => setJiraForm((p) => ({ ...p, sync_on_resolve: e.target.checked }))}
+                />
+                Sync on resolve
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <Button
+                variant="primary"
+                size="sm"
+                type="button"
+                loading={jiraSaving}
+                disabled={jiraDisconnecting || !preferences?.active_team}
+                onClick={handleSaveJira}
+              >
+                {jiraStatus?.connected ? 'Save Jira settings' : 'Connect Jira'}
+              </Button>
+              {jiraStatus?.connected && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  loading={jiraDisconnecting}
+                  disabled={jiraSaving}
+                  onClick={handleDisconnectJira}
+                >
+                  Disconnect
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
 
         <Card>
           <div className="p-6 space-y-4">
