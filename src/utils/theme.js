@@ -20,6 +20,15 @@ export function getLocalTheme() {
   }
 }
 
+/** Whether the user has already made an explicit theme choice on this device/browser. */
+export function hasLocalTheme() {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.THEME) != null;
+  } catch {
+    return false;
+  }
+}
+
 export function setLocalTheme(theme) {
   try {
     localStorage.setItem(STORAGE_KEYS.THEME, normalizeTheme(theme));

@@ -25,7 +25,7 @@ import Verify from './pages/auth/Verify';
 import './index.css';
 import { THEME_MODES, DEFAULT_THEME } from './constants';
 import { TokenService, api, userCanAccessEscalationQueue } from './services/api';
-import { applyThemeToDocument, getLocalTheme, normalizeTheme, setLocalTheme } from './utils/theme';
+import { applyThemeToDocument, getLocalTheme, hasLocalTheme, normalizeTheme, setLocalTheme } from './utils/theme';
 
 function safeNextPath(next) {
   const raw = String(next || '').trim();
@@ -113,11 +113,17 @@ function App() {
       const name = sub?.plan_detail?.name ?? sub?.plan?.name ?? null;
       setPlanName(name || null);
       if (prefs) {
-        const resolved = normalizeTheme(prefs.theme || DEFAULT_THEME);
-        setTheme(resolved);
-        setLocalTheme(resolved);
-        if (!prefs.theme) {
-          api.settings.updatePreferences({ theme: resolved }).catch(() => {});
+        // Once the user has picked a theme on this device, that local choice is
+        // authoritative — don't let a stale/racy server read silently flip it back
+        // (this used to refire on every loadUserData call, e.g. after Billing's
+        // post-checkout refresh, and could revert an explicit local change).
+        if (!hasLocalTheme()) {
+          const resolved = normalizeTheme(prefs.theme || DEFAULT_THEME);
+          setTheme(resolved);
+          setLocalTheme(resolved);
+          if (!prefs.theme) {
+            api.settings.updatePreferences({ theme: resolved }).catch(() => {});
+          }
         }
       }
     } catch {
