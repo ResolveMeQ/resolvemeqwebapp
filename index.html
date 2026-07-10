@@ -6,8 +6,53 @@
     <link rel="apple-touch-icon" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>ResolveMeQ - AI-Powered IT Support</title>
+    <link rel="canonical" id="rmq-canonical" href="https://app.resolvemeq.net/knowledge-base" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('theme');
+          document.documentElement.classList.remove('dark');
+          if (t === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else if (t === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script src="/seo-boot.js"></script>
+    <!-- Crawlable links in initial HTML (SPA shell); React adds the full UI. Avoids "0 outlinks" for non-JS audits. -->
+    <style>
+      .seo-static-links,
+      .seo-static-h1 {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
   </head>
   <body>
+    <h1 id="rmq-h1" class="seo-static-h1">ResolveMeQ Knowledge Base</h1>
+    <nav class="seo-static-links" aria-label="Primary pages">
+      <a href="https://app.resolvemeq.net/knowledge-base">Knowledge Base</a>
+      <a href="https://app.resolvemeq.net/knowledge-base?view=community">Community Q&amp;A</a>
+      <a href="https://app.resolvemeq.net/login">Sign in</a>
+      <a href="https://app.resolvemeq.net/signup">Sign up</a>
+      <a href="https://resolvemeq.net/">ResolveMeQ home</a>
+      <a href="https://resolvemeq.net/features">Features</a>
+      <a href="https://resolvemeq.net/pricing">Pricing</a>
+      <a href="https://resolvemeq.net/docs">Documentation</a>
+      <a href="https://resolvemeq.net/blog">Blog</a>
+      <a href="https://resolvemeq.net/privacy">Privacy</a>
+      <a href="https://resolvemeq.net/terms">Terms</a>
+    </nav>
+    <noscript>You need to enable JavaScript to use ResolveMeQ.</noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

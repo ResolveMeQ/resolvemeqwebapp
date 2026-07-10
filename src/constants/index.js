@@ -361,4 +361,7 @@ export const THEME_MODES = {
   LIGHT: 'light',
   DARK: 'dark',
   AUTO: 'auto',
-}; 
+};
+
+/** Default UI theme for new users and when no preference is stored. */
+export const DEFAULT_THEME = THEME_MODES.LIGHT; 

@@ -66,7 +66,7 @@ const Users = ({ activeTeamId }) => {
   const loadMyTeamsAsOwner = async () => {
     try {
       const teams = await api.teams.list();
-      setMyTeamsAsOwner(Array.isArray(teams) ? teams.filter((t) => t.is_owner) : []);
+      setMyTeamsAsOwner(Array.isArray(teams) ? teams.filter((t) => t.is_owner || t.can_manage_members) : []);
     } catch {
       setMyTeamsAsOwner([]);
     }
@@ -382,7 +382,7 @@ const Users = ({ activeTeamId }) => {
       />
       <header>
         <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">Users</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">People in your teams — invite new members from a team you own.</p>
+        <p className="text-gray-500 dark:text-gray-400 mt-1">People in your teams — invite new members from a workspace you own or administer.</p>
       </header>
 
       {/* Invite to team (only if user owns at least one team) */}
@@ -521,7 +521,7 @@ const Users = ({ activeTeamId }) => {
         {filteredUsers.length === 0 && !loading && (
           <div className="py-12 text-center text-gray-500 dark:text-gray-400 text-sm">
             {users.length === 0
-              ? 'No users in your teams yet. Invite people from a team you own above, or join a team to see members here.'
+              ? 'No users in your teams yet. Invite people from a workspace you manage above, or join a team to see members here.'
               : 'No users match your filters.'}
           </div>
         )}

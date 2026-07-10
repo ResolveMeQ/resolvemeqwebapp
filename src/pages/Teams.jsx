@@ -6,6 +6,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import DelegatedPermissionsModal from '../components/DelegatedPermissionsModal';
 import { api } from '../services/api';
 import { TeamsPageSkeleton } from '../components/ui/Skeleton';
 
@@ -16,6 +17,22 @@ const defaultForm = {
   location: '',
   lead: '',
   members: [],
+};
+
+const PERMISSION_SHORT_LABELS = {
+  manage_playbooks: 'Playbooks',
+  manage_members: 'Members',
+  manage_integrations: 'Integrations',
+  manage_webhooks: 'Webhooks',
+  manage_partner_api: 'Partner API',
+  view_audit_log: 'Audit',
+};
+
+const activePermissionLabels = (perms) => {
+  if (!perms || typeof perms !== 'object') return [];
+  return Object.entries(perms)
+    .filter(([, enabled]) => enabled)
+    .map(([key]) => PERMISSION_SHORT_LABELS[key] || key);
 };
 
 const Teams = () => {
@@ -64,6 +81,8 @@ const Teams = () => {
   const [mspClientName, setMspClientName] = useState('');
   const [mspLoading, setMspLoading] = useState(false);
   const [mspSaving, setMspSaving] = useState(false);
+  const [permModal, setPermModal] = useState(null);
+  const [permSaving, setPermSaving] = useState(false);
 
   const loadMsp = useCallback(async (hubId) => {
     try {
@@ -120,12 +139,12 @@ const Teams = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedTeam?.is_owner && selectedTeam?.id) {
+    if (selectedTeam?.can_manage_members && selectedTeam?.id) {
       loadSentInvitations(selectedTeam.id);
     } else {
       setSentInvitations([]);
     }
-  }, [selectedTeam?.id, selectedTeam?.is_owner, loadSentInvitations]);
+  }, [selectedTeam?.id, selectedTeam?.can_manage_members, loadSentInvitations]);
 
   const loadLimits = async () => {
     try {
@@ -151,6 +170,8 @@ const Teams = () => {
         lead_name: team.lead_name || 'No lead assigned',
         lead_id: team.lead,
         is_owner: team.is_owner === true,
+        is_workspace_admin: team.is_workspace_admin === true,
+        can_manage_members: team.can_manage_members === true,
         team_kind: team.team_kind || 'workspace',
       })) : [];
       setTeams(mappedTeams);
@@ -279,7 +300,39 @@ const Teams = () => {
     lead_name: t.lead_name || 'No lead assigned',
     lead_id: t.lead,
     is_owner: t.is_owner === true,
+    is_workspace_admin: t.is_workspace_admin === true,
+    can_manage_members: t.can_manage_members === true,
   });
+
+  const canManageMembers = (team) => Boolean(team?.can_manage_members || team?.is_owner);
+
+  const refreshTeam = async (teamId) => {
+    const updated = await api.teams.get(teamId);
+    const mapped = mapTeamFromApi(updated);
+    setTeams((prev) => prev.map((t) => (t.id === teamId ? mapped : t)));
+    setFilteredTeams((prev) => prev.map((t) => (t.id === teamId ? mapped : t)));
+    if (selectedTeam?.id === teamId) setSelectedTeam(mapped);
+    return mapped;
+  };
+
+  const openPermissionsModal = (member) => setPermModal({ member });
+
+  const closePermissionsModal = () => setPermModal(null);
+
+  const handleSavePermissions = async (permissions) => {
+    if (!permModal?.member?.id || !selectedTeam?.id) return;
+    setPermSaving(true);
+    try {
+      await api.teams.grantWorkspaceAdmin(selectedTeam.id, permModal.member.id, permissions);
+      await refreshTeam(selectedTeam.id);
+      showToast('Permissions saved.');
+      closePermissionsModal();
+    } catch (error) {
+      showToast(error?.message || 'Could not save permissions.', 'error');
+    } finally {
+      setPermSaving(false);
+    }
+  };
 
   const handleSubmitForm = async (e) => {
     e.preventDefault();
@@ -453,11 +506,7 @@ const Teams = () => {
       onConfirm: async () => {
         try {
           await api.teams.removeMember(teamId, userId);
-          const updated = await api.teams.get(teamId);
-          const mapped = mapTeamFromApi(updated);
-          setTeams((prev) => prev.map((t) => (t.id === teamId ? mapped : t)));
-          setFilteredTeams((prev) => prev.map((t) => (t.id === teamId ? mapped : t)));
-          if (selectedTeam?.id === teamId) setSelectedTeam(mapped);
+          await refreshTeam(teamId);
           showToast('Member removed.');
         } catch (error) {
           showToast(error?.message || 'Failed to remove member.', 'error');
@@ -769,6 +818,9 @@ const Teams = () => {
                     {selectedTeam.is_owner && (
                       <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">Owner</span>
                     )}
+                    {selectedTeam.is_workspace_admin && !selectedTeam.is_owner && (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">Admin</span>
+                    )}
                     {getStatusBadge(selectedTeam.status)}
                   </div>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{selectedTeam.department || '—'} {selectedTeam.location ? ` · ${selectedTeam.location}` : ''}</p>
@@ -843,32 +895,54 @@ const Teams = () => {
                         <Users className="w-4 h-4" />
                         Members ({(selectedTeam.members_details || selectedTeam.members || []).length})
                       </h3>
+                      {selectedTeam.is_owner && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                          Choose which areas each teammate can manage. Billing, workspace deletion, and granting permissions stay with you.
+                        </p>
+                      )}
                       <ul className="space-y-2">
-                        {(selectedTeam.members_details || selectedTeam.members || []).map((member) => (
+                        {(selectedTeam.members_details || selectedTeam.members || []).map((member) => {
+                          const isOwnerMember = member?.id && String(member.id) === String(selectedTeam.owner);
+                          const showMemberActions = canManageMembers(selectedTeam) && member?.id && !isOwnerMember;
+                          return (
                           <li key={member?.id ?? member?.email} className="flex items-center justify-between gap-2 py-2 px-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
                             <div className="flex items-center gap-2 min-w-0">
                               <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">
                                 {(member?.name || member?.email || '?').toString().split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                               </div>
                               <div className="min-w-0">
-                                <p className="font-medium text-gray-900 dark:text-white truncate">{member?.name || member?.email || 'Member'}</p>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <p className="font-medium text-gray-900 dark:text-white truncate">{member?.name || member?.email || 'Member'}</p>
+                                  {isOwnerMember && <Badge variant="primary" size="sm">Owner</Badge>}
+                                  {activePermissionLabels(member?.delegated_permissions).map((label) => (
+                                    <Badge key={label} variant="secondary" size="sm">{label}</Badge>
+                                  ))}
+                                </div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{member?.email}</p>
                               </div>
                             </div>
-                            {selectedTeam.is_owner && member?.id && String(member.id) !== String(selectedTeam.owner) && (
-                              <Button variant="ghost" size="sm" className="text-red-600 dark:text-red-400 shrink-0" onClick={() => confirmRemoveMember(selectedTeam.id, member.id)}>
-                                Remove
-                              </Button>
-                            )}
+                            <div className="flex flex-wrap items-center gap-1 shrink-0">
+                              {selectedTeam.is_owner && showMemberActions && (
+                                <Button variant="ghost" size="sm" onClick={() => openPermissionsModal(member)}>
+                                  Permissions
+                                </Button>
+                              )}
+                              {showMemberActions && (
+                                <Button variant="ghost" size="sm" className="text-red-600 dark:text-red-400" onClick={() => confirmRemoveMember(selectedTeam.id, member.id)}>
+                                  Remove
+                                </Button>
+                              )}
+                            </div>
                           </li>
-                        ))}
+                          );
+                        })}
                         {((selectedTeam.members_details || selectedTeam.members || []).length === 0) && (
                           <p className="text-sm text-gray-500 dark:text-gray-400 py-2">No members yet.</p>
                         )}
                       </ul>
                     </div>
                     <div>
-                      {selectedTeam.is_owner && (
+                      {canManageMembers(selectedTeam) && (
                         <>
                           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                             <UserPlus className="w-4 h-4" />
@@ -1016,6 +1090,11 @@ const Teams = () => {
                               Owner
                             </span>
                           )}
+                          {selectedTeam.is_workspace_admin && !selectedTeam.is_owner && (
+                            <span className="text-xs font-medium px-2 py-0.5 rounded bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">
+                              Admin
+                            </span>
+                          )}
                           {getStatusBadge(selectedTeam.status)}
                         </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
@@ -1088,7 +1167,10 @@ const Teams = () => {
                               Members ({(selectedTeam.members_details || selectedTeam.members || []).length})
                             </h3>
                             <ul className="space-y-2">
-                              {(selectedTeam.members_details || selectedTeam.members || []).map((member) => (
+                              {(selectedTeam.members_details || selectedTeam.members || []).map((member) => {
+                                const isOwnerMember = member?.id && String(member.id) === String(selectedTeam.owner);
+                                const showMemberActions = canManageMembers(selectedTeam) && member?.id && !isOwnerMember;
+                                return (
                                 <li
                                   key={member?.id ?? member?.email}
                                   className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-2 px-3 rounded-lg bg-gray-50 dark:bg-gray-800/50"
@@ -1104,33 +1186,45 @@ const Teams = () => {
                                         .toUpperCase()}
                                     </div>
                                     <div className="min-w-0">
-                                      <p className="font-medium text-gray-900 dark:text-white truncate">
-                                        {member?.name || member?.email || 'Member'}
-                                      </p>
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <p className="font-medium text-gray-900 dark:text-white truncate">
+                                          {member?.name || member?.email || 'Member'}
+                                        </p>
+                                        {isOwnerMember && <Badge variant="primary" size="sm">Owner</Badge>}
+                                        {activePermissionLabels(member?.delegated_permissions).map((label) => (
+                                          <Badge key={label} variant="secondary" size="sm">{label}</Badge>
+                                        ))}
+                                      </div>
                                       <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{member?.email}</p>
                                     </div>
                                   </div>
-                                  {selectedTeam.is_owner &&
-                                    member?.id &&
-                                    String(member.id) !== String(selectedTeam.owner) && (
+                                  <div className="flex flex-wrap items-center gap-1 shrink-0 self-end sm:self-auto">
+                                    {selectedTeam.is_owner && showMemberActions && (
+                                      <Button variant="ghost" size="sm" onClick={() => openPermissionsModal(member)}>
+                                        Permissions
+                                      </Button>
+                                    )}
+                                    {showMemberActions && (
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="text-red-600 dark:text-red-400 shrink-0 self-end sm:self-auto"
+                                        className="text-red-600 dark:text-red-400"
                                         onClick={() => confirmRemoveMember(selectedTeam.id, member.id)}
                                       >
                                         Remove
                                       </Button>
                                     )}
+                                  </div>
                                 </li>
-                              ))}
+                                );
+                              })}
                               {(selectedTeam.members_details || selectedTeam.members || []).length === 0 && (
                                 <p className="text-sm text-gray-500 dark:text-gray-400 py-2">No members yet.</p>
                               )}
                             </ul>
                           </div>
                           <div>
-                            {selectedTeam.is_owner && (
+                            {canManageMembers(selectedTeam) && (
                               <>
                                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                                   <UserPlus className="w-4 h-4" />
@@ -1256,6 +1350,15 @@ const Teams = () => {
           </AnimatePresence>,
           document.body
         )}
+
+      <DelegatedPermissionsModal
+        open={Boolean(permModal?.member)}
+        member={permModal?.member}
+        initialPermissions={permModal?.member?.delegated_permissions}
+        onClose={closePermissionsModal}
+        onSave={handleSavePermissions}
+        saving={permSaving}
+      />
     </div>
   );
 };

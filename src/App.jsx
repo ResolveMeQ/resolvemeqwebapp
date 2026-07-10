@@ -23,8 +23,9 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
 import Verify from './pages/auth/Verify';
 import './index.css';
-import { THEME_MODES } from './constants';
+import { THEME_MODES, DEFAULT_THEME } from './constants';
 import { TokenService, api, userCanAccessEscalationQueue } from './services/api';
+import { applyThemeToDocument, getLocalTheme, normalizeTheme, setLocalTheme } from './utils/theme';
 
 function safeNextPath(next) {
   const raw = String(next || '').trim();
@@ -62,7 +63,7 @@ function App() {
     communityQuestions: [],
     users: [],
   });
-  const [theme, setTheme] = useState(THEME_MODES.DARK);
+  const [theme, setTheme] = useState(() => getLocalTheme());
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authPage, setAuthPage] = useState('login');
   const [user, setUser] = useState(null);
@@ -111,6 +112,14 @@ function App() {
       setUserTeams(Array.isArray(teams) ? teams : []);
       const name = sub?.plan_detail?.name ?? sub?.plan?.name ?? null;
       setPlanName(name || null);
+      if (prefs) {
+        const resolved = normalizeTheme(prefs.theme || DEFAULT_THEME);
+        setTheme(resolved);
+        setLocalTheme(resolved);
+        if (!prefs.theme) {
+          api.settings.updatePreferences({ theme: resolved }).catch(() => {});
+        }
+      }
     } catch {
       setPreferences(null);
       setUserTeams([]);
@@ -158,21 +167,15 @@ function App() {
     }
   };
 
-  // Theme management
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') || THEME_MODES.DARK;
-    setTheme(savedTheme);
-  }, []);
-
-  useEffect(() => {
-    applyTheme(theme);
+    applyThemeToDocument(theme);
   }, [theme]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleSystemThemeChange = () => {
       if (theme === THEME_MODES.AUTO) {
-        applyTheme(THEME_MODES.AUTO);
+        applyThemeToDocument(THEME_MODES.AUTO);
       }
     };
 
@@ -180,30 +183,14 @@ function App() {
     return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
   }, [theme]);
 
-  const applyTheme = (newTheme) => {
-    const root = document.documentElement;
-    
-    // Always start by removing dark class to ensure light mode
-    root.classList.remove('dark');
-    
-    if (newTheme === THEME_MODES.DARK) {
-      root.classList.add('dark');
-    } else if (newTheme === THEME_MODES.LIGHT) {
-      root.classList.remove('dark');
-    } else if (newTheme === THEME_MODES.AUTO) {
-      // Auto mode - follow system preference
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
+  const handleThemeChange = React.useCallback((newTheme) => {
+    const resolved = normalizeTheme(newTheme);
+    setTheme(resolved);
+    setLocalTheme(resolved);
+    if (isAuthenticated) {
+      api.settings.updatePreferences({ theme: resolved }).catch(() => {});
     }
-  };
-
-  const handleThemeChange = (newTheme) => {
-    setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-  };
+  }, [isAuthenticated]);
 
   const handleNavigate = (to) => {
     const path = typeof to === 'string' && to.startsWith('/') ? to : `/${to}`;

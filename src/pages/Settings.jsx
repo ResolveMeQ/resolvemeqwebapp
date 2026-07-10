@@ -21,6 +21,8 @@ import Badge from '../components/ui/Badge';
 import { api, TokenService } from '../services/api';
 import { cn } from '../utils/cn';
 import { SettingsPageSkeleton } from '../components/ui/Skeleton';
+import { THEME_MODES, DEFAULT_THEME } from '../constants';
+import { normalizeTheme } from '../utils/theme';
 
 /**
  * Settings page component with comprehensive configuration options
@@ -73,7 +75,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
       const data = await api.settings.getPreferences();
       setPreferences(data);
       if (data) {
-        const selectedTheme = data.theme ?? theme ?? 'dark';
+        const selectedTheme = normalizeTheme(data.theme ?? theme ?? DEFAULT_THEME);
         setNotificationSettings({
           emailNotifications: data.email_notifications ?? true,
           pushNotifications: data.push_notifications ?? true,
@@ -92,7 +94,6 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
         setAppearanceSettings({
           theme: selectedTheme
         });
-        onThemeChange?.(selectedTheme);
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
@@ -103,7 +104,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   };
 
   const [generalSettings, setGeneralSettings] = useState({ timezone: '', language: '' });
-  const [appearanceSettings, setAppearanceSettings] = useState({ theme: 'dark' });
+  const [appearanceSettings, setAppearanceSettings] = useState({ theme: DEFAULT_THEME });
   const [notificationSettings, setNotificationSettings] = useState({
     emailNotifications: true,
     pushNotifications: true,
@@ -137,6 +138,28 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   const [partnerKeySaving, setPartnerKeySaving] = useState(false);
   const [partnerKeyName, setPartnerKeyName] = useState('');
   const [partnerKeySecret, setPartnerKeySecret] = useState(null);
+  const [workspacePermissions, setWorkspacePermissions] = useState(null);
+  const loadWorkspacePermissions = useCallback(async (teamId) => {
+    if (!teamId) {
+      setWorkspacePermissions(null);
+      return;
+    }
+    try {
+      const team = await api.teams.get(teamId);
+      setWorkspacePermissions(team?.workspace_permissions || null);
+    } catch {
+      setWorkspacePermissions(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadWorkspacePermissions(preferences?.active_team);
+  }, [preferences?.active_team, loadWorkspacePermissions]);
+
+  const canManageIntegrations = Boolean(workspacePermissions?.manage_integrations);
+  const canManagePartnerApi = Boolean(workspacePermissions?.manage_partner_api);
+  const canViewAuditLog = Boolean(workspacePermissions?.view_audit_log);
+
   const [oktaStatus, setOktaStatus] = useState(null);
   const [oktaStatusLoading, setOktaStatusLoading] = useState(false);
   const [oktaConnecting, setOktaConnecting] = useState(false);
@@ -171,13 +194,14 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
 
   useEffect(() => {
     if (!theme) return;
-    setAppearanceSettings((prev) => ({ ...prev, theme }));
+    setAppearanceSettings((prev) => ({ ...prev, theme: normalizeTheme(theme) }));
   }, [theme]);
 
   const handleAppearanceThemeSelect = useCallback(
     (themeValue) => {
-      setAppearanceSettings((prev) => ({ ...prev, theme: themeValue }));
-      onThemeChange?.(themeValue);
+      const resolved = normalizeTheme(themeValue);
+      setAppearanceSettings((prev) => ({ ...prev, theme: resolved }));
+      onThemeChange?.(resolved);
     },
     [onThemeChange]
   );
@@ -522,7 +546,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
         community_mentions: notificationSettings.communityMentions,
         timezone: generalSettings.timezone || 'UTC',
         language: generalSettings.language || 'en',
-        theme: appearanceSettings.theme || 'light'
+        theme: normalizeTheme(theme ?? appearanceSettings.theme ?? DEFAULT_THEME),
       };
       await api.settings.updatePreferences(preferencesData);
 
@@ -1121,6 +1145,14 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
           </Card>
         )}
 
+        {preferences?.active_team && !canManageIntegrations && (
+          <Card className="p-4 border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/30">
+            <p className="text-sm text-amber-900 dark:text-amber-200">
+              You can view integration status here. Connecting or disconnecting requires the Integrations permission from your workspace owner.
+            </p>
+          </Card>
+        )}
+
         <Card>
           <div className="p-6 space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1170,7 +1202,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                     variant="primary"
                     size="sm"
                     type="button"
-                    disabled={!preferences?.active_team || slackConnecting || slackDisconnecting}
+                    disabled={!preferences?.active_team || !canManageIntegrations || slackConnecting || slackDisconnecting}
                     loading={slackConnecting}
                     onClick={handleConnectSlack}
                   >
@@ -1181,7 +1213,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                       variant="outline"
                       size="sm"
                       type="button"
-                      disabled={!preferences?.active_team || slackConnecting || slackDisconnecting}
+                      disabled={!preferences?.active_team || !canManageIntegrations || slackConnecting || slackDisconnecting}
                       loading={slackDisconnecting}
                       onClick={handleDisconnectSlack}
                     >
@@ -1260,7 +1292,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                     variant="primary"
                     size="sm"
                     type="button"
-                    disabled={!preferences?.active_team || teamsLinking || teamsDisconnecting}
+                    disabled={!preferences?.active_team || !canManageIntegrations || teamsLinking || teamsDisconnecting}
                     loading={teamsLinking}
                     onClick={handleConnectTeams}
                   >
@@ -1271,7 +1303,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                       variant="outline"
                       size="sm"
                       type="button"
-                      disabled={!preferences?.active_team || teamsLinking || teamsDisconnecting}
+                      disabled={!preferences?.active_team || !canManageIntegrations || teamsLinking || teamsDisconnecting}
                       loading={teamsDisconnecting}
                       onClick={handleDisconnectTeams}
                     >
@@ -1358,7 +1390,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                 variant="primary"
                 size="sm"
                 type="button"
-                disabled={!preferences?.active_team || oktaConnecting || oktaDisconnecting}
+                disabled={!preferences?.active_team || !canManageIntegrations || oktaConnecting || oktaDisconnecting}
                 loading={oktaConnecting}
                 onClick={handleConnectOkta}
               >
@@ -1400,7 +1432,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                 )}
               </div>
               <div className="flex gap-2 justify-end">
-                <Button variant="primary" size="sm" type="button" loading={googleConnecting} disabled={googleDisconnecting || !preferences?.active_team} onClick={handleConnectGoogle}>
+                <Button variant="primary" size="sm" type="button" loading={googleConnecting} disabled={googleDisconnecting || !preferences?.active_team || !canManageIntegrations} onClick={handleConnectGoogle}>
                   {googleStatus?.connected ? 'Reconnect' : 'Connect'}
                 </Button>
                 {googleStatus?.connected && (
@@ -1431,7 +1463,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                 )}
               </div>
               <div className="flex gap-2 justify-end">
-                <Button variant="primary" size="sm" type="button" loading={microsoftConnecting} disabled={microsoftDisconnecting || !preferences?.active_team} onClick={handleConnectMicrosoft}>
+                <Button variant="primary" size="sm" type="button" loading={microsoftConnecting} disabled={microsoftDisconnecting || !preferences?.active_team || !canManageIntegrations} onClick={handleConnectMicrosoft}>
                   {microsoftStatus?.connected ? 'Reconnect' : 'Connect'}
                 </Button>
                 {microsoftStatus?.connected && (
@@ -1534,7 +1566,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                 size="sm"
                 type="button"
                 loading={jiraSaving}
-                disabled={jiraDisconnecting || !preferences?.active_team}
+                disabled={jiraDisconnecting || !preferences?.active_team || !canManageIntegrations}
                 onClick={handleSaveJira}
               >
                 {jiraStatus?.connected ? 'Save Jira settings' : 'Connect Jira'}
@@ -1567,6 +1599,11 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                   <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 max-w-md">
                     Issue API keys for external intake (Make, n8n, custom portals). Base URL: <code className="text-xs">/api/public/v1/</code>
                   </p>
+                  {!canManagePartnerApi && preferences?.active_team && (
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
+                      View only — ask your workspace owner for Partner API permission to create or revoke keys.
+                    </p>
+                  )}
                   <a
                     href="https://github.com/ResolveMeQ/ResolveMeQ/blob/main/docs/PUBLIC_API.md"
                     target="_blank"
@@ -1588,6 +1625,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                 </Button>
               </div>
             )}
+            {canManagePartnerApi && (
             <div className="flex flex-wrap gap-2">
               <input
                 type="text"
@@ -1600,6 +1638,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                 Create key
               </Button>
             </div>
+            )}
             {partnerKeys.length > 0 ? (
               <ul className="space-y-2 text-sm">
                 {partnerKeys.map((k) => (
@@ -1608,7 +1647,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                       <p className="font-medium text-gray-900 dark:text-white">{k.name}</p>
                       <p className="text-xs text-gray-500 font-mono">{k.key_prefix}… · {k.is_active ? 'active' : 'revoked'}</p>
                     </div>
-                    {k.is_active && (
+                    {k.is_active && canManagePartnerApi && (
                       <Button variant="outline" size="sm" type="button" onClick={() => handleRevokePartnerKey(k.id)}>
                         Revoke
                       </Button>
@@ -1696,7 +1735,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                   variant="primary"
                   size="sm"
                   type="button"
-                  disabled={!preferences?.active_team || webhookSaving}
+                  disabled={!preferences?.active_team || !webhookCanManage || webhookSaving}
                   loading={webhookSaving}
                   onClick={handleCreateWebhook}
                 >
@@ -1765,6 +1804,19 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
 
   const renderSecuritySettings = () => (
     <div className="space-y-4">
+      {!preferences?.active_team && (
+        <Card className="p-4 border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/30">
+          <p className="text-sm text-amber-900 dark:text-amber-200">Select a workspace to view security settings.</p>
+        </Card>
+      )}
+      {preferences?.active_team && !canViewAuditLog && (
+        <Card className="p-4 border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/30">
+          <p className="text-sm text-amber-900 dark:text-amber-200">
+            The compliance audit log is available to workspace owners and teammates with Audit log permission.
+          </p>
+        </Card>
+      )}
+      {canViewAuditLog && (
       <Card>
         <div className="p-6 space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1846,6 +1898,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
           )}
         </div>
       </Card>
+      )}
     </div>
   );
 

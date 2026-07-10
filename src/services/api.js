@@ -844,6 +844,27 @@ export const api = {
         body: JSON.stringify({ user_id: userId }),
       });
     },
+
+    grantWorkspaceAdmin: async (teamId, userId, permissions = null) => {
+      return apiFetch(`/api/teams/${teamId}/workspace-admins/grant/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: userId,
+          ...(permissions ? { permissions } : {}),
+        }),
+      });
+    },
+
+    permissionScopes: async () => {
+      return apiFetch('/api/teams/permission-scopes/');
+    },
+
+    revokeWorkspaceAdmin: async (teamId, userId) => {
+      return apiFetch(`/api/teams/${teamId}/workspace-admins/revoke/`, {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId }),
+      });
+    },
   },
 
   // Billing & subscription (synced with backend)

@@ -13,7 +13,7 @@ import {
   Gem,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import { THEME_MODES } from '../../constants';
+import { THEME_MODES, DEFAULT_THEME } from '../../constants';
 import { api } from '../../services/api';
 import { useLocation } from 'react-router-dom';
 
@@ -30,7 +30,7 @@ const Header = ({
   onThemeChange,
   onLogout,
   onNavigate,
-  theme = THEME_MODES.LIGHT,
+  theme = DEFAULT_THEME,
   className
 }) => {
   const location = useLocation();

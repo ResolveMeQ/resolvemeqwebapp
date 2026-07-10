@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Zap, Plus, ArrowLeft, Play, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 import Card from '../components/ui/Card';
+import WorkspaceRequiredBanner from '../components/WorkspaceRequiredBanner';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import { api } from '../services/api';
@@ -17,7 +18,7 @@ const EMPTY_FORM = {
   priority: 100,
 };
 
-const AutomationRules = () => {
+const AutomationRules = ({ activeTeamId }) => {
   const [rules, setRules] = useState([]);
   const [logs, setLogs] = useState([]);
   const [metadata, setMetadata] = useState(null);
@@ -51,7 +52,7 @@ const AutomationRules = () => {
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, activeTeamId]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -143,6 +144,16 @@ const AutomationRules = () => {
       {error && (
         <Card className="p-3 mb-4 text-sm text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50">
           {error}
+        </Card>
+      )}
+
+      {!activeTeamId && !loading && (
+        <WorkspaceRequiredBanner title="Select a workspace to manage automation rules" />
+      )}
+
+      {activeTeamId && !canManage && !loading && (
+        <Card className="p-3 mb-4 text-sm text-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20">
+          View-only: workspace owners and admins can create and edit rules.
         </Card>
       )}
 

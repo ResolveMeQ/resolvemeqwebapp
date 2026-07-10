@@ -28,6 +28,7 @@ import {
   Zap,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
+import WorkspaceRequiredBanner from '../components/WorkspaceRequiredBanner';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import StatCard from '../components/ui/StatCard';
@@ -518,7 +519,7 @@ function StepEditorCard({
   );
 }
 
-const WorkflowTemplates = () => {
+const WorkflowTemplates = ({ activeTeamId }) => {
   const navigate = useNavigate();
   const [templates, setTemplates] = useState([]);
   const [canManage, setCanManage] = useState(false);
@@ -573,7 +574,7 @@ const WorkflowTemplates = () => {
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, activeTeamId]);
 
   useEffect(() => {
     if (!editorOpen) return;
@@ -885,9 +886,13 @@ const WorkflowTemplates = () => {
         </Card>
       )}
 
-      {!canManage && !loading && (
+      {!activeTeamId && !loading && (
+        <WorkspaceRequiredBanner title="Select a workspace to manage playbooks" />
+      )}
+
+      {activeTeamId && !canManage && !loading && (
         <Card className="p-4 mb-4 border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20 text-sm text-amber-900 dark:text-amber-200">
-          View-only: workspace owners create team playbooks. Global templates are maintained by ResolveMeQ.
+          View-only: workspace owners and admins create team playbooks. Global templates are maintained by ResolveMeQ.
         </Card>
       )}
 
@@ -936,7 +941,7 @@ const WorkflowTemplates = () => {
             description={
               canManage
                 ? 'Start from a proven template or build a custom playbook for your team.'
-                : 'Ask your workspace owner to create playbooks for common IT processes.'
+                : 'Ask your workspace owner or admin to create playbooks for common IT processes.'
             }
             action={
               canManage && (
