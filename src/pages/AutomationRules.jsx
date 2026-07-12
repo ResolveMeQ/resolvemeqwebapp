@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Zap, Plus, ArrowLeft, Play, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Zap, Plus, ArrowLeft, Play, Trash2, ToggleLeft, ToggleRight, Pencil } from 'lucide-react';
 import Card from '../components/ui/Card';
 import WorkspaceRequiredBanner from '../components/WorkspaceRequiredBanner';
 import Button from '../components/ui/Button';
@@ -12,11 +12,102 @@ const EMPTY_FORM = {
   description: '',
   trigger: 'ticket.created',
   condition_field: 'category',
+  condition_op: 'equals',
   condition_value: '',
   action_type: 'start_workflow',
   template_trigger_category: 'onboarding',
+  template_id: '',
+  notify_channel_id: '',
+  notify_message: '',
+  assign_user_id: '',
+  set_field_name: '',
+  set_field_value: '',
+  webhook_url: '',
   priority: 100,
 };
+
+function ruleToForm(rule) {
+  const cond = rule.conditions?.[0];
+  const action = rule.actions?.[0] || {};
+  return {
+    name: rule.name || '',
+    description: rule.description || '',
+    trigger: rule.trigger || 'ticket.created',
+    condition_field: cond?.field || 'category',
+    condition_op: cond?.op || 'equals',
+    condition_value: cond?.value != null ? String(cond.value) : '',
+    action_type: action.type || 'start_workflow',
+    template_trigger_category: action.template_trigger_category || 'onboarding',
+    template_id: action.template_id ? String(action.template_id) : '',
+    notify_channel_id: action.channel_id || '',
+    notify_message: action.message || '',
+    assign_user_id: action.user_id ? String(action.user_id) : '',
+    set_field_name: action.field || '',
+    set_field_value: action.value != null ? String(action.value) : '',
+    webhook_url: action.url || '',
+    priority: rule.priority ?? 100,
+  };
+}
+
+function formToPayload(form) {
+  const conditions = form.condition_value.trim()
+    ? [{
+      field: form.condition_field.trim() || 'category',
+      op: form.condition_op || 'equals',
+      value: form.condition_value.trim(),
+    }]
+    : [];
+
+  const action = { type: form.action_type };
+  switch (form.action_type) {
+    case 'start_workflow':
+      if (form.template_id.trim()) {
+        action.template_id = form.template_id.trim();
+      } else {
+        action.template_trigger_category = form.template_trigger_category.trim();
+      }
+      break;
+    case 'notify_slack':
+      if (form.notify_channel_id.trim()) action.channel_id = form.notify_channel_id.trim();
+      if (form.notify_message.trim()) action.message = form.notify_message.trim();
+      break;
+    case 'notify_teams':
+      if (form.notify_message.trim()) action.message = form.notify_message.trim();
+      break;
+    case 'assign_ticket':
+      action.user_id = form.assign_user_id.trim();
+      break;
+    case 'set_field':
+      action.field = form.set_field_name.trim();
+      action.value = form.set_field_value;
+      break;
+    case 'call_webhook':
+      action.url = form.webhook_url.trim();
+      break;
+    default:
+      break;
+  }
+
+  return {
+    name: form.name.trim(),
+    description: form.description.trim(),
+    trigger: form.trigger,
+    conditions,
+    actions: [action],
+    priority: Number(form.priority) || 100,
+  };
+}
+
+function actionSummary(rule, metadata) {
+  const action = rule.actions?.[0];
+  if (!action?.type) return '';
+  const label = metadata?.actions?.find((a) => a.value === action.type)?.label || action.type;
+  if (action.type === 'start_workflow') {
+    const target = action.template_trigger_category || action.template_id;
+    return target ? `${label} (${target})` : label;
+  }
+  return label;
+}
 
 const AutomationRules = ({ activeTeamId }) => {
   const [rules, setRules] = useState([]);
@@ -25,10 +116,31 @@ const AutomationRules = ({ activeTeamId }) => {
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingRuleId, setEditingRuleId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [testResult, setTestResult] = useState(null);
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingRuleId(null);
+    setForm(EMPTY_FORM);
+  };
+
+  const openCreateForm = () => {
+    setEditingRuleId(null);
+    setForm(EMPTY_FORM);
+    setShowForm(true);
+    setError(null);
+  };
+
+  const openEditForm = (rule) => {
+    setEditingRuleId(rule.id);
+    setForm(ruleToForm(rule));
+    setShowForm(true);
+    setError(null);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,33 +166,22 @@ const AutomationRules = ({ activeTeamId }) => {
     load();
   }, [load, activeTeamId]);
 
-  const handleCreate = async (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return;
     setSaving(true);
     setError(null);
     try {
-      const conditions = form.condition_value.trim()
-        ? [{ field: form.condition_field.trim() || 'category', op: 'equals', value: form.condition_value.trim() }]
-        : [];
-      const actions =
-        form.action_type === 'start_workflow'
-          ? [{ type: 'start_workflow', template_trigger_category: form.template_trigger_category.trim() }]
-          : [{ type: form.action_type }];
-      await api.automation.createRule({
-        name: form.name.trim(),
-        description: form.description.trim(),
-        trigger: form.trigger,
-        conditions,
-        actions,
-        priority: Number(form.priority) || 100,
-        is_active: true,
-      });
-      setShowForm(false);
-      setForm(EMPTY_FORM);
+      const payload = formToPayload(form);
+      if (editingRuleId) {
+        await api.automation.updateRule(editingRuleId, payload);
+      } else {
+        await api.automation.createRule({ ...payload, is_active: true });
+      }
+      closeForm();
       load();
     } catch (err) {
-      setError(err?.message || 'Could not create rule.');
+      setError(err?.message || `Could not ${editingRuleId ? 'update' : 'create'} rule.`);
     } finally {
       setSaving(false);
     }
@@ -100,6 +201,7 @@ const AutomationRules = ({ activeTeamId }) => {
     if (!rule.can_edit || !window.confirm(`Delete rule "${rule.name}"?`)) return;
     try {
       await api.automation.deleteRule(rule.id);
+      if (editingRuleId === rule.id) closeForm();
       load();
     } catch (err) {
       setError(err?.message || 'Could not delete rule.');
@@ -113,6 +215,119 @@ const AutomationRules = ({ activeTeamId }) => {
       setTestResult(res?.logs?.[0]?.message || 'Dry run completed.');
     } catch (err) {
       setTestResult(err?.message || 'Dry run failed.');
+    }
+  };
+
+  const renderActionFields = () => {
+    switch (form.action_type) {
+      case 'start_workflow':
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Template category</label>
+              <input
+                value={form.template_trigger_category}
+                onChange={(e) => setForm((f) => ({ ...f, template_trigger_category: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                placeholder="onboarding"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Or template ID</label>
+              <input
+                value={form.template_id}
+                onChange={(e) => setForm((f) => ({ ...f, template_id: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                placeholder="UUID (overrides category)"
+              />
+            </div>
+          </div>
+        );
+      case 'notify_slack':
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Slack channel ID (optional)</label>
+              <input
+                value={form.notify_channel_id}
+                onChange={(e) => setForm((f) => ({ ...f, notify_channel_id: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                placeholder="Uses ops channel if empty"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Message (optional)</label>
+              <input
+                value={form.notify_message}
+                onChange={(e) => setForm((f) => ({ ...f, notify_message: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                placeholder="Defaults to ticket summary"
+              />
+            </div>
+          </div>
+        );
+      case 'notify_teams':
+        return (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Message (optional)</label>
+            <input
+              value={form.notify_message}
+              onChange={(e) => setForm((f) => ({ ...f, notify_message: e.target.value }))}
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+              placeholder="Defaults to ticket summary"
+            />
+          </div>
+        );
+      case 'assign_ticket':
+        return (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Assign to user ID</label>
+            <input
+              value={form.assign_user_id}
+              onChange={(e) => setForm((f) => ({ ...f, assign_user_id: e.target.value }))}
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+              required
+            />
+          </div>
+        );
+      case 'set_field':
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ticket field</label>
+              <input
+                value={form.set_field_name}
+                onChange={(e) => setForm((f) => ({ ...f, set_field_name: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                placeholder="status"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Value</label>
+              <input
+                value={form.set_field_value}
+                onChange={(e) => setForm((f) => ({ ...f, set_field_value: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+              />
+            </div>
+          </div>
+        );
+      case 'call_webhook':
+        return (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Webhook URL</label>
+            <input
+              value={form.webhook_url}
+              onChange={(e) => setForm((f) => ({ ...f, webhook_url: e.target.value }))}
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+              placeholder="https://..."
+              required
+            />
+          </div>
+        );
+      default:
+        return null;
     }
   };
 
@@ -134,7 +349,7 @@ const AutomationRules = ({ activeTeamId }) => {
           </p>
         </div>
         {canManage && (
-          <Button variant="primary" size="sm" onClick={() => setShowForm((s) => !s)}>
+          <Button variant="primary" size="sm" onClick={() => (showForm && !editingRuleId ? closeForm() : openCreateForm())}>
             <Plus className="w-4 h-4 mr-1.5" />
             New rule
           </Button>
@@ -165,7 +380,10 @@ const AutomationRules = ({ activeTeamId }) => {
 
       {showForm && canManage && (
         <Card className="p-4 mb-6">
-          <form onSubmit={handleCreate} className="space-y-3">
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+            {editingRuleId ? 'Edit rule' : 'New rule'}
+          </h2>
+          <form onSubmit={handleSave} className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Name</label>
               <input
@@ -174,6 +392,14 @@ const AutomationRules = ({ activeTeamId }) => {
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
                 placeholder="Auto-start onboarding"
                 required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Description (optional)</label>
+              <input
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -190,50 +416,60 @@ const AutomationRules = ({ activeTeamId }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">If field equals</label>
-                <div className="flex gap-2">
-                  <input
-                    value={form.condition_field}
-                    onChange={(e) => setForm((f) => ({ ...f, condition_field: e.target.value }))}
-                    className="w-1/3 px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-                    placeholder="category"
-                  />
-                  <input
-                    value={form.condition_value}
-                    onChange={(e) => setForm((f) => ({ ...f, condition_value: e.target.value }))}
-                    className="flex-1 px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-                    placeholder="onboarding (leave empty = always)"
-                  />
-                </div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Priority</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={form.priority}
+                  onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                />
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Then (action)</label>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">If field matches (leave value empty = always)</label>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  value={form.condition_field}
+                  onChange={(e) => setForm((f) => ({ ...f, condition_field: e.target.value }))}
+                  className="w-28 px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                  placeholder="category"
+                />
                 <select
-                  value={form.action_type}
-                  onChange={(e) => setForm((f) => ({ ...f, action_type: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                  value={form.condition_op}
+                  onChange={(e) => setForm((f) => ({ ...f, condition_op: e.target.value }))}
+                  className="w-32 px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
                 >
-                  {(metadata?.actions || []).map((a) => (
-                    <option key={a.value} value={a.value}>{a.label}</option>
+                  {(metadata?.condition_ops || [{ value: 'equals', label: 'Equals' }]).map((op) => (
+                    <option key={op.value} value={op.value}>{op.label}</option>
                   ))}
                 </select>
+                <input
+                  value={form.condition_value}
+                  onChange={(e) => setForm((f) => ({ ...f, condition_value: e.target.value }))}
+                  className="flex-1 min-w-[8rem] px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                  placeholder="onboarding"
+                />
               </div>
-              {form.action_type === 'start_workflow' && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Template category</label>
-                  <input
-                    value={form.template_trigger_category}
-                    onChange={(e) => setForm((f) => ({ ...f, template_trigger_category: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-                  />
-                </div>
-              )}
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Then (action)</label>
+              <select
+                value={form.action_type}
+                onChange={(e) => setForm((f) => ({ ...f, action_type: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+              >
+                {(metadata?.actions || []).map((a) => (
+                  <option key={a.value} value={a.value}>{a.label}</option>
+                ))}
+              </select>
+            </div>
+            {renderActionFields()}
             <div className="flex gap-2 justify-end">
-              <Button type="button" variant="ghost" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
-              <Button type="submit" variant="primary" size="sm" loading={saving}>Create rule</Button>
+              <Button type="button" variant="ghost" size="sm" onClick={closeForm}>Cancel</Button>
+              <Button type="submit" variant="primary" size="sm" loading={saving}>
+                {editingRuleId ? 'Save changes' : 'Create rule'}
+              </Button>
             </div>
           </form>
         </Card>
@@ -248,7 +484,7 @@ const AutomationRules = ({ activeTeamId }) => {
       ) : (
         <div className="space-y-3">
           {rules.map((rule) => (
-            <Card key={rule.id} className="p-4">
+            <Card key={rule.id} className={`p-4 ${editingRuleId === rule.id ? 'ring-2 ring-primary-500/40' : ''}`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -259,8 +495,10 @@ const AutomationRules = ({ activeTeamId }) => {
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {metadata?.triggers?.find((t) => t.value === rule.trigger)?.label || rule.trigger}
                     {rule.conditions?.length > 0 && (
-                      <> · if {rule.conditions[0].field} = {String(rule.conditions[0].value)}</>
+                      <> · if {rule.conditions[0].field} {rule.conditions[0].op || 'equals'} {String(rule.conditions[0].value)}</>
                     )}
+                    {' · '}
+                    {actionSummary(rule, metadata)}
                   </p>
                   {rule.description && (
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{rule.description}</p>
@@ -269,6 +507,14 @@ const AutomationRules = ({ activeTeamId }) => {
                 <div className="flex items-center gap-1 shrink-0">
                   {rule.can_edit && (
                     <>
+                      <button
+                        type="button"
+                        onClick={() => openEditForm(rule)}
+                        className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        title="Edit rule"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => toggleActive(rule)}

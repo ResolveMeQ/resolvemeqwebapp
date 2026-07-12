@@ -278,7 +278,10 @@ const Tickets = ({ activeTeamId }) => {
       setDetailTicket(t);
     } catch (err) {
       console.error('Error loading ticket:', err);
-      if (!silent) setDetailTicket(null);
+      if (!silent) {
+        showToast(err?.message || 'Could not load ticket details.', 'error');
+        setDetailTicket(null);
+      }
     } finally {
       if (!silent) setDetailLoading(false);
     }
@@ -290,8 +293,10 @@ const Tickets = ({ activeTeamId }) => {
     try {
       const data = await api.workflows.list({ ticket: ticketId });
       setTicketWorkflow(data?.workflows?.[0] || null);
-    } catch {
+    } catch (err) {
+      console.error('Error loading workflow:', err);
       setTicketWorkflow(null);
+      showToast(err?.message || 'Could not load workflow for this ticket.', 'error');
     }
   };
 
@@ -333,6 +338,7 @@ const Tickets = ({ activeTeamId }) => {
       }
     } catch (err) {
       console.error('Error updating status:', err);
+      showToast(err?.message || 'Could not update ticket status.', 'error');
     } finally {
       setUpdatingStatus(null);
     }
@@ -375,6 +381,7 @@ const Tickets = ({ activeTeamId }) => {
       showToast(etaText, 'info');
     } catch (err) {
       console.error('Error escalating:', err);
+      showToast(err?.message || 'Could not escalate this ticket. Try again.', 'error');
     } finally {
       setEscalateLoading(null);
     }
@@ -401,6 +408,7 @@ const Tickets = ({ activeTeamId }) => {
       loadTicketDetail(id, { silent: true });
     } catch (err) {
       console.error('Error adding comment:', err);
+      showToast(err?.message || 'Could not add your comment.', 'error');
       setDetailTicket((prev) => (prev && (prev.ticket_id ?? prev.id) === id
         ? { ...prev, comments: (prev.comments || []).filter((c) => c.id !== optimisticComment.id) }
         : prev));
@@ -475,6 +483,7 @@ const Tickets = ({ activeTeamId }) => {
       closeEdit();
     } catch (err) {
       console.error('Error updating ticket:', err);
+      showToast(err?.message || 'Could not save ticket changes.', 'error');
     } finally {
       setSaveEditLoading(false);
     }
@@ -491,6 +500,7 @@ const Tickets = ({ activeTeamId }) => {
       setDeleteConfirm(null);
     } catch (err) {
       console.error('Error deleting ticket:', err);
+      showToast(err?.message || 'Could not delete this ticket.', 'error');
     } finally {
       setDeleteLoading(null);
     }

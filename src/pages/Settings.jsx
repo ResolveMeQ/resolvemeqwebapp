@@ -139,16 +139,20 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   const [partnerKeyName, setPartnerKeyName] = useState('');
   const [partnerKeySecret, setPartnerKeySecret] = useState(null);
   const [workspacePermissions, setWorkspacePermissions] = useState(null);
+  const [permissionsLoadError, setPermissionsLoadError] = useState(false);
   const loadWorkspacePermissions = useCallback(async (teamId) => {
     if (!teamId) {
       setWorkspacePermissions(null);
+      setPermissionsLoadError(false);
       return;
     }
     try {
       const team = await api.teams.get(teamId);
       setWorkspacePermissions(team?.workspace_permissions || null);
+      setPermissionsLoadError(false);
     } catch {
       setWorkspacePermissions(null);
+      setPermissionsLoadError(true);
     }
   }, []);
 
@@ -1145,7 +1149,15 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
           </Card>
         )}
 
-        {preferences?.active_team && !canManageIntegrations && (
+        {preferences?.active_team && permissionsLoadError && (
+          <Card className="p-4 border-red-200 dark:border-red-900/50 bg-red-50/80 dark:bg-red-950/30">
+            <p className="text-sm text-red-900 dark:text-red-200">
+              Could not load workspace permissions. Refresh the page or try again — integration controls stay disabled until permissions load.
+            </p>
+          </Card>
+        )}
+
+        {preferences?.active_team && !permissionsLoadError && !canManageIntegrations && (
           <Card className="p-4 border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/30">
             <p className="text-sm text-amber-900 dark:text-amber-200">
               You can view integration status here. Connecting or disconnecting requires the Integrations permission from your workspace owner.
