@@ -465,6 +465,9 @@ const Tickets = ({ activeTeamId }) => {
       await api.agent.sendAgentReply(id, text);
       setAgentReplyText('');
       setChatPreviewRefresh((n) => n + 1);
+      // Replying claims an unclaimed ticket (see send_agent_reply) -- refresh so
+      // claimed_at/assigned_to shown elsewhere on this page reflect that.
+      loadTicketDetail(id, { silent: true });
       showToast(`${agentReplyCopy.successToast} They’ll see it in the Conversation section and AI Chat.`, 'success');
     } catch (err) {
       console.error('Error sending agent reply:', err);
@@ -1455,7 +1458,7 @@ const Tickets = ({ activeTeamId }) => {
                           </div>
                         )}
 
-                        {detailTicket?.status === 'escalated' && detailTicket?.claimed_at && (
+                        {detailTicket?.status === 'escalated' && (
                           <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
                             <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">
                               {agentReplyCopy.sectionTitle}

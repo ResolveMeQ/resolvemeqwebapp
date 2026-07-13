@@ -543,6 +543,10 @@ const AIChatPanel = ({
             wasHelpful: wh ?? null,
             showFeedbackPrompt: hidePrompt ? false : aiMsg.sender_type === 'ai',
             createdAt: aiMsg.created_at,
+            // The backend's own fallback message (AI unreachable) renders with the
+            // same "Try again" affordance as a client-side error -- make sure it
+            // resends the user's actual question, not the button's own label text.
+            retryMessage: aiMsg.sender_type === 'system' ? messageText : undefined,
           },
         ]);
       } else if (data.routed_to_human) {
