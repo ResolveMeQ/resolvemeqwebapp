@@ -27,7 +27,7 @@ import {
 import Card from '../components/ui/Card';
 import EmptyState from '../components/ui/EmptyState';
 import Button from '../components/ui/Button';
-import { api } from '../services/api';
+import { api, getApiErrorMessage } from '../services/api';
 import { cn } from '../utils/cn';
 import { KnowledgeBaseArticlesSkeleton } from '../components/ui/Skeleton';
 import { renderMarkdown } from '../utils/markdown';
@@ -363,6 +363,8 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
   const [communityDetailOpen, setCommunityDetailOpen] = useState(false);
   const [questionFiles, setQuestionFiles] = useState([]);
   const [answerFiles, setAnswerFiles] = useState([]);
+  const [questionFormErrors, setQuestionFormErrors] = useState({});
+  const [answerFormErrors, setAnswerFormErrors] = useState({});
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [commentDrafts, setCommentDrafts] = useState({});
   const [commentFiles, setCommentFiles] = useState({});
@@ -1006,6 +1008,7 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
       .filter(Boolean);
     try {
       setUploadingFiles(true);
+      setQuestionFormErrors({});
       const uploadedAttachments = [];
       for (const file of questionFiles) {
         const uploaded = await api.knowledgeBase.uploadCommunityAttachment(file);
@@ -1024,13 +1027,17 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
       setQuestionDraft({ title: '', body: '', tags: '' });
       setQuestionFiles([]);
       setSelectedDuplicateQuestion(null);
+      setQuestionFormErrors({});
       setCreatingQuestion(false);
       showToast('Question posted.');
       await loadCommunityQuestions();
       await openCommunityQuestion(created);
       window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
     } catch (error) {
-      showToast(error?.message || 'Failed to post question.', 'error');
+      if (error?.fieldErrors && Object.keys(error.fieldErrors).length > 0) {
+        setQuestionFormErrors(error.fieldErrors);
+      }
+      showToast(getApiErrorMessage(error, 'Failed to post question.'), 'error');
     } finally {
       setUploadingFiles(false);
     }
@@ -1110,6 +1117,7 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
     if (!selectedQuestion) return;
     try {
       setUploadingFiles(true);
+      setAnswerFormErrors({});
       const uploadedAttachments = [];
       for (const file of answerFiles) {
         const uploaded = await api.knowledgeBase.uploadCommunityAttachment(file);
@@ -1121,11 +1129,15 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
       });
       setAnswerDraft('');
       setAnswerFiles([]);
+      setAnswerFormErrors({});
       showToast('Answer posted.');
       await Promise.all([loadCommunityQuestions(), loadCommunityQuestionDetail(selectedQuestion.id)]);
       window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
     } catch (error) {
-      showToast(error?.message || 'Unable to post answer.', 'error');
+      if (error?.fieldErrors && Object.keys(error.fieldErrors).length > 0) {
+        setAnswerFormErrors(error.fieldErrors);
+      }
+      showToast(getApiErrorMessage(error, 'Unable to post answer.'), 'error');
     } finally {
       setUploadingFiles(false);
     }
@@ -1164,7 +1176,7 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
       showToast('Comment posted.');
       window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
     } catch (error) {
-      showToast(error?.message || 'Unable to post comment.', 'error');
+      showToast(getApiErrorMessage(error, 'Unable to post comment.'), 'error');
     } finally {
       setActionLoadingKey(null);
       setUploadingFiles(false);
@@ -1450,11 +1462,17 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
         ))}
       </div>
       <form onSubmit={handleAddAnswer} className="space-y-2 border-t border-gray-200 dark:border-gray-800 pt-3">
+        {answerFormErrors._form && (
+          <p className="text-sm text-red-600 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-3 py-2">
+            {answerFormErrors._form}
+          </p>
+        )}
         <textarea
           value={answerDraft}
           onChange={(e) => {
             const v = e.target.value;
             setAnswerDraft(v);
+            setAnswerFormErrors((prev) => ({ ...prev, body: '', _form: '' }));
             const caret = e.target.selectionStart;
             if (mentionDebounceTimer) window.clearTimeout(mentionDebounceTimer);
             const t = window.setTimeout(() => {
@@ -1464,8 +1482,16 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
           }}
           rows={3}
           placeholder="Write your answer"
-          className="w-full min-w-0 max-w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+          className={cn(
+            'w-full min-w-0 max-w-full px-3 py-2 rounded-lg border bg-white dark:bg-gray-900 text-sm',
+            answerFormErrors.body
+              ? 'border-red-400 dark:border-red-600 focus:ring-red-500'
+              : 'border-gray-300 dark:border-gray-700'
+          )}
         />
+        {answerFormErrors.body && (
+          <p className="text-xs text-red-600 dark:text-red-400">{answerFormErrors.body}</p>
+        )}
         <input
           type="file"
           multiple
@@ -1591,7 +1617,12 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
           <Button
             data-tour="kb-ask-question"
             variant="primary"
-            onClick={() => setCreatingQuestion((v) => !v)}
+            onClick={() => {
+              setCreatingQuestion((open) => {
+                if (!open) setQuestionFormErrors({});
+                return !open;
+              });
+            }}
           >
             <Plus className="w-4 h-4 mr-1.5" />
             Ask question
@@ -1601,11 +1632,17 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
         {creatingQuestion && (
           <Card className="p-4">
             <form onSubmit={handleCreateQuestion} className="space-y-3">
+              {questionFormErrors._form && (
+                <p className="text-sm text-red-600 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-3 py-2">
+                  {questionFormErrors._form}
+                </p>
+              )}
               <input
                 value={questionDraft.title}
                 onChange={(e) => {
                   const v = e.target.value;
                   setQuestionDraft((p) => ({ ...p, title: v }));
+                  setQuestionFormErrors((prev) => ({ ...prev, title: '', _form: '' }));
                   const caret = e.target.selectionStart;
                   if (mentionDebounceTimer) window.clearTimeout(mentionDebounceTimer);
                   const t = window.setTimeout(() => {
@@ -1614,12 +1651,21 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
                   setMentionDebounceTimer(t);
                 }}
                 placeholder="Question title"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+                className={cn(
+                  'w-full px-3 py-2 rounded-lg border bg-white dark:bg-gray-900 text-sm',
+                  questionFormErrors.title
+                    ? 'border-red-400 dark:border-red-600 focus:ring-red-500'
+                    : 'border-gray-300 dark:border-gray-700'
+                )}
                 required
               />
+              {questionFormErrors.title ? (
+                <p className="text-xs text-red-600 dark:text-red-400">{questionFormErrors.title}</p>
+              ) : (
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Tip: Use a specific title like "Windows 11 VPN disconnects every 10 minutes on office Wi-Fi".
               </p>
+              )}
               {checkingDuplicates && (
                 <p className="text-xs text-gray-500 dark:text-gray-400">Checking similar questions...</p>
               )}
@@ -1670,6 +1716,7 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
                 onChange={(e) => {
                   const v = e.target.value;
                   setQuestionDraft((p) => ({ ...p, body: v }));
+                  setQuestionFormErrors((prev) => ({ ...prev, body: '', _form: '' }));
                   const caret = e.target.selectionStart;
                   if (mentionDebounceTimer) window.clearTimeout(mentionDebounceTimer);
                   const t = window.setTimeout(() => {
@@ -1679,15 +1726,34 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
                 }}
                 placeholder="Describe your issue or question..."
                 rows={4}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+                className={cn(
+                  'w-full px-3 py-2 rounded-lg border bg-white dark:bg-gray-900 text-sm',
+                  questionFormErrors.body
+                    ? 'border-red-400 dark:border-red-600 focus:ring-red-500'
+                    : 'border-gray-300 dark:border-gray-700'
+                )}
                 required
               />
+              {questionFormErrors.body && (
+                <p className="text-xs text-red-600 dark:text-red-400">{questionFormErrors.body}</p>
+              )}
               <input
                 value={questionDraft.tags}
-                onChange={(e) => setQuestionDraft((p) => ({ ...p, tags: e.target.value }))}
+                onChange={(e) => {
+                  setQuestionDraft((p) => ({ ...p, tags: e.target.value }));
+                  setQuestionFormErrors((prev) => ({ ...prev, tags: '' }));
+                }}
                 placeholder="Tags (comma-separated)"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+                className={cn(
+                  'w-full px-3 py-2 rounded-lg border bg-white dark:bg-gray-900 text-sm',
+                  questionFormErrors.tags
+                    ? 'border-red-400 dark:border-red-600 focus:ring-red-500'
+                    : 'border-gray-300 dark:border-gray-700'
+                )}
               />
+              {questionFormErrors.tags && (
+                <p className="text-xs text-red-600 dark:text-red-400">{questionFormErrors.tags}</p>
+              )}
               <input
                 type="file"
                 multiple

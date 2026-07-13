@@ -170,7 +170,9 @@ const AIChatPanel = ({
   const messagesEndRef = useRef(null);
   const liveRef = useRef(null);
   const screenshotInputRef = useRef(null);
+  const feedbackInFlightRef = useRef(new Set());
   const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
+  const [feedbackSubmittingId, setFeedbackSubmittingId] = useState(null);
 
   const dismissedPromptStorageKey = (promptId) =>
     `resolvemeq_dismiss_feedback_prompt_${ticketId}_${promptId}`;
@@ -344,6 +346,7 @@ const AIChatPanel = ({
   const buildMessagesFromAgentResponse = (ticketData, initialRated = null) => {
     const ar = ticketData?.agent_response;
     if (!ticketData?.agent_processed || !ar || typeof ar !== 'object') return null;
+    const stableTicketId = ticketData?.id ?? ticketData?.ticket_id ?? ticketId ?? 'unknown';
     const solution = ar.solution || {};
     const responseStyle = ar.response_style || 'guided_steps';
     const steps = solution.steps || solution.immediate_actions || [];
@@ -366,9 +369,9 @@ const AIChatPanel = ({
     }
     const userText = ticketData.description || ticketData.issue_type || 'My issue';
     return [
-      { id: `injected-user-${Date.now()}`, type: 'user', text: userText, createdAt: new Date().toISOString() },
+      { id: `injected-user-${stableTicketId}`, type: 'user', text: userText, createdAt: new Date().toISOString() },
       {
-        id: `injected-ai-${Date.now()}`,
+        id: `injected-ai-${stableTicketId}`,
         type: 'ai',
         text: aiText,
         confidence,
@@ -652,10 +655,15 @@ const AIChatPanel = ({
 
   const submitFeedback = async (messageId, helpful) => {
     const sid = String(messageId);
+    if (feedbackInFlightRef.current.has(sid)) return;
+
     const isInjected = sid.startsWith('injected-ai');
 
     let previousWasHelpful = null;
     let previousShowPrompt = true;
+
+    feedbackInFlightRef.current.add(sid);
+    setFeedbackSubmittingId(sid);
 
     // Optimistic update: show feedback state immediately so user knows their click worked
     setMessages((prev) => {
@@ -663,6 +671,11 @@ const AIChatPanel = ({
       if (t) {
         previousWasHelpful = t.wasHelpful ?? null;
         previousShowPrompt = t.showFeedbackPrompt !== false;
+        if (t.wasHelpful === helpful) {
+          return prev.map((msg) =>
+            msg.id === messageId ? { ...msg, showFeedbackPrompt: false } : msg
+          );
+        }
       }
       return prev.map((msg) =>
         msg.id === messageId ? { ...msg, wasHelpful: helpful, showFeedbackPrompt: false } : msg
@@ -701,6 +714,9 @@ const AIChatPanel = ({
         )
       );
       onAppToast?.('Could not save feedback. Try again.', 'error');
+    } finally {
+      feedbackInFlightRef.current.delete(sid);
+      setFeedbackSubmittingId((current) => (current === sid ? null : current));
     }
   };
 
@@ -1289,7 +1305,8 @@ const AIChatPanel = ({
                           <button
                             type="button"
                             onClick={() => submitFeedback(msg.id, true)}
-                            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center p-2 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
+                            disabled={feedbackSubmittingId === String(msg.id)}
+                            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center p-2 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:pointer-events-none"
                             title="Yes, helpful"
                             aria-label="Mark as helpful"
                             onKeyDown={(e) => {
@@ -1304,7 +1321,8 @@ const AIChatPanel = ({
                           <button
                             type="button"
                             onClick={() => submitFeedback(msg.id, false)}
-                            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+                            disabled={feedbackSubmittingId === String(msg.id)}
+                            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:pointer-events-none"
                             title="No, I need different help"
                             aria-label="Mark as not helpful"
                             onKeyDown={(e) => {

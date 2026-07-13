@@ -207,6 +207,94 @@ export function isBillingRecoverableError(error) {
   return error instanceof BillingRecoverableError;
 }
 
+function formatFieldErrorValue(val) {
+  if (val == null) return '';
+  if (Array.isArray(val)) {
+    return val
+      .map((item) => (typeof item === 'string' ? item : formatFieldErrorValue(item)))
+      .filter(Boolean)
+      .join(' ');
+  }
+  if (typeof val === 'string') return val;
+  if (typeof val === 'object') {
+    return Object.values(val)
+      .map((item) => formatFieldErrorValue(item))
+      .filter(Boolean)
+      .join(' ');
+  }
+  return String(val);
+}
+
+/** Parse Django REST Framework validation payloads into a user-facing message + field map. */
+export function parseApiErrorPayload(data) {
+  if (data == null) {
+    return { message: null, fieldErrors: {} };
+  }
+  if (typeof data === 'string') {
+    const trimmed = data.trim();
+    return { message: trimmed || null, fieldErrors: {} };
+  }
+  if (typeof data !== 'object' || Array.isArray(data)) {
+    return { message: null, fieldErrors: {} };
+  }
+
+  const fieldErrors = {};
+  const reservedKeys = new Set(['message', 'error', 'detail', 'billing_error', 'recovery']);
+
+  const absorbField = (key, val) => {
+    const text = formatFieldErrorValue(val);
+    if (!text) return;
+    if (key === 'non_field_errors' || key === 'nonFieldErrors') {
+      fieldErrors._form = fieldErrors._form ? `${fieldErrors._form} ${text}` : text;
+      return;
+    }
+    fieldErrors[key] = fieldErrors[key] ? `${fieldErrors[key]} ${text}` : text;
+  };
+
+  let detailMessage = null;
+  if (Array.isArray(data.detail)) {
+    detailMessage = data.detail.map((item) => formatFieldErrorValue(item)).filter(Boolean).join(' ');
+  } else if (typeof data.detail === 'string' && data.detail.trim()) {
+    detailMessage = data.detail.trim();
+  } else if (data.detail && typeof data.detail === 'object') {
+    Object.entries(data.detail).forEach(([key, val]) => absorbField(key, val));
+  }
+
+  Object.entries(data).forEach(([key, val]) => {
+    if (reservedKeys.has(key)) return;
+    absorbField(key, val);
+  });
+
+  const explicitMessage =
+    (typeof data.message === 'string' && data.message.trim()) ||
+    (typeof data.error === 'string' && data.error.trim()) ||
+    null;
+
+  const fieldMessages = Object.entries(fieldErrors)
+    .filter(([key]) => key !== '_form')
+    .map(([, value]) => value);
+
+  const message =
+    explicitMessage ||
+    detailMessage ||
+    fieldErrors._form ||
+    fieldMessages[0] ||
+    null;
+
+  return { message, fieldErrors };
+}
+
+export function getApiErrorMessage(error, fallback = 'Something went wrong.') {
+  if (!error) return fallback;
+  if (typeof error === 'string') return error;
+  if (typeof error.message === 'string' && error.message.trim()) return error.message;
+  if (error.apiData) {
+    const { message } = parseApiErrorPayload(error.apiData);
+    if (message) return message;
+  }
+  return fallback;
+}
+
 const handleResponse = async (response) => {
   const contentType = response.headers.get('content-type');
   const isJson = contentType && contentType.includes('application/json');
@@ -235,15 +323,17 @@ const handleResponse = async (response) => {
       throw new BillingRecoverableError(typeof friendly === 'string' ? friendly : JSON.stringify(friendly), data);
     }
 
-    // Prefer explicit message/error/detail; then first field error from DRF serializer.errors
-    let msg = data && (data.message || data.error || (Array.isArray(data.detail) ? data.detail[0] : data.detail));
-    if (msg == null && data && typeof data === 'object' && !Array.isArray(data)) {
-      const firstKey = Object.keys(data)[0];
-      const firstVal = firstKey ? data[firstKey] : null;
-      msg = Array.isArray(firstVal) ? firstVal[0] : firstVal;
-    }
-    const error = typeof msg === 'string' ? msg : (data && typeof data === 'object' ? JSON.stringify(data) : data) || response.statusText;
-    throw new Error(error);
+    const { message, fieldErrors } = parseApiErrorPayload(data);
+    const err = new Error(
+      message ||
+        (typeof data === 'string' ? data : null) ||
+        response.statusText ||
+        'Request failed'
+    );
+    err.fieldErrors = fieldErrors;
+    err.status = response.status;
+    err.apiData = data;
+    throw err;
   }
 
   return data;
