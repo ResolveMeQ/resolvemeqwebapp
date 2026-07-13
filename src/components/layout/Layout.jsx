@@ -106,6 +106,10 @@ const Layout = ({
           onLogout={onLogout}
           onNavigate={onNavigate}
           theme={theme}
+          activeTeamId={activeTeamId}
+          activeTeamName={activeTeamName}
+          userTeams={userTeams}
+          onActiveTeamChange={onActiveTeamChange}
         />
 
         <AgentQuotaBanner user={user} />

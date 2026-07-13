@@ -16,6 +16,7 @@ import { cn } from '../../utils/cn';
 import { THEME_MODES, DEFAULT_THEME } from '../../constants';
 import { api } from '../../services/api';
 import { useLocation } from 'react-router-dom';
+import WorkspaceSwitcher from '../WorkspaceSwitcher';
 
 /**
  * Header component with search, notifications, and user menu.
@@ -31,7 +32,11 @@ const Header = ({
   onLogout,
   onNavigate,
   theme = DEFAULT_THEME,
-  className
+  className,
+  activeTeamId,
+  activeTeamName,
+  userTeams = [],
+  onActiveTeamChange,
 }) => {
   const location = useLocation();
   /** Backend profile uses user_email / user_full_name; normalizeSessionUser maps to email / full_name (see api.js). */
@@ -316,6 +321,15 @@ const Header = ({
             mobileSearchOpen && 'max-md:hidden'
           )}
         >
+          {!mobileSearchOpen && (
+            <WorkspaceSwitcher
+              variant="header"
+              activeTeamId={activeTeamId}
+              activeTeamName={activeTeamName}
+              userTeams={userTeams}
+              onActiveTeamChange={onActiveTeamChange}
+            />
+          )}
           {!mobileSearchOpen && (
             <button
               type="button"

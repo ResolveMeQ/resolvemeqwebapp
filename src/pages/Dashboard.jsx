@@ -21,6 +21,7 @@ import Badge from '../components/ui/Badge';
 import StatCard from '../components/ui/StatCard';
 import EmptyState from '../components/ui/EmptyState';
 import AIRecommendationsPanel from '../components/AIRecommendationsPanel';
+import WorkspaceRequiredBanner from '../components/WorkspaceRequiredBanner';
 import { api, TokenService, userCanAccessEscalationQueue } from '../services/api';
 import { DashboardPageSkeleton } from '../components/ui/Skeleton';
 
@@ -251,6 +252,9 @@ const Dashboard = ({ activeTeamId }) => {
 
   return (
     <div className="space-y-6">
+      {!activeTeamId && (
+        <WorkspaceRequiredBanner title="Set up your workspace to get started" />
+      )}
       <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
         <div className="p-6 md:p-8 grid grid-cols-1 xl:grid-cols-[1.65fr_1fr] gap-6 items-start">
           <div>

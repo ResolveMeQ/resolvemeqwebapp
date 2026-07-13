@@ -13,7 +13,7 @@ const WorkspaceRequiredBanner = ({ title = 'Select a workspace' }) => (
       <div>
         <p className="font-medium">{title}</p>
         <p className="mt-1 text-amber-800/90 dark:text-amber-100/80">
-          Use the workspace switcher in the sidebar to choose a team. Templates, rules, and other workspace settings apply to the active workspace only.
+          Use the workspace control in the header or sidebar, or open Teams to create one.
         </p>
         <p className="mt-2">
           <Link to="/teams" className="text-primary-700 dark:text-primary-300 font-medium hover:underline">

@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home,
@@ -15,16 +14,15 @@ import {
   Plug,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   Menu,
   X,
   Sun,
   Moon,
   Monitor,
-  Building2,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { NAVIGATION_ITEMS, THEME_MODES } from '../../constants';
+import WorkspaceSwitcher from '../WorkspaceSwitcher';
 
 /**
  * Sidebar component with responsive design and glassmorphism effects
@@ -52,16 +50,6 @@ const Sidebar = ({
   canAccessEscalationQueue = false,
 }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
-  const teamDropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (teamDropdownRef.current && !teamDropdownRef.current.contains(e.target)) setTeamDropdownOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const iconMap = {
     Home,
@@ -224,113 +212,17 @@ const Sidebar = ({
         ))}
       </nav>
 
-      {/* Active team switcher */}
-      {userTeams.length === 0 && !activeTeamId ? (
-        <div
-          data-tour="team-switcher"
-          className="px-3 py-3 border-t border-gray-200 dark:border-gray-800"
-        >
-          {!effectiveCollapsed ? (
-            <div className="rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/20 px-3 py-2.5">
-              <div className="flex items-start gap-2">
-                <Building2 className="w-4 h-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-300" />
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-amber-900 dark:text-amber-100">No workspace yet</p>
-                  <p className="mt-1 text-[11px] leading-snug text-amber-800/90 dark:text-amber-100/80">
-                    Create one from Teams to unlock workspace settings and the switcher here.
-                  </p>
-                  <Link
-                    to="/teams"
-                    className="mt-2 inline-block text-xs font-medium text-primary-700 dark:text-primary-300 hover:underline"
-                  >
-                    Create workspace
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <Link
-              to="/teams"
-              title="Create workspace"
-              className="flex items-center justify-center w-full p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-amber-700 dark:text-amber-300"
-            >
-              <Building2 size={18} />
-            </Link>
-          )}
-        </div>
-      ) : (userTeams.length > 0 || activeTeamId) && (
-        <div
-          data-tour="team-switcher"
-          className="px-3 py-3 border-t border-gray-200 dark:border-gray-800"
-          ref={teamDropdownRef}
-        >
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setTeamDropdownOpen(!teamDropdownOpen)}
-              className={cn(
-                'w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors duration-150 text-left',
-                'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-              )}
-              title={effectiveCollapsed ? (activeTeamName || 'Select team') : undefined}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-500 dark:text-gray-400">
-                  <Users size={18} />
-                </div>
-                {!effectiveCollapsed && (
-                  <span className="font-medium truncate text-sm">
-                    {activeTeamName || 'Select team'}
-                  </span>
-                )}
-              </div>
-              {!effectiveCollapsed && <ChevronDown size={14} className="text-gray-400 dark:text-gray-500 shrink-0" />}
-            </button>
-            <AnimatePresence>
-              {teamDropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  className={cn(
-                    'absolute py-1 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 z-50 max-h-48 overflow-y-auto',
-                    effectiveCollapsed
-                      ? 'left-full ml-2 top-0 min-w-[180px]'
-                      : 'left-0 right-0 bottom-full mb-2'
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={() => { onActiveTeamChange?.(null); setTeamDropdownOpen(false); }}
-                    className={cn(
-                      'w-full px-3 py-2 text-left text-sm transition-colors duration-150',
-                      !activeTeamId ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                    )}
-                  >
-                    No team selected
-                  </button>
-                  {userTeams.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => { onActiveTeamChange?.(t.id); setTeamDropdownOpen(false); }}
-                      className={cn(
-                        'w-full px-3 py-2 text-left text-sm truncate transition-colors duration-150',
-                        activeTeamId === t.id ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                      )}
-                    >
-                      {t.name}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-      )}
+      <WorkspaceSwitcher
+        variant="sidebar"
+        collapsed={effectiveCollapsed}
+        activeTeamId={activeTeamId}
+        activeTeamName={activeTeamName}
+        userTeams={userTeams}
+        onActiveTeamChange={onActiveTeamChange}
+      />
 
       {/* Theme Toggle */}
-      <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-800">
+      <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-800 shrink-0">
         <button
           onClick={handleThemeChange}
           className="w-full flex items-center px-3 py-2 rounded-lg transition-colors duration-150 text-left group hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -371,7 +263,7 @@ const Sidebar = ({
         variants={sidebarVariants}
         animate={collapsed ? 'closed' : 'open'}
         className={cn(
-          'hidden lg:flex flex-col bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800',
+          'hidden lg:flex flex-col h-screen overflow-hidden bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800',
           className
         )}
       >

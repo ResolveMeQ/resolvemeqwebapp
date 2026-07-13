@@ -472,7 +472,7 @@ function App() {
     );
   }
 
-  const hasTeamSwitcher = userTeams.length > 0 || !!preferences?.active_team;
+  const hasTeamSwitcher = true;
 
   return (
     <>
