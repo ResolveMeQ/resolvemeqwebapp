@@ -20,6 +20,7 @@ import { api, AgentQuotaExceededError, isAgentQuotaError } from '../services/api
 import Button from './ui/Button';
 import ConfidenceBadge from './ui/ConfidenceBadge';
 import { cn } from '../utils/cn';
+import { resolveMediaUrl } from '../utils/media';
 import {
   normalizeSuggestedActionsList,
   suggestedActionsFromAgentResponse,
@@ -1565,9 +1566,12 @@ const AIChatPanel = ({
         {ticket?.screenshot && (
           <div className="mb-2 flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-2 py-1.5">
             <img
-              src={ticket.screenshot}
-              alt=""
+              src={resolveMediaUrl(ticket.screenshot)}
+              alt="Ticket screenshot"
               className="h-10 w-10 rounded object-cover border border-gray-200 dark:border-gray-600 shrink-0"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
             />
             <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">
               Screenshot on this ticket — the assistant can use it on your next message.

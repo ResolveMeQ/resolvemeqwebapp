@@ -5,9 +5,21 @@ export function resolveMediaUrl(url) {
   if (!url || typeof url !== 'string') return '';
   const u = url.trim();
   if (!u) return '';
-  if (u.startsWith('http://') || u.startsWith('https://')) return u;
-  if (u.startsWith('/')) return `${API_ORIGIN}${u}`;
-  return u;
+  let resolved = u;
+  if (u.startsWith('http://') || u.startsWith('https://')) {
+    resolved = u;
+  } else if (u.startsWith('/')) {
+    resolved = `${API_ORIGIN}${u}`;
+  }
+  // Mixed-content: app is HTTPS but API stored http:// links before proxy SSL fix.
+  if (
+    typeof window !== 'undefined' &&
+    window.location?.protocol === 'https:' &&
+    resolved.startsWith('http://')
+  ) {
+    resolved = `https://${resolved.slice(7)}`;
+  }
+  return resolved;
 }
 
 export function formatFileSize(bytes) {
