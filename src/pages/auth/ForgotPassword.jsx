@@ -8,6 +8,7 @@ import {
   Lock
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import AuthThemeToggle from '../../components/auth/AuthThemeToggle';
 import { api } from '../../services/api';
 
 /**
@@ -49,6 +50,7 @@ const ForgotPassword = ({ onNavigateToLogin }) => {
   if (success) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+        <AuthThemeToggle />
         <div className="w-full max-w-md">
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8 text-center">
             <div className="w-16 h-16 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center justify-center mx-auto mb-6">
@@ -94,6 +96,7 @@ const ForgotPassword = ({ onNavigateToLogin }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+      <AuthThemeToggle />
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-6">

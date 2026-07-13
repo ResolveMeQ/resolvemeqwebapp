@@ -22,7 +22,7 @@ import { api, TokenService } from '../services/api';
 import { cn } from '../utils/cn';
 import { SettingsPageSkeleton } from '../components/ui/Skeleton';
 import { THEME_MODES, DEFAULT_THEME } from '../constants';
-import { normalizeTheme } from '../utils/theme';
+import { normalizeTheme, hasLocalTheme, getLocalTheme } from '../utils/theme';
 
 /**
  * Settings page component with comprehensive configuration options
@@ -75,7 +75,8 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
       const data = await api.settings.getPreferences();
       setPreferences(data);
       if (data) {
-        const selectedTheme = normalizeTheme(data.theme ?? theme ?? DEFAULT_THEME);
+        const effectiveTheme = theme ?? (hasLocalTheme() ? getLocalTheme() : (data.theme ?? DEFAULT_THEME));
+        const selectedTheme = normalizeTheme(effectiveTheme);
         setNotificationSettings({
           emailNotifications: data.email_notifications ?? true,
           pushNotifications: data.push_notifications ?? true,
@@ -538,6 +539,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   const handleSave = async () => {
     setLoading(true);
     try {
+      const savedTheme = normalizeTheme(theme ?? appearanceSettings.theme ?? DEFAULT_THEME);
       const preferencesData = {
         email_notifications: notificationSettings.emailNotifications,
         push_notifications: notificationSettings.pushNotifications,
@@ -550,9 +552,10 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
         community_mentions: notificationSettings.communityMentions,
         timezone: generalSettings.timezone || 'UTC',
         language: generalSettings.language || 'en',
-        theme: normalizeTheme(theme ?? appearanceSettings.theme ?? DEFAULT_THEME),
+        theme: savedTheme,
       };
       await api.settings.updatePreferences(preferencesData);
+      onThemeChange?.(savedTheme);
 
       const profilePayload = {
         first_name: profileSettings.first_name ?? '',

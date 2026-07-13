@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home,
@@ -19,7 +20,8 @@ import {
   X,
   Sun,
   Moon,
-  Monitor
+  Monitor,
+  Building2,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { NAVIGATION_ITEMS, THEME_MODES } from '../../constants';
@@ -223,7 +225,40 @@ const Sidebar = ({
       </nav>
 
       {/* Active team switcher */}
-      {(userTeams.length > 0 || activeTeamId) && (
+      {userTeams.length === 0 && !activeTeamId ? (
+        <div
+          data-tour="team-switcher"
+          className="px-3 py-3 border-t border-gray-200 dark:border-gray-800"
+        >
+          {!effectiveCollapsed ? (
+            <div className="rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/20 px-3 py-2.5">
+              <div className="flex items-start gap-2">
+                <Building2 className="w-4 h-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-300" />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-amber-900 dark:text-amber-100">No workspace yet</p>
+                  <p className="mt-1 text-[11px] leading-snug text-amber-800/90 dark:text-amber-100/80">
+                    Create one from Teams to unlock workspace settings and the switcher here.
+                  </p>
+                  <Link
+                    to="/teams"
+                    className="mt-2 inline-block text-xs font-medium text-primary-700 dark:text-primary-300 hover:underline"
+                  >
+                    Create workspace
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <Link
+              to="/teams"
+              title="Create workspace"
+              className="flex items-center justify-center w-full p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-amber-700 dark:text-amber-300"
+            >
+              <Building2 size={18} />
+            </Link>
+          )}
+        </div>
+      ) : (userTeams.length > 0 || activeTeamId) && (
         <div
           data-tour="team-switcher"
           className="px-3 py-3 border-t border-gray-200 dark:border-gray-800"

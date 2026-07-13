@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import GoogleSignInButton from '../../components/auth/GoogleSignInButton';
+import AuthThemeToggle from '../../components/auth/AuthThemeToggle';
 import { isGoogleAuthEnabled } from '../../utils/googleAuth';
 import { api, TokenService } from '../../services/api';
 
@@ -120,6 +121,7 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+      <AuthThemeToggle />
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-6">
