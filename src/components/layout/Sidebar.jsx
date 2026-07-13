@@ -12,6 +12,7 @@ import {
   Settings,
   CreditCard,
   Plug,
+  Zap,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -63,6 +64,7 @@ const Sidebar = ({
     Settings,
     CreditCard,
     Plug,
+    Zap,
   };
 
   const themeIcons = {
@@ -98,7 +100,7 @@ const Sidebar = ({
       label: 'Operations',
       items: NAVIGATION_ITEMS.filter((item) => {
         if (item.id === 'escalation-queue') return canAccessEscalationQueue;
-        return ['dashboard', 'tickets', 'escalation-queue', 'workflows'].includes(item.id);
+        return ['dashboard', 'tickets', 'escalation-queue', 'workflows', 'automation-rules'].includes(item.id);
       }),
     },
     {

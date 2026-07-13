@@ -148,7 +148,7 @@ const Workflows = () => {
           <Link to="/workflows/templates">
             <Button variant="outline" size="sm">
               <Settings2 className="w-4 h-4 mr-1.5" />
-              Templates
+              Playbooks
             </Button>
           </Link>
           <Link to="/settings/automation">

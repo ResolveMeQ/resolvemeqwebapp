@@ -155,6 +155,12 @@ export const NAVIGATION_ITEMS = [
     icon: 'ListChecks',
   },
   {
+    id: 'automation-rules',
+    label: 'Automation Rules',
+    href: '/settings/automation',
+    icon: 'Zap',
+  },
+  {
     id: 'analytics',
     label: 'Analytics',
     href: '/analytics',

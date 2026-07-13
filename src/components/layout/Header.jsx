@@ -11,6 +11,7 @@ import {
   Monitor,
   X,
   Gem,
+  Users,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { THEME_MODES, DEFAULT_THEME } from '../../constants';
@@ -321,7 +322,9 @@ const Header = ({
             mobileSearchOpen && 'max-md:hidden'
           )}
         >
-          {!mobileSearchOpen && (
+          {/* Once a workspace is active, it moves into the user menu below (name +
+              workspace shown together) instead of a second dropdown here. */}
+          {!mobileSearchOpen && !activeTeamId && (
             <WorkspaceSwitcher
               variant="header"
               activeTeamId={activeTeamId}
@@ -533,8 +536,11 @@ const Header = ({
                 </div>
                 <div className="hidden md:block text-left min-w-0">
                   <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[200px]">{accountMenuName}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500 truncate max-w-[200px]" title={emailTrimmed || undefined}>
-                    {accountMenuEmail}
+                  <p
+                    className="text-xs text-gray-500 dark:text-gray-500 truncate max-w-[200px]"
+                    title={activeTeamName ? `${activeTeamName} · ${emailTrimmed}` : (emailTrimmed || undefined)}
+                  >
+                    {activeTeamName ? `${activeTeamName} · ${accountMenuEmail}` : accountMenuEmail}
                   </p>
                 </div>
                 <ChevronDown size={14} className="text-gray-400 dark:text-gray-500 hidden md:block" />
@@ -561,12 +567,38 @@ const Header = ({
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 4 }}
-                  className="absolute right-0 mt-2 w-52 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50"
+                  className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50"
                 >
                   <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{accountMenuName}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-500 truncate mt-0.5">{accountMenuEmail}</p>
                   </div>
+                  {userTeams.length > 0 && (
+                    <div className="p-1 border-b border-gray-200 dark:border-gray-800">
+                      <p className="px-3 pt-1.5 pb-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+                        Workspace
+                      </p>
+                      {userTeams.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            onActiveTeamChange?.(t.id);
+                            setIsUserMenuOpen(false);
+                          }}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors duration-150',
+                            activeTeamId === t.id
+                              ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 font-medium'
+                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                          )}
+                        >
+                          <Users size={14} className="shrink-0" />
+                          <span className="truncate">{t.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div className="p-1">
                     <button
                       onClick={() => {

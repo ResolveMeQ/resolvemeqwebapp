@@ -36,6 +36,8 @@ import EmptyState from '../components/ui/EmptyState';
 import { api } from '../services/api';
 import { cn } from '../utils/cn';
 
+const CUSTOM_OPTION = '__custom__';
+
 const EMPTY_STEP = () => ({
   title: '',
   description: '',
@@ -221,6 +223,7 @@ function StepEditorCard({
   index,
   total,
   assigneeRoles,
+  conditionFields = [],
   onChange,
   onMove,
   onDuplicate,
@@ -230,6 +233,13 @@ function StepEditorCard({
 }) {
   const meta = STEP_TYPE_META[step.step_type] || STEP_TYPE_META.manual;
   const Icon = meta.icon;
+  const isCustomSkipField = step.skip_field === CUSTOM_OPTION
+    || (step.skip_field && !conditionFields.some((f) => f.value === step.skip_field));
+  const selectedSkipField = conditionFields.find((f) => f.value === step.skip_field);
+  const skipValueChoices = selectedSkipField?.choices || [];
+  const isCustomSkipValue = skipValueChoices.length === 0
+    || step.skip_equals === CUSTOM_OPTION
+    || (step.skip_equals && !skipValueChoices.some((c) => c.value === step.skip_equals));
 
   return (
     <motion.div
@@ -491,21 +501,69 @@ function StepEditorCard({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className={labelClass}>Ticket field</label>
-                        <input
-                          value={step.skip_field || ''}
-                          onChange={(e) => onChange({ skip_field: e.target.value })}
-                          className={inputClass}
-                          placeholder="category"
-                        />
+                        {isCustomSkipField ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              value={step.skip_field === CUSTOM_OPTION ? '' : (step.skip_field || '')}
+                              onChange={(e) => onChange({ skip_field: e.target.value })}
+                              className={inputClass}
+                              placeholder="custom_field"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => onChange({ skip_field: conditionFields[0]?.value || 'category', skip_equals: '' })}
+                              className="text-[11px] text-primary-600 dark:text-primary-400 hover:underline whitespace-nowrap"
+                            >
+                              Pick from list
+                            </button>
+                          </div>
+                        ) : (
+                          <select
+                            value={step.skip_field || ''}
+                            onChange={(e) => onChange({ skip_field: e.target.value, skip_equals: '' })}
+                            className={inputClass}
+                          >
+                            <option value="">Select a field…</option>
+                            {conditionFields.map((f) => (
+                              <option key={f.value} value={f.value}>{f.label}</option>
+                            ))}
+                            <option value={CUSTOM_OPTION}>Other (type manually)…</option>
+                          </select>
+                        )}
                       </div>
                       <div>
                         <label className={labelClass}>Skip if equals</label>
-                        <input
-                          value={step.skip_equals || ''}
-                          onChange={(e) => onChange({ skip_equals: e.target.value })}
-                          className={inputClass}
-                          placeholder="Leave empty to never skip"
-                        />
+                        {isCustomSkipValue ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              value={step.skip_equals === CUSTOM_OPTION ? '' : (step.skip_equals ?? '')}
+                              onChange={(e) => onChange({ skip_equals: e.target.value })}
+                              className={inputClass}
+                              placeholder="Leave empty to never skip"
+                            />
+                            {skipValueChoices.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => onChange({ skip_equals: '' })}
+                                className="text-[11px] text-primary-600 dark:text-primary-400 hover:underline whitespace-nowrap"
+                              >
+                                Pick from list
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <select
+                            value={step.skip_equals || ''}
+                            onChange={(e) => onChange({ skip_equals: e.target.value })}
+                            className={inputClass}
+                          >
+                            <option value="">Leave empty to never skip</option>
+                            {skipValueChoices.map((c) => (
+                              <option key={c.value} value={c.value}>{c.label}</option>
+                            ))}
+                            <option value={CUSTOM_OPTION}>Other (type manually)…</option>
+                          </select>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -542,6 +600,7 @@ const WorkflowTemplates = ({ activeTeamId }) => {
   const [deleting, setDeleting] = useState(false);
   const [showStarters, setShowStarters] = useState(false);
   const [assigneeRoles, setAssigneeRoles] = useState([{ value: '', label: 'Anyone' }]);
+  const [conditionFields, setConditionFields] = useState([]);
   const [onboardingSku, setOnboardingSku] = useState(null);
   const [onboardingPanelOpen, setOnboardingPanelOpen] = useState(false);
 
@@ -554,17 +613,19 @@ const WorkflowTemplates = ({ activeTeamId }) => {
     setLoading(true);
     setError(null);
     try {
-      const [data, catsRes, rolesRes, skuRes] = await Promise.all([
+      const [data, catsRes, rolesRes, skuRes, metaRes] = await Promise.all([
         api.workflows.listTemplatesManage(),
         api.tickets.getCategories().catch(() => ({ categories: [] })),
         api.workflows.assigneeRoles().catch(() => ({ roles: [] })),
         api.workflows.onboardingPlaybook().catch(() => null),
+        api.automation.metadata().catch(() => null),
       ]);
       setTemplates(data?.templates || []);
       setCanManage(Boolean(data?.can_manage));
       setCategories(catsRes?.categories || []);
       if (rolesRes?.roles?.length) setAssigneeRoles(rolesRes.roles);
       setOnboardingSku(skuRes?.playbook || null);
+      setConditionFields(metaRes?.condition_fields || []);
     } catch (e) {
       setError(e?.message || 'Could not load templates.');
     } finally {
@@ -751,8 +812,8 @@ const WorkflowTemplates = ({ activeTeamId }) => {
             auto_complete: Boolean(s.auto_complete),
             auto_assign: s.auto_assign || '',
           };
-          const field = (s.skip_field || '').trim();
-          const equals = (s.skip_equals ?? '').toString().trim();
+          const field = s.skip_field === CUSTOM_OPTION ? '' : (s.skip_field || '').trim();
+          const equals = s.skip_equals === CUSTOM_OPTION ? '' : (s.skip_equals ?? '').toString().trim();
           if (field && equals) {
             step.skip_when = { ticket_field: field, equals };
           }
@@ -1230,6 +1291,7 @@ const WorkflowTemplates = ({ activeTeamId }) => {
                             index={idx}
                             total={form.steps.length}
                             assigneeRoles={assigneeRoles}
+                            conditionFields={conditionFields}
                             expanded={expandedStepIdx === idx}
                             onToggleExpand={() => setExpandedStepIdx((i) => (i === idx ? -1 : idx))}
                             onChange={(patch) => updateStep(idx, patch)}

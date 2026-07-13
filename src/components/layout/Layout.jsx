@@ -14,7 +14,7 @@ const PATH_TO_PAGE_ID = {
   '/escalation-queue': 'escalation-queue',
   '/workflows': 'workflows',
   '/workflows/templates': 'workflows',
-  '/settings/automation': 'workflows',
+  '/settings/automation': 'automation-rules',
   '/analytics': 'analytics',
   '/teams': 'teams',
   '/users': 'users',

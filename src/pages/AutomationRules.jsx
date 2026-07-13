@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Plus, ArrowLeft, Play, Trash2, ToggleLeft, ToggleRight, Pencil, Copy } from 'lucide-react';
 import Card from '../components/ui/Card';
 import WorkspaceRequiredBanner from '../components/WorkspaceRequiredBanner';
@@ -7,10 +8,13 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import { api } from '../services/api';
 
+const CUSTOM_OPTION = '__custom__';
+
 const EMPTY_FORM = {
   name: '',
   description: '',
   trigger: 'ticket.created',
+  cron_expression: '',
   condition_field: 'category',
   condition_op: 'equals',
   condition_value: '',
@@ -33,6 +37,7 @@ function ruleToForm(rule) {
     name: rule.name || '',
     description: rule.description || '',
     trigger: rule.trigger || 'ticket.created',
+    cron_expression: rule.cron_expression || '',
     condition_field: cond?.field || 'category',
     condition_op: cond?.op || 'equals',
     condition_value: cond?.value != null ? String(cond.value) : '',
@@ -50,11 +55,13 @@ function ruleToForm(rule) {
 }
 
 function formToPayload(form) {
-  const conditions = form.condition_value.trim()
+  const conditionField = form.condition_field === CUSTOM_OPTION ? '' : form.condition_field.trim();
+  const conditionValue = form.condition_value === CUSTOM_OPTION ? '' : form.condition_value.trim();
+  const conditions = conditionValue
     ? [{
-      field: form.condition_field.trim() || 'category',
+      field: conditionField || 'category',
       op: form.condition_op || 'equals',
-      value: form.condition_value.trim(),
+      value: conditionValue,
     }]
     : [];
 
@@ -92,6 +99,7 @@ function formToPayload(form) {
     name: form.name.trim(),
     description: form.description.trim(),
     trigger: form.trigger,
+    cron_expression: form.trigger === 'schedule.cron' ? form.cron_expression.trim() : '',
     conditions,
     actions: [action],
     priority: Number(form.priority) || 100,
@@ -139,6 +147,9 @@ function RuleCard({
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             {metadata?.triggers?.find((t) => t.value === rule.trigger)?.label || rule.trigger}
+            {rule.trigger === 'schedule.cron' && rule.cron_expression && (
+              <> (<span className="font-mono">{rule.cron_expression}</span>)</>
+            )}
             {rule.conditions?.length > 0 && (
               <> · if {rule.conditions[0].field} {rule.conditions[0].op || 'equals'} {String(rule.conditions[0].value)}</>
             )}
@@ -214,6 +225,8 @@ const AutomationRules = ({ activeTeamId }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [testResult, setTestResult] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const closeForm = () => {
     setShowForm(false);
@@ -306,14 +319,23 @@ const AutomationRules = ({ activeTeamId }) => {
     }
   };
 
-  const handleDelete = async (rule) => {
-    if (!rule.can_edit || !window.confirm(`Delete rule "${rule.name}"?`)) return;
+  const handleDelete = (rule) => {
+    if (!rule.can_edit) return;
+    setDeleteTarget(rule);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget?.can_edit) return;
+    setDeleting(true);
     try {
-      await api.automation.deleteRule(rule.id);
-      if (editingRuleId === rule.id) closeForm();
+      await api.automation.deleteRule(deleteTarget.id);
+      if (editingRuleId === deleteTarget.id) closeForm();
+      setDeleteTarget(null);
       load();
     } catch (err) {
       setError(err?.message || 'Could not delete rule.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -440,6 +462,15 @@ const AutomationRules = ({ activeTeamId }) => {
     }
   };
 
+  const knownConditionFields = metadata?.condition_fields || [];
+  const isCustomField = form.condition_field === CUSTOM_OPTION
+    || (form.condition_field && !knownConditionFields.some((f) => f.value === form.condition_field));
+  const selectedField = knownConditionFields.find((f) => f.value === form.condition_field);
+  const valueChoices = selectedField?.choices || [];
+  const isCustomValue = valueChoices.length === 0
+    || form.condition_value === CUSTOM_OPTION
+    || (form.condition_value && !valueChoices.some((c) => c.value === form.condition_value));
+
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto">
       <Link to="/workflows" className="inline-flex items-center text-xs text-primary-600 dark:text-primary-400 hover:underline mb-4">
@@ -542,15 +573,55 @@ const AutomationRules = ({ activeTeamId }) => {
                 />
               </div>
             </div>
+            {form.trigger === 'schedule.cron' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cron schedule (UTC)</label>
+                <input
+                  value={form.cron_expression}
+                  onChange={(e) => setForm((f) => ({ ...f, cron_expression: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-mono"
+                  placeholder="0 9 * * 1"
+                />
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1.5">
+                  5-field cron, UTC. Example: <span className="font-mono">0 9 * * 1</span> = every Monday at 09:00 UTC.
+                </p>
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">If field matches (leave value empty = always)</label>
               <div className="flex flex-wrap gap-2">
-                <input
-                  value={form.condition_field}
-                  onChange={(e) => setForm((f) => ({ ...f, condition_field: e.target.value }))}
-                  className="w-28 px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-                  placeholder="category"
-                />
+                {isCustomField ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      value={form.condition_field === CUSTOM_OPTION ? '' : form.condition_field}
+                      onChange={(e) => setForm((f) => ({ ...f, condition_field: e.target.value }))}
+                      className="w-28 px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                      placeholder="custom_field"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({
+                        ...f,
+                        condition_field: knownConditionFields[0]?.value || 'category',
+                        condition_value: '',
+                      }))}
+                      className="text-[11px] text-primary-600 dark:text-primary-400 hover:underline whitespace-nowrap"
+                    >
+                      Pick from list
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={form.condition_field}
+                    onChange={(e) => setForm((f) => ({ ...f, condition_field: e.target.value, condition_value: '' }))}
+                    className="w-36 px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                  >
+                    {knownConditionFields.map((f) => (
+                      <option key={f.value} value={f.value}>{f.label}</option>
+                    ))}
+                    <option value={CUSTOM_OPTION}>Other (type manually)…</option>
+                  </select>
+                )}
                 <select
                   value={form.condition_op}
                   onChange={(e) => setForm((f) => ({ ...f, condition_op: e.target.value }))}
@@ -560,12 +631,37 @@ const AutomationRules = ({ activeTeamId }) => {
                     <option key={op.value} value={op.value}>{op.label}</option>
                   ))}
                 </select>
-                <input
-                  value={form.condition_value}
-                  onChange={(e) => setForm((f) => ({ ...f, condition_value: e.target.value }))}
-                  className="flex-1 min-w-[8rem] px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-                  placeholder="onboarding"
-                />
+                {isCustomValue ? (
+                  <div className="flex items-center gap-1 flex-1 min-w-[8rem]">
+                    <input
+                      value={form.condition_value === CUSTOM_OPTION ? '' : form.condition_value}
+                      onChange={(e) => setForm((f) => ({ ...f, condition_value: e.target.value }))}
+                      className="flex-1 px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                      placeholder="onboarding"
+                    />
+                    {valueChoices.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, condition_value: '' }))}
+                        className="text-[11px] text-primary-600 dark:text-primary-400 hover:underline whitespace-nowrap"
+                      >
+                        Pick from list
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <select
+                    value={form.condition_value}
+                    onChange={(e) => setForm((f) => ({ ...f, condition_value: e.target.value }))}
+                    className="flex-1 min-w-[8rem] px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+                  >
+                    <option value="">Any value (leave empty = always)</option>
+                    {valueChoices.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                    <option value={CUSTOM_OPTION}>Other (type manually)…</option>
+                  </select>
+                )}
               </div>
             </div>
             <div>
@@ -673,6 +769,32 @@ const AutomationRules = ({ activeTeamId }) => {
           </div>
         </div>
       )}
+
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          >
+            <Card className="w-full max-w-sm p-6">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">Delete rule?</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                &ldquo;{deleteTarget.name}&rdquo; will be removed and will stop running immediately.
+              </p>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button variant="ghost" size="sm" disabled={deleting} onClick={() => setDeleteTarget(null)}>
+                  Cancel
+                </Button>
+                <Button variant="primary" size="sm" loading={deleting} onClick={confirmDelete} className="!bg-red-600 hover:!bg-red-700">
+                  Delete
+                </Button>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
