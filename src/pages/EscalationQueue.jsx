@@ -5,7 +5,7 @@ import { AlertTriangle, Clock, UserCheck, RefreshCw } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
-import { api, TokenService } from '../services/api';
+import { api, TokenService, getApiErrorMessage } from '../services/api';
 
 const PRIORITY_BADGE = {
   critical: 'error',
@@ -45,6 +45,7 @@ const EscalationQueue = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [claimingId, setClaimingId] = useState(null);
+  const [claimErrors, setClaimErrors] = useState({});
   const [toast, setToast] = useState(null);
   const toastSeq = useRef(0);
 
@@ -61,9 +62,7 @@ const EscalationQueue = () => {
       const data = await api.tickets.getEscalationQueue();
       setTickets(data?.tickets || []);
     } catch (e) {
-      // Silent polls are best-effort -- a missed tick just means the next one picks it up;
-      // don't flash an error banner over a queue the user isn't actively looking at.
-      if (!silent) setError(e?.message || 'Could not load the escalation queue.');
+      if (!silent) setError(getApiErrorMessage(e, 'Could not load the escalation queue.'));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -82,16 +81,25 @@ const EscalationQueue = () => {
 
   const handleClaim = async (ticket) => {
     if (!currentUser?.id) return;
-    setClaimingId(ticket.ticket_id);
+    const ticketId = ticket.ticket_id;
+    setClaimingId(ticketId);
+    setClaimErrors((prev) => {
+      const next = { ...prev };
+      delete next[ticketId];
+      return next;
+    });
     try {
-      const res = await api.tickets.assign(ticket.ticket_id, currentUser.id);
+      const res = await api.tickets.assign(ticketId, currentUser.id);
       const updated = res?.ticket;
       setTickets((prev) =>
-        prev.map((t) => (t.ticket_id === ticket.ticket_id ? { ...t, ...(updated || {}) } : t))
+        prev.map((t) => (t.ticket_id === ticketId ? { ...t, ...(updated || {}) } : t))
       );
-      showToast(res?.message || 'Ticket claimed.', updated?.claimed_at ? 'success' : 'info');
+      const msg = res?.message || 'Ticket claimed.';
+      showToast(msg, updated?.claimed_at ? 'success' : 'info');
     } catch (e) {
-      showToast(e?.message || 'Could not claim this ticket.', 'error');
+      const msg = getApiErrorMessage(e, 'Could not claim this ticket.');
+      setClaimErrors((prev) => ({ ...prev, [ticketId]: msg }));
+      showToast(msg, 'error');
     } finally {
       setClaimingId(null);
     }
@@ -188,14 +196,24 @@ const EscalationQueue = () => {
                         Claimed by {ticket.assigned_to_name || 'a teammate'}
                       </div>
                     ) : (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        loading={claimingId === ticket.ticket_id}
-                        onClick={() => handleClaim(ticket)}
-                      >
-                        Claim
-                      </Button>
+                      <div className="flex flex-col items-end gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          loading={claimingId === ticket.ticket_id}
+                          onClick={() => handleClaim(ticket)}
+                        >
+                          Claim
+                        </Button>
+                        {claimErrors[ticket.ticket_id] && (
+                          <p
+                            role="alert"
+                            className="text-xs text-red-600 dark:text-red-400 max-w-[14rem] text-right"
+                          >
+                            {claimErrors[ticket.ticket_id]}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </Card>
                 </motion.div>
@@ -207,8 +225,13 @@ const EscalationQueue = () => {
 
       {toast && (
         <div
-          className={`fixed bottom-6 right-6 px-4 py-3 rounded-lg shadow-lg text-sm text-white ${
-            toast.type === 'error' ? 'bg-red-600' : toast.type === 'info' ? 'bg-blue-600' : 'bg-emerald-600'
+          role="status"
+          className={`fixed bottom-4 left-1/2 z-[10050] max-w-md w-[calc(100%-2rem)] -translate-x-1/2 rounded-lg px-4 py-3 text-sm shadow-lg border text-white ${
+            toast.type === 'error'
+              ? 'bg-red-600 border-red-700'
+              : toast.type === 'info'
+                ? 'bg-blue-600 border-blue-700'
+                : 'bg-emerald-600 border-emerald-700'
           }`}
         >
           {toast.message}

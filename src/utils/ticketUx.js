@@ -7,6 +7,44 @@ function formatEta(slaIso) {
 }
 
 /**
+ * Copy for replying to the ticket reporter after claiming an escalation.
+ * In-workspace requests use teammate language; platform support uses customer language.
+ */
+export function getAgentReplyCopy(ticket, currentUser) {
+  const reporterName = (ticket?.reporter_name || '').trim();
+  const internal =
+    ticket?.is_internal_request === true ||
+    (!currentUser?.is_platform_agent &&
+      ticket?.user &&
+      currentUser?.id &&
+      String(ticket.user) !== String(currentUser.id) &&
+      Boolean(ticket?.team || ticket?.team_id || ticket?.team_name));
+
+  if (internal) {
+    const shortName = reporterName ? reporterName.split(/\s+/)[0] : null;
+    return {
+      sectionTitle: reporterName ? `Reply to ${reporterName}` : 'Reply to teammate',
+      helperText: reporterName
+        ? `Lands in the same chat thread ${shortName} has been using — not these internal notes.`
+        : 'Lands in the same chat thread your teammate has been using — not these internal notes.',
+      placeholder: reporterName
+        ? `Type your reply to ${shortName || reporterName}...`
+        : 'Type your reply to your teammate...',
+      successToast: reporterName ? `Reply sent to ${shortName || reporterName}.` : 'Reply sent to your teammate.',
+      internalNotesHint: 'Internal team notes — not shared with the requester.',
+    };
+  }
+
+  return {
+    sectionTitle: 'Reply to customer',
+    helperText: "Lands in the same chat thread the customer's been using — not these internal notes.",
+    placeholder: 'Type your reply to the customer...',
+    successToast: 'Reply sent to the customer.',
+    internalNotesHint: 'Internal team notes — not sent to the customer.',
+  };
+}
+
+/**
  * Single-line “next step” copy for ticket detail (above the fold).
  */
 export function getTicketNextStep(ticket) {

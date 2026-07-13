@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Brain, CheckCircle, AlertCircle, TrendingUp, Clock, Users, Lightbulb, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api, AgentQuotaExceededError, isAgentQuotaError } from '../services/api';
+import { copyTextToClipboard } from '../utils/clipboard';
 import Button from './ui/Button';
 
 const Card = ({ children, className }) => (
@@ -15,6 +16,7 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket })
   const [processing, setProcessing] = useState(false);
   const [applyingSolution, setApplyingSolution] = useState(false);
   const [quotaError, setQuotaError] = useState(null);
+  const [copyFeedback, setCopyFeedback] = useState('');
 
   useEffect(() => {
     if (ticketId) {
@@ -89,16 +91,6 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket })
     if (id && typeof onOpenTicket === 'function') onOpenTicket(id);
   };
 
-  const handleCopyAssignment = () => {
-    const team = assignment?.team || '';
-    const reason = assignment?.reason || '';
-    const text = team ? `Suggested Team: ${team}${reason ? `\nReason: ${reason}` : ''}` : reason || '';
-    if (text && navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(text);
-      // Brief feedback could be added via toast if available
-    }
-  };
-
   if (loading) {
     return (
       <Card className="p-6">
@@ -113,6 +105,22 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket })
   const analysis = agentResponse.analysis || {};
   const solution = agentResponse.solution || {};
   const assignment = agentResponse.assignment || {};
+  const assignmentReason = (agentResponse.reasoning || assignment?.reason || '').trim();
+
+  const handleCopyAssignment = async () => {
+    const team = assignment?.team || '';
+    const text = team
+      ? `Suggested team: ${team}${assignmentReason ? `\n\nReason: ${assignmentReason}` : ''}`
+      : assignmentReason;
+    if (!text) {
+      setCopyFeedback('Nothing to copy yet.');
+      return;
+    }
+    const ok = await copyTextToClipboard(text);
+    setCopyFeedback(ok ? 'Copied to clipboard.' : 'Could not copy — select the text and copy manually.');
+    window.setTimeout(() => setCopyFeedback(''), 3000);
+  };
+
   return (
     <div className="space-y-4">
       {quotaError && (
@@ -272,12 +280,25 @@ const AgentInsights = ({ ticketId, onEscalate, onActionComplete, onOpenTicket })
               onClick={handleCopyAssignment}
               className="w-full text-left p-3 bg-primary-50 dark:bg-primary-900/30 rounded-lg border border-primary-200 dark:border-primary-800 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors cursor-pointer group"
             >
-              <div className="font-medium text-gray-900 dark:text-white">Suggested Team: {assignment.team || '—'}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{assignment.reason}</div>
-              <span className="text-xs text-primary-600 dark:text-primary-400 mt-2 inline-block opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="font-medium text-gray-900 dark:text-white">Suggested team: {assignment.team || '—'}</div>
+              <div
+                className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-3"
+                title={assignmentReason || undefined}
+              >
+                {assignmentReason || '—'}
+              </div>
+              <span className="text-xs text-primary-600 dark:text-primary-400 mt-2 inline-block group-hover:opacity-100 opacity-80 transition-opacity">
                 Click to copy
               </span>
             </button>
+            {copyFeedback && (
+              <p
+                role="status"
+                className={`text-xs ${copyFeedback.startsWith('Copied') ? 'text-green-600 dark:text-green-400' : 'text-amber-700 dark:text-amber-300'}`}
+              >
+                {copyFeedback}
+              </p>
+            )}
           </div>
         </Card>
       )}

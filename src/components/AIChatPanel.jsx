@@ -16,16 +16,20 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
-import { api, AgentQuotaExceededError, isAgentQuotaError } from '../services/api';
+import { api, AgentQuotaExceededError, isAgentQuotaError, getApiErrorMessage } from '../services/api';
 import Button from './ui/Button';
 import ConfidenceBadge from './ui/ConfidenceBadge';
 import { cn } from '../utils/cn';
 import { resolveMediaUrl } from '../utils/media';
 import {
   normalizeSuggestedActionsList,
-  suggestedActionsFromAgentResponse,
-  quickRepliesFromAgentResponse,
 } from '../utils/chatUi';
+import {
+  buildInitialChatMessages,
+  buildSyntheticMessagesFromAgentResponse,
+  extractHistoryMessageList,
+  isEphemeralChatMessage,
+} from '../utils/chatMessages';
 import {
   IllustrationChatLoading,
   IllustrationChatWelcome,
@@ -42,6 +46,43 @@ const PROSE_RESPONSE_STYLES = new Set([
 
 const CHAT_TEXTAREA_MAX_H = 180;
 const CHAT_COMPOSER_MIN_H = 44;
+
+function screenshotVisionBanner(ticket) {
+  if (!ticket?.screenshot) return null;
+  const status = ticket?.agent_response?.screenshot_vision_status;
+  if (!ticket?.agent_processed) {
+    return {
+      tone: 'pending',
+      text: 'Screenshot attached — AI analysis in progress…',
+    };
+  }
+  if (status?.loaded) {
+    return {
+      tone: 'success',
+      text: 'Screenshot analyzed — the AI included your image in its assessment.',
+    };
+  }
+  if (status?.attached && !status?.loaded) {
+    return {
+      tone: 'warning',
+      text: 'Screenshot could not be read by the AI. Re-attach it with the button below.',
+    };
+  }
+  return {
+    tone: 'info',
+    text: 'Screenshot on file — message the AI to ask what it sees, or re-attach to refresh.',
+  };
+}
+
+const screenshotBannerToneClass = {
+  success:
+    'border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/80 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-200',
+  warning:
+    'border-amber-200 dark:border-amber-800/50 bg-amber-50/80 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200',
+  pending:
+    'border-blue-200 dark:border-blue-800/50 bg-blue-50/80 dark:bg-blue-950/20 text-blue-900 dark:text-blue-200',
+  info: 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400',
+};
 
 /** Real priority/ETA from the escalate API response, instead of a hardcoded generic line. */
 function escalationMessageFromResponse(res) {
@@ -145,6 +186,7 @@ const AIChatPanel = ({
   onActionComplete,
   onTicketUpdate,
   onAppToast,
+  refreshKey = 0,
   /** When set, "Add context" / focus comments uses this instead of scrolling a global id (e.g. parent re-opens ticket detail). */
   onFocusComments,
   /** Optional: open parent “Request human help” modal instead of direct escalation. */
@@ -206,6 +248,11 @@ const AIChatPanel = ({
   }, [feedbackPrompts, ticketId, promptNonce, memoryDismissedPromptIds]);
 
   const topFeedbackPrompt = visibleFeedbackPrompts[0];
+  const screenshotBanner = useMemo(() => screenshotVisionBanner(ticket), [
+    ticket?.screenshot,
+    ticket?.agent_processed,
+    ticket?.agent_response?.screenshot_vision_status,
+  ]);
 
   // Show "Taking a moment..." after 5s of waiting for AI
   useEffect(() => {
@@ -222,55 +269,29 @@ const AIChatPanel = ({
     if (isOpen && ticketId) {
       loadConversationHistory();
     }
-  }, [isOpen, ticketId]);
+  }, [isOpen, ticketId, refreshKey]);
 
-  // Poll for new messages while the panel is open on an escalated ticket -- there's no
-  // push/WebSocket here, so without this an agent's reply only shows up after the
-  // customer navigates away and back. Append-only (by id) so it never clobbers
-  // client-only bubbles (resolution-check prompts, retry/error messages, etc.) that
-  // don't come from the history endpoint.
+  // Poll for new messages while the panel is open -- there's no push/WebSocket here.
   useEffect(() => {
-    if (!isOpen || !ticketId || ticket?.status !== 'escalated') return;
+    if (!isOpen || !ticketId) return;
     const interval = setInterval(async () => {
       try {
         const data = await api.agent.getChatHistory(ticketId);
-        const conv = data.conversation || data;
-        const msgList = Array.isArray(data.messages)
-          ? data.messages
-          : Array.isArray(conv?.messages)
-            ? conv.messages
-            : [];
+        const msgList = extractHistoryMessageList(data);
         if (!msgList.length) return;
         setMessages((prev) => {
-          const existingIds = new Set(prev.map((m) => m.id));
-          const newOnes = msgList
-            .filter((msg) => !existingIds.has(msg.id))
-            .map((msg) => {
-              const meta = msg.metadata || {};
-              return {
-                id: msg.id,
-                type: msg.sender_type || msg.type,
-                text: msg.text,
-                confidence: msg.confidence,
-                authorName: msg.author_name,
-                metadata: {
-                  ...meta,
-                  suggested_actions: normalizeSuggestedActionsList(meta.suggested_actions),
-                },
-                messageType: msg.message_type,
-                wasHelpful: msg.was_helpful,
-                showFeedbackPrompt: false,
-                createdAt: msg.created_at,
-              };
-            });
-          return newOnes.length ? [...prev, ...newOnes] : prev;
+          const ephemeral = prev.filter(isEphemeralChatMessage);
+          const merged = buildInitialChatMessages(msgList, ticket);
+          return [...merged, ...ephemeral].sort(
+            (a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
+          );
         });
       } catch {
-        // Best-effort -- a missed poll just means the customer waits for the next tick.
+        // Best-effort -- a missed poll just means the user waits for the next tick.
       }
-    }, 15000);
+    }, 8000);
     return () => clearInterval(interval);
-  }, [isOpen, ticketId, ticket?.status]);
+  }, [isOpen, ticketId, refreshKey, ticket]);
 
   useEffect(() => {
     setMemoryDismissedPromptIds(new Set());
@@ -343,58 +364,6 @@ const AIChatPanel = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  /** Build synthetic messages from ticket.agent_response when conversation is empty (e.g. from Describe flow) */
-  const buildMessagesFromAgentResponse = (ticketData, initialRated = null) => {
-    const ar = ticketData?.agent_response;
-    if (!ticketData?.agent_processed || !ar || typeof ar !== 'object') return null;
-    const stableTicketId = ticketData?.id ?? ticketData?.ticket_id ?? ticketId ?? 'unknown';
-    const solution = ar.solution || {};
-    const responseStyle = ar.response_style || 'guided_steps';
-    const steps = solution.steps || solution.immediate_actions || [];
-    const confidence = ar.confidence ?? 0.5;
-    const reasoning = ar.reasoning || '';
-    let aiText = '';
-    if (PROSE_RESPONSE_STYLES.has(responseStyle)) {
-      aiText = reasoning || (Array.isArray(steps) && steps[0]) || '';
-    } else if (Array.isArray(steps) && steps.length > 0) {
-      if (steps.length === 1) {
-        aiText = steps[0];
-      } else if (steps.length <= 3) {
-        aiText = "Here's what I suggest:\n\n" + steps.map((s, i) => `${i + 1}. ${s}`).join('\n');
-      } else {
-        aiText = "Here are the first steps to try:\n\n" + steps.slice(0, 3).map((s, i) => `${i + 1}. ${s}`).join('\n');
-        aiText += `\n\nThere are ${steps.length - 3} more steps. Would you like to see them?`;
-      }
-    } else {
-      aiText = reasoning || "I've analyzed your issue and I'm here to help. Can you provide more details?";
-    }
-    const userText = ticketData.description || ticketData.issue_type || 'My issue';
-    return [
-      { id: `injected-user-${stableTicketId}`, type: 'user', text: userText, createdAt: new Date().toISOString() },
-      {
-        id: `injected-ai-${stableTicketId}`,
-        type: 'ai',
-        text: aiText,
-        confidence,
-        metadata: {
-          response_style: responseStyle,
-          steps: PROSE_RESPONSE_STYLES.has(responseStyle) ? [] : (Array.isArray(steps) ? steps : []),
-          suggested_actions: suggestedActionsFromAgentResponse(ar),
-          estimated_time: PROSE_RESPONSE_STYLES.has(responseStyle) ? undefined : solution.estimated_time,
-          success_probability: PROSE_RESPONSE_STYLES.has(responseStyle) ? undefined : solution.success_probability,
-          quick_replies: quickRepliesFromAgentResponse(ar),
-          kb_article_citations: ar.kb_article_citations || [],
-          remediation_script: PROSE_RESPONSE_STYLES.has(responseStyle) ? null : (solution.remediation_script || null),
-        },
-        messageType:
-          PROSE_RESPONSE_STYLES.has(responseStyle) ? 'text' : steps.length > 1 ? 'steps' : 'text',
-        wasHelpful: initialRated != null ? initialRated : null,
-        showFeedbackPrompt: initialRated == null,
-        createdAt: new Date().toISOString(),
-      },
-    ];
-  };
-
   const loadConversationHistory = async () => {
     if (!ticketId) return;
     setIsLoading(true);
@@ -402,93 +371,66 @@ const AIChatPanel = ({
       const data = await api.agent.getChatHistory(ticketId);
       const conv = data.conversation || data;
       const convId = conv?.id || data.id;
-      const msgList = Array.isArray(data.messages)
-        ? data.messages
-        : Array.isArray(conv?.messages)
-          ? conv.messages
-          : [];
+      const msgList = extractHistoryMessageList(data);
       const initialRated =
         data.initial_solution_was_helpful ?? conv?.initial_solution_was_helpful ?? null;
 
       if (convId) setConversationId(convId);
-      if (msgList.length > 0) {
-        setMessages(
-          msgList.map((msg) => {
-            const meta = msg.metadata || {};
-            const wh = msg.was_helpful;
-            const hidePrompt =
-              msg.show_feedback_prompt === false || wh != null;
-            return {
-              id: msg.id,
-              type: msg.sender_type || msg.type,
-              text: msg.text,
-              confidence: msg.confidence,
-              authorName: msg.author_name,
-              metadata: {
-                ...meta,
-                suggested_actions: normalizeSuggestedActionsList(meta.suggested_actions),
-              },
-              messageType: msg.message_type,
-              wasHelpful: wh,
-              showFeedbackPrompt: hidePrompt ? false : (msg.sender_type || msg.type) === 'ai',
-              createdAt: msg.created_at,
-            };
-          })
-        );
-      } else {
-        // No messages: try to inject from ticket.agent_response (from process/Describe flow)
-        let injected = false;
+
+      let ticketData = ticket;
+      try {
+        if (!ticketData?.agent_processed || (msgList.length > 0 && !msgList.some((m) => m.sender_type === 'user' || m.sender_type === 'ai'))) {
+          ticketData = await api.tickets.get(ticketId);
+        }
+      } catch (_) {
+        ticketData = ticket;
+      }
+
+      const initialMessages = buildInitialChatMessages(msgList, ticketData, initialRated);
+      if (initialMessages.length > 0) {
+        setMessages(initialMessages);
+        return;
+      }
+
+      // Poll for agent_response when process may still be running (e.g. from Describe flow)
+      let injected = false;
+      const pollMs = 2000;
+      let pollMax = 15000;
+      const waitingForAnalysis = Boolean(ticketData && !ticketData.agent_processed);
+      if (waitingForAnalysis) {
+        pollMax = 60000;
+        setAnalysisPending(true);
+      }
+      let elapsed = 0;
+      while (elapsed < pollMax) {
+        await new Promise((r) => setTimeout(r, pollMs));
+        elapsed += pollMs;
         try {
-          const ticketData = await api.tickets.get(ticketId);
-          const built = buildMessagesFromAgentResponse(ticketData, initialRated);
+          const freshTicket = await api.tickets.get(ticketId);
+          let rated = initialRated;
+          try {
+            const gh = await api.agent.getChatHistory(ticketId);
+            const historyMsgs = extractHistoryMessageList(gh);
+            if (historyMsgs.length > 0) {
+              setMessages(buildInitialChatMessages(historyMsgs, freshTicket, rated));
+              injected = true;
+              break;
+            }
+            rated =
+              gh.initial_solution_was_helpful ??
+              gh.conversation?.initial_solution_was_helpful ??
+              rated;
+          } catch (_) {}
+          const built = buildSyntheticMessagesFromAgentResponse(freshTicket, rated);
           if (built?.length) {
             setMessages(built);
             injected = true;
+            break;
           }
         } catch (_) {}
-        if (!injected) {
-          // Poll for agent_response when process may still be running (e.g. from Describe flow)
-          const pollMs = 2000;
-          let pollMax = 15000;
-          let ticketData = ticket;
-          try {
-            if (!ticketData?.agent_processed) {
-              ticketData = await api.tickets.get(ticketId);
-            }
-          } catch (_) {
-            ticketData = null;
-          }
-          const waitingForAnalysis = Boolean(ticketData && !ticketData.agent_processed);
-          if (waitingForAnalysis) {
-            pollMax = 60000;
-            setAnalysisPending(true);
-          }
-          let elapsed = 0;
-          while (elapsed < pollMax) {
-            await new Promise((r) => setTimeout(r, pollMs));
-            elapsed += pollMs;
-            try {
-              const freshTicket = await api.tickets.get(ticketId);
-              let rated = initialRated;
-              try {
-                const gh = await api.agent.getChatHistory(ticketId);
-                rated =
-                  gh.initial_solution_was_helpful ??
-                  gh.conversation?.initial_solution_was_helpful ??
-                  rated;
-              } catch (_) {}
-              const built = buildMessagesFromAgentResponse(freshTicket, rated);
-              if (built?.length) {
-                setMessages(built);
-                injected = true;
-                break;
-              }
-            } catch (_) {}
-          }
-          setAnalysisPending(false);
-        }
-        if (!injected) startNewConversation();
       }
+      setAnalysisPending(false);
+      if (!injected) startNewConversation();
     } catch (error) {
       console.error('Failed to load chat history:', error);
       startNewConversation();
@@ -833,12 +775,14 @@ const AIChatPanel = ({
         }
       } catch (err) {
         console.error('Suggested action failed:', err);
+        const msg = getApiErrorMessage(err, 'Action could not be completed. Please try again or get human help below.');
         setMessages((prev) => [...prev, {
           id: `err-${Date.now()}`,
           type: 'system',
-          text: 'Action could not be completed. Please try again or get human help below.',
+          text: msg,
           createdAt: new Date().toISOString(),
         }]);
+        onAppToast?.(msg, 'error');
       } finally {
         setActionInProgress(null);
       }
@@ -904,12 +848,14 @@ const AIChatPanel = ({
       }
     } catch (err) {
       console.error('Suggested action failed:', err);
+      const msg = getApiErrorMessage(err, 'Action could not be completed. Please try again or get human help below.');
       setMessages((prev) => [...prev, {
         id: `err-${Date.now()}`,
         type: 'system',
-        text: 'Action could not be completed. Please try again or get human help below.',
+        text: msg,
         createdAt: new Date().toISOString(),
       }]);
+      onAppToast?.(msg, 'error');
     } finally {
       setActionInProgress(null);
     }
@@ -1563,8 +1509,13 @@ const AIChatPanel = ({
             </div>
           </div>
         )}
-        {ticket?.screenshot && (
-          <div className="mb-2 flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-2 py-1.5">
+        {ticket?.screenshot && screenshotBanner && (
+          <div
+            className={cn(
+              'mb-2 flex items-center gap-2 rounded-lg border px-2 py-1.5',
+              screenshotBannerToneClass[screenshotBanner.tone] || screenshotBannerToneClass.info
+            )}
+          >
             <img
               src={resolveMediaUrl(ticket.screenshot)}
               alt="Ticket screenshot"
@@ -1573,9 +1524,7 @@ const AIChatPanel = ({
                 e.currentTarget.style.display = 'none';
               }}
             />
-            <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">
-              Screenshot on this ticket — the assistant can use it on your next message.
-            </p>
+            <p className="text-[11px] leading-snug">{screenshotBanner.text}</p>
           </div>
         )}
         <div className="flex gap-2 items-end">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,10 +19,11 @@ import WorkflowChecklist from '../components/WorkflowChecklist';
 import ActionHistory from '../components/ActionHistory';
 import ResolutionFeedback from '../components/ResolutionFeedback';
 import AIChatPanel from '../components/AIChatPanel';
-import { api, TokenService, AgentQuotaExceededError, isAgentQuotaError } from '../services/api';
+import TicketChatPreview from '../components/TicketChatPreview';
+import { api, TokenService, AgentQuotaExceededError, isAgentQuotaError, getApiErrorMessage } from '../services/api';
 import { TICKET_CATEGORY_FALLBACK } from '../constants';
 import { cn } from '../utils/cn';
-import { getTicketNextStep } from '../utils/ticketUx';
+import { getTicketNextStep, getAgentReplyCopy } from '../utils/ticketUx';
 import { TicketsPageSkeleton, TicketDetailPanelSkeleton, Skeleton } from '../components/ui/Skeleton';
 import {
   IllustrationTicketsEmpty,
@@ -88,8 +89,10 @@ const Tickets = ({ activeTeamId }) => {
   const [commentLoading, setCommentLoading] = useState(false);
   const [agentReplyText, setAgentReplyText] = useState('');
   const [agentReplyLoading, setAgentReplyLoading] = useState(false);
+  const [chatPreviewRefresh, setChatPreviewRefresh] = useState(0);
   const [escalateLoading, setEscalateLoading] = useState(null);
   const [escalateModal, setEscalateModal] = useState({ open: false, ticketId: null });
+  const [escalateModalError, setEscalateModalError] = useState('');
   const [escalateForm, setEscalateForm] = useState({ reason: 'talk_to_human', note: '', phone: '', conversation_summary: '' });
   const [deleteLoading, setDeleteLoading] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -131,6 +134,11 @@ const Tickets = ({ activeTeamId }) => {
     setToast({ id, message, type });
     setTimeout(() => setToast((t) => (t && t.id === id ? null : t)), 4500);
   }, []);
+
+  const agentReplyCopy = useMemo(
+    () => getAgentReplyCopy(detailTicket, TokenService.getUser()),
+    [detailTicket]
+  );
 
   const scrollTicketCommentsIntoView = useCallback((delayMs = 360) => {
     window.setTimeout(() => {
@@ -346,6 +354,20 @@ const Tickets = ({ activeTeamId }) => {
 
   const openEscalate = (ticketId, { conversation_summary } = {}) => {
     if (!ticketId) return;
+    const id = Number(ticketId);
+    const ticket =
+      (detailTicket && Number(detailTicket.ticket_id ?? detailTicket.id) === id && detailTicket) ||
+      (currentTicket && Number(currentTicket.ticket_id ?? currentTicket.id) === id && currentTicket) ||
+      activeTickets.find((t) => Number(t.ticket_id ?? t.id) === id) ||
+      null;
+    const status = (ticket?.status || '').toLowerCase();
+    if (status === 'resolved') {
+      setEscalateModalError(
+        'This ticket is already resolved. Change the status back to open or in progress if you still need help.'
+      );
+    } else {
+      setEscalateModalError('');
+    }
     setEscalateForm({ reason: 'talk_to_human', note: '', phone: '', conversation_summary: (conversation_summary || '').trim() });
     setEscalateModal({ open: true, ticketId });
   };
@@ -353,6 +375,7 @@ const Tickets = ({ activeTeamId }) => {
   const submitEscalate = async () => {
     const ticketId = escalateModal?.ticketId;
     if (!ticketId) return;
+    setEscalateModalError('');
     setEscalateLoading(ticketId);
     try {
       const res = await api.tickets.escalate(ticketId, {
@@ -373,15 +396,20 @@ const Tickets = ({ activeTeamId }) => {
       if (detailTicket && (detailTicket.ticket_id ?? detailTicket.id) === ticketId) {
         setDetailTicket((prev) => (prev ? { ...prev, ...patch } : null));
       }
+      if (currentTicket && (currentTicket.ticket_id ?? currentTicket.id) === ticketId) {
+        setCurrentTicket((prev) => (prev ? { ...prev, ...patch } : null));
+      }
       window.dispatchEvent(new CustomEvent('resolvemeq:refresh-notifications'));
       setEscalateModal({ open: false, ticketId: null });
       const etaText = eta?.eta_text
         ? `Request sent (${(eta.priority || 'medium').toUpperCase()} priority). Expect a response ${eta.eta_text}.`
-        : 'Request sent. A support specialist will review this ticket soon.';
+        : res?.message || 'Request sent. A support specialist will review this ticket soon.';
       showToast(etaText, 'info');
     } catch (err) {
       console.error('Error escalating:', err);
-      showToast(err?.message || 'Could not escalate this ticket. Try again.', 'error');
+      const msg = getApiErrorMessage(err, 'Could not escalate this ticket. Try again.');
+      setEscalateModalError(msg);
+      showToast(msg, 'error');
     } finally {
       setEscalateLoading(null);
     }
@@ -427,7 +455,7 @@ const Tickets = ({ activeTeamId }) => {
     }
   };
 
-  /** Reply to the customer -- lands in their AI chat thread, not the internal notes above. */
+  /** Reply to the reporter — lands in their AI chat thread, not the internal notes above. */
   const handleSendAgentReply = async () => {
     if (!detailTicket || !agentReplyText.trim()) return;
     const id = detailTicket.ticket_id ?? detailTicket.id;
@@ -436,10 +464,11 @@ const Tickets = ({ activeTeamId }) => {
     try {
       await api.agent.sendAgentReply(id, text);
       setAgentReplyText('');
-      showToast('Reply sent to the customer.', 'success');
+      setChatPreviewRefresh((n) => n + 1);
+      showToast(`${agentReplyCopy.successToast} They’ll see it in the Conversation section and AI Chat.`, 'success');
     } catch (err) {
       console.error('Error sending agent reply:', err);
-      showToast(err?.message || 'Could not send your reply. Try again.', 'error');
+      showToast(getApiErrorMessage(err, 'Could not send your reply. Try again.'), 'error');
     } finally {
       setAgentReplyLoading(false);
     }
@@ -612,7 +641,7 @@ const Tickets = ({ activeTeamId }) => {
       {toast && (
         <div
           className={cn(
-            'fixed bottom-4 left-1/2 z-[60] max-w-md w-[calc(100%-2rem)] -translate-x-1/2 rounded-lg px-4 py-3 text-sm shadow-lg border',
+            'fixed bottom-4 left-1/2 z-[10050] max-w-md w-[calc(100%-2rem)] -translate-x-1/2 rounded-lg px-4 py-3 text-sm shadow-lg border',
             toast.type === 'error' &&
               'bg-red-50 dark:bg-red-950/90 text-red-900 dark:text-red-100 border-red-200 dark:border-red-800',
             toast.type === 'info' &&
@@ -828,6 +857,7 @@ const Tickets = ({ activeTeamId }) => {
           <AIChatPanel
             ticket={currentTicket}
             isOpen={showAIAgent}
+            refreshKey={chatPreviewRefresh}
             onClose={() => setShowAIAgent(false)}
             onBackToTicket={() => {
               setShowAIAgent(false);
@@ -1396,6 +1426,18 @@ const Tickets = ({ activeTeamId }) => {
                         )}
 
                         <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
+                          <TicketChatPreview
+                            ticketId={detailTicket?.ticket_id ?? detailTicket?.id}
+                            ticket={detailTicket}
+                            refreshKey={chatPreviewRefresh}
+                            onOpenChat={() => {
+                              setCurrentTicket(detailTicket);
+                              setShowAIAgent(true);
+                            }}
+                          />
+                        </div>
+
+                        <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
                           <AgentInsights
                             ticketId={detailTicket?.ticket_id ?? detailTicket?.id}
                             onEscalate={() => openEscalate(detailTicket?.ticket_id ?? detailTicket?.id)}
@@ -1416,10 +1458,10 @@ const Tickets = ({ activeTeamId }) => {
                         {detailTicket?.status === 'escalated' && detailTicket?.claimed_at && (
                           <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
                             <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">
-                              Reply to customer
+                              {agentReplyCopy.sectionTitle}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                              Lands in the same chat thread the customer's been using — not these internal notes.
+                              {agentReplyCopy.helperText}
                             </p>
                             <div className="flex gap-2 items-end">
                               <textarea
@@ -1427,7 +1469,7 @@ const Tickets = ({ activeTeamId }) => {
                                 rows={1}
                                 value={agentReplyText}
                                 onChange={(e) => setAgentReplyText(e.target.value)}
-                                placeholder="Type your reply to the customer..."
+                                placeholder={agentReplyCopy.placeholder}
                                 className="flex-1 min-h-[40px] max-h-[160px] px-3 py-2 border border-emerald-300 dark:border-emerald-800 rounded-lg bg-white dark:bg-gray-900 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none resize-none overflow-y-auto"
                               />
                               <Button
@@ -1464,7 +1506,7 @@ const Tickets = ({ activeTeamId }) => {
                             )}
                           </div>
                           <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                            Internal team notes — not sent to the customer.
+                            {agentReplyCopy.internalNotesHint}
                           </p>
                           {(detailTicket?.comments?.length ?? 0) > 0 && (
                             <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
@@ -1536,7 +1578,12 @@ const Tickets = ({ activeTeamId }) => {
               type="button"
               className="absolute inset-0 bg-black/50 dark:bg-black/60"
               aria-label="Close"
-              onClick={() => !escalateLoading && setEscalateModal({ open: false, ticketId: null })}
+              onClick={() => {
+                if (!escalateLoading) {
+                  setEscalateModalError('');
+                  setEscalateModal({ open: false, ticketId: null });
+                }
+              }}
             />
             <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl p-6">
               <div className="flex items-start justify-between gap-3 mb-2">
@@ -1549,12 +1596,26 @@ const Tickets = ({ activeTeamId }) => {
                 <button
                   type="button"
                   className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  onClick={() => !escalateLoading && setEscalateModal({ open: false, ticketId: null })}
+                  onClick={() => {
+                    if (!escalateLoading) {
+                      setEscalateModalError('');
+                      setEscalateModal({ open: false, ticketId: null });
+                    }
+                  }}
                   aria-label="Close"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
+
+              {escalateModalError && (
+                <p
+                  className="mt-3 text-sm text-red-700 dark:text-red-300 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-3 py-2"
+                  role="alert"
+                >
+                  {escalateModalError}
+                </p>
+              )}
 
               <div className="mt-4 space-y-4">
                 <div>
@@ -1563,7 +1624,10 @@ const Tickets = ({ activeTeamId }) => {
                   </label>
                   <select
                     value={escalateForm.reason}
-                    onChange={(e) => setEscalateForm((p) => ({ ...p, reason: e.target.value }))}
+                    onChange={(e) => {
+                      setEscalateModalError('');
+                      setEscalateForm((p) => ({ ...p, reason: e.target.value }));
+                    }}
                     className="w-full text-sm border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   >
                     <option value="talk_to_human">Talk to a support specialist</option>
@@ -1581,7 +1645,10 @@ const Tickets = ({ activeTeamId }) => {
                   <input
                     type="tel"
                     value={escalateForm.phone}
-                    onChange={(e) => setEscalateForm((p) => ({ ...p, phone: e.target.value }))}
+                    onChange={(e) => {
+                      setEscalateModalError('');
+                      setEscalateForm((p) => ({ ...p, phone: e.target.value }));
+                    }}
                     placeholder="e.g. +1 555 012 3456"
                     className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                     maxLength={40}
@@ -1598,7 +1665,10 @@ const Tickets = ({ activeTeamId }) => {
                   <textarea
                     rows={4}
                     value={escalateForm.note}
-                    onChange={(e) => setEscalateForm((p) => ({ ...p, note: e.target.value }))}
+                    onChange={(e) => {
+                      setEscalateModalError('');
+                      setEscalateForm((p) => ({ ...p, note: e.target.value }));
+                    }}
                     placeholder="What have you tried? What’s the impact?"
                     className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                     maxLength={2000}
@@ -1606,7 +1676,16 @@ const Tickets = ({ activeTeamId }) => {
                 </div>
 
                 <div className="flex justify-end gap-2 pt-1">
-                  <Button type="button" variant="ghost" size="sm" disabled={escalateLoading} onClick={() => setEscalateModal({ open: false, ticketId: null })}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={escalateLoading}
+                    onClick={() => {
+                      setEscalateModalError('');
+                      setEscalateModal({ open: false, ticketId: null });
+                    }}
+                  >
                     Cancel
                   </Button>
                   <Button type="button" variant="primary" size="sm" loading={escalateLoading} disabled={escalateLoading} onClick={submitEscalate}>

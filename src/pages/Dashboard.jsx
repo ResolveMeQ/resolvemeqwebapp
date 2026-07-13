@@ -22,7 +22,7 @@ import StatCard from '../components/ui/StatCard';
 import EmptyState from '../components/ui/EmptyState';
 import AIRecommendationsPanel from '../components/AIRecommendationsPanel';
 import WorkspaceRequiredBanner from '../components/WorkspaceRequiredBanner';
-import { api, TokenService, userCanAccessEscalationQueue } from '../services/api';
+import { api, TokenService, userCanAccessEscalationQueue, getApiErrorMessage } from '../services/api';
 import { DashboardPageSkeleton } from '../components/ui/Skeleton';
 
 /**
@@ -38,6 +38,7 @@ const Dashboard = ({ activeTeamId }) => {
   const [error, setError] = useState(null);
   const [escalatedTickets, setEscalatedTickets] = useState([]);
   const [escalatedLoading, setEscalatedLoading] = useState(false);
+  const [escalatedError, setEscalatedError] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -54,11 +55,13 @@ const Dashboard = ({ activeTeamId }) => {
   const loadEscalationQueue = async () => {
     if (!showEscalationQueue) return;
     setEscalatedLoading(true);
+    setEscalatedError(null);
     try {
       const data = await api.tickets.getEscalationQueue({ limit: 10 });
       setEscalatedTickets(data?.tickets ?? []);
-    } catch {
+    } catch (err) {
       setEscalatedTickets([]);
+      setEscalatedError(getApiErrorMessage(err, 'Could not load the escalation queue.'));
     } finally {
       setEscalatedLoading(false);
     }
@@ -71,7 +74,12 @@ const Dashboard = ({ activeTeamId }) => {
         api.analytics.getTicketAnalytics(),
         api.tickets.list({ limit: 5 }),
         showEscalationQueue
-          ? api.tickets.getEscalationQueue({ limit: 10 }).catch(() => ({ tickets: [] }))
+          ? api.tickets.getEscalationQueue({ limit: 10 }).catch((err) => {
+              if (!silent) {
+                setEscalatedError(getApiErrorMessage(err, 'Could not load the escalation queue.'));
+              }
+              return { tickets: [] };
+            })
           : Promise.resolve({ tickets: [] }),
         api.analytics.getOutcomeMetrics().catch(() => null),
       ]);
@@ -80,6 +88,7 @@ const Dashboard = ({ activeTeamId }) => {
       setOutcomeMetrics(outcomeData);
       setRecentTickets(Array.isArray(ticketsData) ? ticketsData.slice(0, 5) : []);
       setEscalatedTickets(Array.isArray(escData?.tickets) ? escData.tickets : []);
+      if (!silent && escData?.tickets?.length) setEscalatedError(null);
       setError(null);
     } catch (err) {
       console.error('Error loading dashboard:', err);
@@ -456,6 +465,11 @@ const Dashboard = ({ activeTeamId }) => {
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
             Escalated tickets across your teams, sorted by priority.
           </p>
+          {escalatedError && (
+            <p role="alert" className="text-sm text-red-600 dark:text-red-400 mb-3">
+              {escalatedError}
+            </p>
+          )}
           {escalatedLoading && escalatedTickets.length === 0 ? (
             <div className="space-y-3 py-2">
               {[0, 1, 2].map((k) => (
