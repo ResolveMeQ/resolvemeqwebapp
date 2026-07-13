@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Edit, Trash2, Users, X, Mail, UserPlus, RefreshCw } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Users, X, Mail, UserPlus, RefreshCw, Shield } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -33,6 +33,42 @@ const activePermissionLabels = (perms) => {
   return Object.entries(perms)
     .filter(([, enabled]) => enabled)
     .map(([key]) => PERMISSION_SHORT_LABELS[key] || key);
+};
+
+const memberHasDelegatedPermissions = (member) =>
+  activePermissionLabels(member?.delegated_permissions).length > 0;
+
+const MemberRowActions = ({ member, isOwner, showMemberActions, onAssignRoles, onRemove }) => {
+  if (!showMemberActions) return null;
+
+  const hasRoles = memberHasDelegatedPermissions(member);
+
+  return (
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 shrink-0 w-full sm:w-auto">
+      {isOwner && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onAssignRoles(member)}
+          className="justify-center border-primary-300 dark:border-primary-600 bg-primary-50 dark:bg-primary-950/40 text-primary-800 dark:text-primary-200 hover:bg-primary-100 dark:hover:bg-primary-900/50 font-medium shadow-sm"
+          title="Assign workspace permissions (playbooks, integrations, members, etc.)"
+        >
+          <Shield className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+          {hasRoles ? 'Edit roles' : 'Assign roles'}
+        </Button>
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="justify-center text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/30"
+        onClick={() => onRemove(member)}
+      >
+        Remove
+      </Button>
+    </div>
+  );
 };
 
 const Teams = () => {
@@ -896,8 +932,8 @@ const Teams = () => {
                         Members ({(selectedTeam.members_details || selectedTeam.members || []).length})
                       </h3>
                       {selectedTeam.is_owner && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                          Choose which areas each teammate can manage. Billing, workspace deletion, and granting permissions stay with you.
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 rounded-lg border border-primary-200/80 dark:border-primary-900/50 bg-primary-50/50 dark:bg-primary-950/20 px-3 py-2">
+                          Use <span className="font-medium text-primary-800 dark:text-primary-200">Assign roles</span> on each member to grant access to playbooks, integrations, and more. Workflow step roles (IT/HR) are set under <span className="font-medium">Users</span>.
                         </p>
                       )}
                       <ul className="space-y-2">
@@ -905,7 +941,7 @@ const Teams = () => {
                           const isOwnerMember = member?.id && String(member.id) === String(selectedTeam.owner);
                           const showMemberActions = canManageMembers(selectedTeam) && member?.id && !isOwnerMember;
                           return (
-                          <li key={member?.id ?? member?.email} className="flex items-center justify-between gap-2 py-2 px-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                          <li key={member?.id ?? member?.email} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-3 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                             <div className="flex items-center gap-2 min-w-0">
                               <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">
                                 {(member?.name || member?.email || '?').toString().split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
@@ -914,6 +950,9 @@ const Teams = () => {
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <p className="font-medium text-gray-900 dark:text-white truncate">{member?.name || member?.email || 'Member'}</p>
                                   {isOwnerMember && <Badge variant="primary" size="sm">Owner</Badge>}
+                                  {!isOwnerMember && !memberHasDelegatedPermissions(member) && selectedTeam.is_owner && (
+                                    <Badge variant="default" size="sm">Member</Badge>
+                                  )}
                                   {activePermissionLabels(member?.delegated_permissions).map((label) => (
                                     <Badge key={label} variant="secondary" size="sm">{label}</Badge>
                                   ))}
@@ -921,18 +960,13 @@ const Teams = () => {
                                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{member?.email}</p>
                               </div>
                             </div>
-                            <div className="flex flex-wrap items-center gap-1 shrink-0">
-                              {selectedTeam.is_owner && showMemberActions && (
-                                <Button variant="ghost" size="sm" onClick={() => openPermissionsModal(member)}>
-                                  Permissions
-                                </Button>
-                              )}
-                              {showMemberActions && (
-                                <Button variant="ghost" size="sm" className="text-red-600 dark:text-red-400" onClick={() => confirmRemoveMember(selectedTeam.id, member.id)}>
-                                  Remove
-                                </Button>
-                              )}
-                            </div>
+                            <MemberRowActions
+                              member={member}
+                              isOwner={selectedTeam.is_owner}
+                              showMemberActions={showMemberActions}
+                              onAssignRoles={openPermissionsModal}
+                              onRemove={(m) => confirmRemoveMember(selectedTeam.id, m.id)}
+                            />
                           </li>
                           );
                         })}
@@ -1173,7 +1207,7 @@ const Teams = () => {
                                 return (
                                 <li
                                   key={member?.id ?? member?.email}
-                                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-2 px-3 rounded-lg bg-gray-50 dark:bg-gray-800/50"
+                                  className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-3 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50"
                                 >
                                   <div className="flex items-center gap-2 min-w-0">
                                     <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">
@@ -1191,6 +1225,9 @@ const Teams = () => {
                                           {member?.name || member?.email || 'Member'}
                                         </p>
                                         {isOwnerMember && <Badge variant="primary" size="sm">Owner</Badge>}
+                                        {!isOwnerMember && !memberHasDelegatedPermissions(member) && selectedTeam.is_owner && (
+                                          <Badge variant="default" size="sm">Member</Badge>
+                                        )}
                                         {activePermissionLabels(member?.delegated_permissions).map((label) => (
                                           <Badge key={label} variant="secondary" size="sm">{label}</Badge>
                                         ))}
@@ -1198,23 +1235,13 @@ const Teams = () => {
                                       <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{member?.email}</p>
                                     </div>
                                   </div>
-                                  <div className="flex flex-wrap items-center gap-1 shrink-0 self-end sm:self-auto">
-                                    {selectedTeam.is_owner && showMemberActions && (
-                                      <Button variant="ghost" size="sm" onClick={() => openPermissionsModal(member)}>
-                                        Permissions
-                                      </Button>
-                                    )}
-                                    {showMemberActions && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-red-600 dark:text-red-400"
-                                        onClick={() => confirmRemoveMember(selectedTeam.id, member.id)}
-                                      >
-                                        Remove
-                                      </Button>
-                                    )}
-                                  </div>
+                                  <MemberRowActions
+                                    member={member}
+                                    isOwner={selectedTeam.is_owner}
+                                    showMemberActions={showMemberActions}
+                                    onAssignRoles={openPermissionsModal}
+                                    onRemove={(m) => confirmRemoveMember(selectedTeam.id, m.id)}
+                                  />
                                 </li>
                                 );
                               })}

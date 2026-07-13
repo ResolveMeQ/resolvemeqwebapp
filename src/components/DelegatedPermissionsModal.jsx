@@ -58,9 +58,11 @@ const DelegatedPermissionsModal = ({
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-gray-200 dark:border-gray-800">
           <div>
             <h2 id="delegated-permissions-title" className="text-base font-semibold text-gray-900 dark:text-white">
-              Workspace permissions
+              Assign workspace roles
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{memberLabel}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {memberLabel} — choose what this person can manage in the workspace.
+            </p>
           </div>
           <button
             type="button"
