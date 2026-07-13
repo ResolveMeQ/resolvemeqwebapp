@@ -6,7 +6,8 @@
   publish = "build"
 
 [build.environment]
-  NODE_VERSION = "18"
+  # Vite 7 requires Node 20.19+ or 22.12+ (crypto.hash); Node 18 fails builds
+  NODE_VERSION = "22"
 
 # Ensure JS is served with correct MIME type (fixes blank page / module script error)
 [[headers]]
