@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Zap, Plus, ArrowLeft, Play, Trash2, ToggleLeft, ToggleRight, Pencil } from 'lucide-react';
+import { Zap, Plus, ArrowLeft, Play, Trash2, ToggleLeft, ToggleRight, Pencil, Copy } from 'lucide-react';
 import Card from '../components/ui/Card';
 import WorkspaceRequiredBanner from '../components/WorkspaceRequiredBanner';
 import Button from '../components/ui/Button';
@@ -109,6 +109,99 @@ function actionSummary(rule, metadata) {
   return label;
 }
 
+function canDryRunRule(rule, canManage) {
+  return Boolean(rule.can_edit || (rule.is_global && canManage));
+}
+
+function RuleCard({
+  rule,
+  metadata,
+  editingRuleId,
+  canManage,
+  onEdit,
+  onDuplicate,
+  onToggle,
+  onDryRun,
+  onDelete,
+}) {
+  return (
+    <Card className={`p-4 ${editingRuleId === rule.id ? 'ring-2 ring-primary-500/40' : ''}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{rule.name}</p>
+            {rule.is_global && (
+              <Badge variant="secondary" className="text-[10px]" title="ResolveMeQ platform starter — copy to your workspace to edit">
+                Platform starter
+              </Badge>
+            )}
+            {!rule.is_active && <Badge variant="warning" className="text-[10px]">Paused</Badge>}
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            {metadata?.triggers?.find((t) => t.value === rule.trigger)?.label || rule.trigger}
+            {rule.conditions?.length > 0 && (
+              <> · if {rule.conditions[0].field} {rule.conditions[0].op || 'equals'} {String(rule.conditions[0].value)}</>
+            )}
+            {' · '}
+            {actionSummary(rule, metadata)}
+          </p>
+          {rule.description && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{rule.description}</p>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-1 shrink-0">
+          {rule.is_global && canManage && (
+            <Button variant="outline" size="sm" onClick={() => onDuplicate(rule)} title="Create an editable copy in your workspace">
+              <Copy className="w-3.5 h-3.5 mr-1" />
+              Copy to workspace
+            </Button>
+          )}
+          {rule.can_edit && (
+            <>
+              <button
+                type="button"
+                onClick={() => onEdit(rule)}
+                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                title="Edit rule"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onToggle(rule)}
+                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                title={rule.is_active ? 'Pause rule' : 'Activate rule'}
+              >
+                {rule.is_active ? <ToggleRight className="w-5 h-5 text-primary-600" /> : <ToggleLeft className="w-5 h-5" />}
+              </button>
+            </>
+          )}
+          {canDryRunRule(rule, canManage) && (
+            <button
+              type="button"
+              onClick={() => onDryRun(rule)}
+              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+              title="Dry run"
+            >
+              <Play className="w-4 h-4" />
+            </button>
+          )}
+          {rule.can_edit && (
+            <button
+              type="button"
+              onClick={() => onDelete(rule)}
+              className="p-2 rounded-lg text-gray-500 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+              title="Delete"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 const AutomationRules = ({ activeTeamId }) => {
   const [rules, setRules] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -141,6 +234,22 @@ const AutomationRules = ({ activeTeamId }) => {
     setShowForm(true);
     setError(null);
   };
+
+  const openDuplicateForm = (rule) => {
+    const base = ruleToForm(rule);
+    setEditingRuleId(null);
+    setForm({
+      ...base,
+      name: `${rule.name} (my copy)`.slice(0, 200),
+      description: rule.description || '',
+    });
+    setShowForm(true);
+    setError(null);
+  };
+
+  const workspaceRules = rules.filter((r) => !r.is_global);
+  const globalRules = rules.filter((r) => r.is_global);
+  const showRuleForm = showForm && (editingRuleId != null || canManage);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -368,7 +477,14 @@ const AutomationRules = ({ activeTeamId }) => {
 
       {activeTeamId && !canManage && !loading && (
         <Card className="p-3 mb-4 text-sm text-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20">
-          View-only: workspace owners and admins can create and edit rules.
+          View-only: ask your workspace owner to grant <span className="font-medium">Playbooks &amp; automation rules</span> under Teams → Assign roles.
+        </Card>
+      )}
+
+      {activeTeamId && canManage && globalRules.length > 0 && !loading && (
+        <Card className="p-3 mb-4 text-sm text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40">
+          <strong className="text-gray-900 dark:text-white">Your workspace rules</strong> are fully editable.
+          {' '}<strong className="text-gray-900 dark:text-white">Platform starters</strong> below are read-only examples — use <span className="font-medium">Copy to workspace</span> to customize.
         </Card>
       )}
 
@@ -378,7 +494,7 @@ const AutomationRules = ({ activeTeamId }) => {
         </Card>
       )}
 
-      {showForm && canManage && (
+      {showRuleForm && (
         <Card className="p-4 mb-6">
           <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
             {editingRuleId ? 'Edit rule' : 'New rule'}
@@ -482,69 +598,61 @@ const AutomationRules = ({ activeTeamId }) => {
           No rules yet. Create one above to automate what happens when a ticket matches a condition.
         </Card>
       ) : (
-        <div className="space-y-3">
-          {rules.map((rule) => (
-            <Card key={rule.id} className={`p-4 ${editingRuleId === rule.id ? 'ring-2 ring-primary-500/40' : ''}`}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{rule.name}</p>
-                    {rule.is_global && <Badge variant="secondary" className="text-[10px]">Global</Badge>}
-                    {!rule.is_active && <Badge variant="warning" className="text-[10px]">Paused</Badge>}
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {metadata?.triggers?.find((t) => t.value === rule.trigger)?.label || rule.trigger}
-                    {rule.conditions?.length > 0 && (
-                      <> · if {rule.conditions[0].field} {rule.conditions[0].op || 'equals'} {String(rule.conditions[0].value)}</>
-                    )}
-                    {' · '}
-                    {actionSummary(rule, metadata)}
-                  </p>
-                  {rule.description && (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{rule.description}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  {rule.can_edit && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => openEditForm(rule)}
-                        className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                        title="Edit rule"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleActive(rule)}
-                        className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                        title={rule.is_active ? 'Pause rule' : 'Activate rule'}
-                      >
-                        {rule.is_active ? <ToggleRight className="w-5 h-5 text-primary-600" /> : <ToggleLeft className="w-5 h-5" />}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDryRun(rule)}
-                        className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                        title="Dry run"
-                      >
-                        <Play className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(rule)}
-                        className="p-2 rounded-lg text-gray-500 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-800"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
+        <div className="space-y-6">
+          {workspaceRules.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                Your workspace rules ({workspaceRules.length})
+              </h2>
+              <div className="space-y-3">
+                {workspaceRules.map((rule) => (
+                  <RuleCard
+                    key={rule.id}
+                    rule={rule}
+                    metadata={metadata}
+                    editingRuleId={editingRuleId}
+                    canManage={canManage}
+                    onEdit={openEditForm}
+                    onDuplicate={openDuplicateForm}
+                    onToggle={toggleActive}
+                    onDryRun={handleDryRun}
+                    onDelete={handleDelete}
+                  />
+                ))}
               </div>
+            </section>
+          )}
+          {workspaceRules.length === 0 && canManage && globalRules.length > 0 && (
+            <Card className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              No workspace rules yet. Copy a platform starter below or create your own with <span className="font-medium">New rule</span>.
             </Card>
-          ))}
+          )}
+          {globalRules.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">
+                Platform starters ({globalRules.length})
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Shipped by ResolveMeQ for every workspace. Read-only — duplicate to customize.
+              </p>
+              <div className="space-y-3">
+                {globalRules.map((rule) => (
+                  <RuleCard
+                    key={rule.id}
+                    rule={rule}
+                    metadata={metadata}
+                    editingRuleId={editingRuleId}
+                    canManage={canManage}
+                    onEdit={openEditForm}
+                    onDuplicate={openDuplicateForm}
+                    onToggle={toggleActive}
+                    onDryRun={handleDryRun}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
 
