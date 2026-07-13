@@ -392,7 +392,7 @@ function App() {
         path="/knowledge-base"
         element={
           <Layout {...layoutProps}>
-            <KnowledgeBase isAuthenticated={isAuthenticated} />
+            <KnowledgeBase isAuthenticated={isAuthenticated} activeTeamId={preferences?.active_team} />
           </Layout>
         }
       />

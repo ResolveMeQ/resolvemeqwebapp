@@ -629,6 +629,8 @@ export const api = {
 
   // Knowledge Base endpoints
   knowledgeBase: {
+    metadata: async () => apiFetch('/api/knowledge_base/metadata/'),
+
     search: async (query) => {
       const data = await apiFetch(`/api/knowledge_base/articles/?q=${encodeURIComponent(query)}`);
       return Array.isArray(data) ? data : (data?.results || data?.data || []);
@@ -642,6 +644,23 @@ export const api = {
     get: async (id) => {
       return apiFetch(`/api/knowledge_base/articles/${id}/`);
     },
+
+    createArticle: async (payload) =>
+      apiFetch('/api/knowledge_base/articles/', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+
+    updateArticle: async (id, payload) =>
+      apiFetch(`/api/knowledge_base/articles/${id}/`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      }),
+
+    deleteArticle: async (id) =>
+      apiFetch(`/api/knowledge_base/articles/${id}/`, {
+        method: 'DELETE',
+      }),
 
     rate: async (id, isHelpful) => {
       return apiFetch(`/api/knowledge_base/articles/${id}/rate/`, {

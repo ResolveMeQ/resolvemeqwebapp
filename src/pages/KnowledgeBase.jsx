@@ -7,6 +7,9 @@ import {
   BookOpen,
   MessageSquare,
   Plus,
+  Pencil,
+  Trash2,
+  ArrowLeft,
   ArrowBigUp,
   ArrowBigDown,
   Check,
@@ -192,6 +195,8 @@ function ArticleDetailPanelContent({
   handleRate,
   ratingArticleId,
   sheetMode,
+  onEdit,
+  onDelete,
 }) {
   if (!article) return null;
   const id = article.kb_id ?? article.id;
@@ -205,15 +210,40 @@ function ArticleDetailPanelContent({
       >
         <h2 className="text-base font-semibold text-gray-900 dark:text-white truncate pr-2">
           {article.title}
+          {article.is_global && (
+            <span className="ml-2 text-[10px] font-medium uppercase text-gray-500 dark:text-gray-400">Global</span>
+          )}
         </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
-          aria-label="Close panel"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {article.can_edit && onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(article)}
+              className="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+              title="Edit article"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          )}
+          {article.can_edit && onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(article)}
+              className="p-2 rounded-md text-gray-500 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+              title="Delete article"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+            aria-label="Close panel"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       <div
@@ -289,7 +319,14 @@ function ArticleDetailPanelContent({
   );
 }
 
-const KnowledgeBase = ({ isAuthenticated = true }) => {
+const EMPTY_ARTICLE_FORM = {
+  title: '',
+  content: '',
+  tags: '',
+  is_published: true,
+};
+
+const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [mentionDebounceTimer, setMentionDebounceTimer] = useState(null);
@@ -331,6 +368,11 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
   const [commentFiles, setCommentFiles] = useState({});
   const [actionLoadingKey, setActionLoadingKey] = useState(null);
   const [openingQuestionId, setOpeningQuestionId] = useState(null);
+  const [canManageArticles, setCanManageArticles] = useState(false);
+  const [showArticleForm, setShowArticleForm] = useState(false);
+  const [editingArticleId, setEditingArticleId] = useState(null);
+  const [articleForm, setArticleForm] = useState(EMPTY_ARTICLE_FORM);
+  const [articleSaving, setArticleSaving] = useState(false);
 
   // Mentions (autocomplete)
   const [mentionState, setMentionState] = useState({
@@ -508,7 +550,14 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
 
   useEffect(() => {
     loadArticles();
-  }, []);
+    if (isAuthenticated) {
+      api.knowledgeBase.metadata()
+        .then((meta) => setCanManageArticles(Boolean(meta?.can_manage)))
+        .catch(() => setCanManageArticles(false));
+    } else {
+      setCanManageArticles(false);
+    }
+  }, [isAuthenticated, activeTeamId]);
 
   useEffect(() => {
     const raw = (searchParams.get('q') || '').trim();
@@ -727,6 +776,82 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
       showToast(err?.message || 'Failed to submit rating. Please try again.', 'error');
     } finally {
       setRatingArticleId(null);
+    }
+  };
+
+  const closeArticleForm = () => {
+    setShowArticleForm(false);
+    setEditingArticleId(null);
+    setArticleForm(EMPTY_ARTICLE_FORM);
+  };
+
+  const openCreateArticle = () => {
+    if (!requireAuthAction('create articles')) return;
+    if (!canManageArticles) {
+      showToast('Only workspace owners or playbook admins can author articles.', 'error');
+      return;
+    }
+    setEditingArticleId(null);
+    setArticleForm(EMPTY_ARTICLE_FORM);
+    setShowArticleForm(true);
+  };
+
+  const openEditArticle = (article) => {
+    if (!article?.can_edit) return;
+    const id = article.kb_id ?? article.id;
+    setEditingArticleId(id);
+    setArticleForm({
+      title: article.title || '',
+      content: article.content || '',
+      tags: (article.tags || []).join(', '),
+      is_published: article.is_published !== false,
+    });
+    setShowArticleForm(true);
+  };
+
+  const handleSaveArticle = async (e) => {
+    e.preventDefault();
+    if (!articleForm.title.trim() || !articleForm.content.trim()) return;
+    setArticleSaving(true);
+    try {
+      const tags = articleForm.tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const payload = {
+        title: articleForm.title.trim(),
+        content: articleForm.content.trim(),
+        tags,
+        is_published: Boolean(articleForm.is_published),
+      };
+      if (editingArticleId) {
+        await api.knowledgeBase.updateArticle(editingArticleId, payload);
+        showToast('Article updated.');
+      } else {
+        await api.knowledgeBase.createArticle(payload);
+        showToast('Article published to your workspace.');
+      }
+      closeArticleForm();
+      await loadArticles();
+    } catch (err) {
+      showToast(err?.message || 'Could not save article.', 'error');
+    } finally {
+      setArticleSaving(false);
+    }
+  };
+
+  const handleDeleteArticle = async (article) => {
+    if (!article?.can_edit) return;
+    const id = article.kb_id ?? article.id;
+    if (!window.confirm(`Delete article "${article.title}"?`)) return;
+    try {
+      await api.knowledgeBase.deleteArticle(id);
+      if ((selectedArticle?.kb_id ?? selectedArticle?.id) === id) closeArticle();
+      closeArticleForm();
+      showToast('Article deleted.');
+      await loadArticles();
+    } catch (err) {
+      showToast(err?.message || 'Could not delete article.', 'error');
     }
   };
 
@@ -1834,7 +1959,64 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
         >
           <RefreshCw className="w-4 h-4" />
         </Button>
+        {isAuthenticated && canManageArticles && (
+          <Button variant="primary" size="sm" onClick={openCreateArticle}>
+            <Plus className="w-4 h-4 mr-1.5" />
+            New article
+          </Button>
+        )}
       </div>
+
+      {isAuthenticated && !canManageArticles && viewMode === 'articles' && (
+        <Card className="p-3 text-sm text-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20">
+          Articles are read-only. Workspace owners and playbook admins can create runbooks your AI cites during tickets.
+        </Card>
+      )}
+
+      {showArticleForm && canManageArticles && (
+        <Card className="p-4">
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+            {editingArticleId ? 'Edit article' : 'New article'}
+          </h2>
+          <form onSubmit={handleSaveArticle} className="space-y-3">
+            <input
+              value={articleForm.title}
+              onChange={(e) => setArticleForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="VPN won't connect from home"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+              required
+            />
+            <textarea
+              value={articleForm.content}
+              onChange={(e) => setArticleForm((f) => ({ ...f, content: e.target.value }))}
+              placeholder="## Steps&#10;1. Check Wi-Fi&#10;2. Reconnect VPN"
+              rows={10}
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-mono"
+              required
+            />
+            <input
+              value={articleForm.tags}
+              onChange={(e) => setArticleForm((f) => ({ ...f, tags: e.target.value }))}
+              placeholder="vpn, wifi, remote (comma-separated)"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+            />
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={articleForm.is_published}
+                onChange={(e) => setArticleForm((f) => ({ ...f, is_published: e.target.checked }))}
+              />
+              Published (visible to AI and employees)
+            </label>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="ghost" size="sm" onClick={closeArticleForm}>Cancel</Button>
+              <Button type="submit" variant="primary" size="sm" loading={articleSaving}>
+                {editingArticleId ? 'Save changes' : 'Publish article'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
 
       {allTags.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
@@ -1980,6 +2162,8 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
               handleRate={handleRate}
               ratingArticleId={ratingArticleId}
               sheetMode={false}
+              onEdit={openEditArticle}
+              onDelete={handleDeleteArticle}
             />
           </motion.div>
         )}
@@ -2016,6 +2200,8 @@ const KnowledgeBase = ({ isAuthenticated = true }) => {
                     handleRate={handleRate}
                     ratingArticleId={ratingArticleId}
                     sheetMode
+                    onEdit={openEditArticle}
+                    onDelete={handleDeleteArticle}
                   />
                 </motion.aside>
               </>
