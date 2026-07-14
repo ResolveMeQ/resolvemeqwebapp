@@ -18,6 +18,7 @@ import {
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import ConfirmModal from '../components/ui/ConfirmModal';
 import { api, TokenService } from '../services/api';
 import { cn } from '../utils/cn';
 import { SettingsPageSkeleton } from '../components/ui/Skeleton';
@@ -120,6 +121,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   const [slackStatus, setSlackStatus] = useState(null);
   const [slackStatusLoading, setSlackStatusLoading] = useState(false);
   const [slackConnecting, setSlackConnecting] = useState(false);
+  const [confirmModal, setConfirmModal] = useState(null);
   const [slackDisconnecting, setSlackDisconnecting] = useState(false);
   const [teamsStatus, setTeamsStatus] = useState(null);
   const [teamsStatusLoading, setTeamsStatusLoading] = useState(false);
@@ -585,19 +587,28 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     }
   };
 
-  const handleDisconnectSlack = async () => {
+  const confirmDisconnectSlack = () => {
     const teamId = preferences?.active_team;
     if (!teamId) return;
-    try {
-      setSlackDisconnecting(true);
-      await api.integrations.slackDisconnect(teamId);
-      showToast('Slack disconnected for this workspace.');
-      await loadSlackStatus();
-    } catch (e) {
-      showToast(e?.message || 'Could not disconnect Slack.', 'error');
-    } finally {
-      setSlackDisconnecting(false);
-    }
+    setConfirmModal({
+      title: 'Disconnect Slack?',
+      description: 'Ticket notifications and slash commands for this workspace will stop working until you reconnect.',
+      variant: 'danger',
+      confirmLabel: 'Disconnect',
+      onConfirm: async () => {
+        try {
+          setSlackDisconnecting(true);
+          await api.integrations.slackDisconnect(teamId);
+          showToast('Slack disconnected for this workspace.');
+          await loadSlackStatus();
+        } catch (e) {
+          showToast(e?.message || 'Could not disconnect Slack.', 'error');
+          throw e;
+        } finally {
+          setSlackDisconnecting(false);
+        }
+      },
+    });
   };
 
   const handleConnectSlack = async () => {
@@ -634,20 +645,29 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     }
   };
 
-  const handleDisconnectTeams = async () => {
+  const confirmDisconnectTeams = () => {
     const teamId = preferences?.active_team;
     if (!teamId) return;
-    try {
-      setTeamsDisconnecting(true);
-      await api.integrations.teamsDisconnect(teamId);
-      setTeamsLinkInfo(null);
-      showToast('Microsoft Teams disconnected for this workspace.');
-      await loadTeamsStatus();
-    } catch (e) {
-      showToast(e?.message || 'Could not disconnect Teams.', 'error');
-    } finally {
-      setTeamsDisconnecting(false);
-    }
+    setConfirmModal({
+      title: 'Disconnect Microsoft Teams?',
+      description: 'Ticket notifications and bot commands for this workspace will stop working until you reconnect.',
+      variant: 'danger',
+      confirmLabel: 'Disconnect',
+      onConfirm: async () => {
+        try {
+          setTeamsDisconnecting(true);
+          await api.integrations.teamsDisconnect(teamId);
+          setTeamsLinkInfo(null);
+          showToast('Microsoft Teams disconnected for this workspace.');
+          await loadTeamsStatus();
+        } catch (e) {
+          showToast(e?.message || 'Could not disconnect Teams.', 'error');
+          throw e;
+        } finally {
+          setTeamsDisconnecting(false);
+        }
+      },
+    });
   };
 
   const handleCreateWebhook = async () => {
@@ -684,15 +704,23 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     }
   };
 
-  const handleDeleteWebhook = async (endpointId) => {
-    if (!window.confirm('Delete this webhook endpoint?')) return;
-    try {
-      await api.integrations.deleteWebhook(endpointId);
-      showToast('Webhook deleted.');
-      await loadWebhooks();
-    } catch (e) {
-      showToast(e?.message || 'Could not delete webhook.', 'error');
-    }
+  const confirmDeleteWebhook = (endpointId) => {
+    setConfirmModal({
+      title: 'Delete this webhook endpoint?',
+      description: 'Events will stop being delivered to this URL immediately.',
+      variant: 'danger',
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        try {
+          await api.integrations.deleteWebhook(endpointId);
+          showToast('Webhook deleted.');
+          await loadWebhooks();
+        } catch (e) {
+          showToast(e?.message || 'Could not delete webhook.', 'error');
+          throw e;
+        }
+      },
+    });
   };
 
   const toggleWebhookEvent = (event) => {
@@ -724,19 +752,28 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     }
   };
 
-  const handleDisconnectOkta = async () => {
+  const confirmDisconnectOkta = () => {
     const teamId = preferences?.active_team;
     if (!teamId) return;
-    try {
-      setOktaDisconnecting(true);
-      await api.integrations.oktaDisconnect(teamId);
-      showToast('Okta disconnected for this workspace.');
-      await loadOktaStatus();
-    } catch (e) {
-      showToast(e?.message || 'Could not disconnect Okta.', 'error');
-    } finally {
-      setOktaDisconnecting(false);
-    }
+    setConfirmModal({
+      title: 'Disconnect Okta?',
+      description: 'Workflow auto-checks that rely on Okta (e.g. onboarding account verification) will stop working until you reconnect.',
+      variant: 'danger',
+      confirmLabel: 'Disconnect',
+      onConfirm: async () => {
+        try {
+          setOktaDisconnecting(true);
+          await api.integrations.oktaDisconnect(teamId);
+          showToast('Okta disconnected for this workspace.');
+          await loadOktaStatus();
+        } catch (e) {
+          showToast(e?.message || 'Could not disconnect Okta.', 'error');
+          throw e;
+        } finally {
+          setOktaDisconnecting(false);
+        }
+      },
+    });
   };
 
   const handleConnectGoogle = async () => {
@@ -754,19 +791,28 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     }
   };
 
-  const handleDisconnectGoogle = async () => {
+  const confirmDisconnectGoogle = () => {
     const teamId = preferences?.active_team;
     if (!teamId) return;
-    try {
-      setGoogleDisconnecting(true);
-      await api.integrations.googleWorkspaceDisconnect(teamId);
-      showToast('Google Workspace disconnected.');
-      await loadGoogleStatus();
-    } catch (e) {
-      showToast(e?.message || 'Could not disconnect Google.', 'error');
-    } finally {
-      setGoogleDisconnecting(false);
-    }
+    setConfirmModal({
+      title: 'Disconnect Google Workspace?',
+      description: 'Workflow auto-checks that rely on Google Workspace will stop working until you reconnect.',
+      variant: 'danger',
+      confirmLabel: 'Disconnect',
+      onConfirm: async () => {
+        try {
+          setGoogleDisconnecting(true);
+          await api.integrations.googleWorkspaceDisconnect(teamId);
+          showToast('Google Workspace disconnected.');
+          await loadGoogleStatus();
+        } catch (e) {
+          showToast(e?.message || 'Could not disconnect Google.', 'error');
+          throw e;
+        } finally {
+          setGoogleDisconnecting(false);
+        }
+      },
+    });
   };
 
   const handleConnectMicrosoft = async () => {
@@ -784,19 +830,28 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     }
   };
 
-  const handleDisconnectMicrosoft = async () => {
+  const confirmDisconnectMicrosoft = () => {
     const teamId = preferences?.active_team;
     if (!teamId) return;
-    try {
-      setMicrosoftDisconnecting(true);
-      await api.integrations.microsoft365Disconnect(teamId);
-      showToast('Microsoft 365 disconnected.');
-      await loadMicrosoftStatus();
-    } catch (e) {
-      showToast(e?.message || 'Could not disconnect Microsoft.', 'error');
-    } finally {
-      setMicrosoftDisconnecting(false);
-    }
+    setConfirmModal({
+      title: 'Disconnect Microsoft 365?',
+      description: 'Workflow auto-checks that rely on Microsoft 365 will stop working until you reconnect.',
+      variant: 'danger',
+      confirmLabel: 'Disconnect',
+      onConfirm: async () => {
+        try {
+          setMicrosoftDisconnecting(true);
+          await api.integrations.microsoft365Disconnect(teamId);
+          showToast('Microsoft 365 disconnected.');
+          await loadMicrosoftStatus();
+        } catch (e) {
+          showToast(e?.message || 'Could not disconnect Microsoft.', 'error');
+          throw e;
+        } finally {
+          setMicrosoftDisconnecting(false);
+        }
+      },
+    });
   };
 
   const handleSaveJira = async () => {
@@ -842,19 +897,28 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     }
   };
 
-  const handleDisconnectJira = async () => {
+  const confirmDisconnectJira = () => {
     const teamId = preferences?.active_team;
     if (!teamId) return;
-    try {
-      setJiraDisconnecting(true);
-      await api.integrations.jiraDisconnect(teamId);
-      showToast('Jira disconnected.');
-      await loadJiraStatus();
-    } catch (e) {
-      showToast(e?.message || 'Could not disconnect Jira.', 'error');
-    } finally {
-      setJiraDisconnecting(false);
-    }
+    setConfirmModal({
+      title: 'Disconnect Jira?',
+      description: 'Escalated tickets will stop syncing to Jira until you reconnect.',
+      variant: 'danger',
+      confirmLabel: 'Disconnect',
+      onConfirm: async () => {
+        try {
+          setJiraDisconnecting(true);
+          await api.integrations.jiraDisconnect(teamId);
+          showToast('Jira disconnected.');
+          await loadJiraStatus();
+        } catch (e) {
+          showToast(e?.message || 'Could not disconnect Jira.', 'error');
+          throw e;
+        } finally {
+          setJiraDisconnecting(false);
+        }
+      },
+    });
   };
 
   const inputClass = 'input-enterprise';
@@ -1230,7 +1294,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                       type="button"
                       disabled={!preferences?.active_team || !canManageIntegrations || slackConnecting || slackDisconnecting}
                       loading={slackDisconnecting}
-                      onClick={handleDisconnectSlack}
+                      onClick={confirmDisconnectSlack}
                     >
                       Disconnect
                     </Button>
@@ -1320,7 +1384,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                       type="button"
                       disabled={!preferences?.active_team || !canManageIntegrations || teamsLinking || teamsDisconnecting}
                       loading={teamsDisconnecting}
-                      onClick={handleDisconnectTeams}
+                      onClick={confirmDisconnectTeams}
                     >
                       Disconnect
                     </Button>
@@ -1418,7 +1482,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                   type="button"
                   disabled={oktaDisconnecting}
                   loading={oktaDisconnecting}
-                  onClick={handleDisconnectOkta}
+                  onClick={confirmDisconnectOkta}
                 >
                   Disconnect
                 </Button>
@@ -1451,7 +1515,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                   {googleStatus?.connected ? 'Reconnect' : 'Connect'}
                 </Button>
                 {googleStatus?.connected && (
-                  <Button variant="outline" size="sm" type="button" loading={googleDisconnecting} disabled={googleConnecting} onClick={handleDisconnectGoogle}>
+                  <Button variant="outline" size="sm" type="button" loading={googleDisconnecting} disabled={googleConnecting} onClick={confirmDisconnectGoogle}>
                     Disconnect
                   </Button>
                 )}
@@ -1482,7 +1546,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                   {microsoftStatus?.connected ? 'Reconnect' : 'Connect'}
                 </Button>
                 {microsoftStatus?.connected && (
-                  <Button variant="outline" size="sm" type="button" loading={microsoftDisconnecting} disabled={microsoftConnecting} onClick={handleDisconnectMicrosoft}>
+                  <Button variant="outline" size="sm" type="button" loading={microsoftDisconnecting} disabled={microsoftConnecting} onClick={confirmDisconnectMicrosoft}>
                     Disconnect
                   </Button>
                 )}
@@ -1593,7 +1657,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                   type="button"
                   loading={jiraDisconnecting}
                   disabled={jiraSaving}
-                  onClick={handleDisconnectJira}
+                  onClick={confirmDisconnectJira}
                 >
                   Disconnect
                 </Button>
@@ -1781,7 +1845,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                         <Button variant="outline" size="sm" type="button" onClick={() => handleTestWebhook(wh.id)}>
                           Test
                         </Button>
-                        <Button variant="outline" size="sm" type="button" onClick={() => handleDeleteWebhook(wh.id)}>
+                        <Button variant="outline" size="sm" type="button" onClick={() => confirmDeleteWebhook(wh.id)}>
                           Delete
                         </Button>
                       </div>
@@ -1940,6 +2004,16 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
 
   return (
     <div className="space-y-6">
+      <ConfirmModal
+        open={!!confirmModal}
+        onClose={() => setConfirmModal(null)}
+        title={confirmModal?.title}
+        description={confirmModal?.description}
+        variant={confirmModal?.variant}
+        confirmLabel={confirmModal?.confirmLabel}
+        cancelLabel={confirmModal?.cancelLabel}
+        onConfirm={confirmModal?.onConfirm}
+      />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Settings</h1>

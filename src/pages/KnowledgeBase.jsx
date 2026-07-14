@@ -324,6 +324,7 @@ const EMPTY_ARTICLE_FORM = {
   content: '',
   tags: '',
   is_published: true,
+  is_verified: false,
 };
 
 const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
@@ -807,6 +808,7 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
       content: article.content || '',
       tags: (article.tags || []).join(', '),
       is_published: article.is_published !== false,
+      is_verified: article.is_verified === true,
     });
     setShowArticleForm(true);
   };
@@ -825,6 +827,7 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
         content: articleForm.content.trim(),
         tags,
         is_published: Boolean(articleForm.is_published),
+        is_verified: Boolean(articleForm.is_verified),
       };
       if (editingArticleId) {
         await api.knowledgeBase.updateArticle(editingArticleId, payload);
@@ -2073,6 +2076,14 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
                 onChange={(e) => setArticleForm((f) => ({ ...f, is_published: e.target.checked }))}
               />
               Published (visible to AI and employees)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={articleForm.is_verified}
+                onChange={(e) => setArticleForm((f) => ({ ...f, is_verified: e.target.checked }))}
+              />
+              Verified (reviewed and confirmed accurate)
             </label>
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="ghost" size="sm" onClick={closeArticleForm}>Cancel</Button>

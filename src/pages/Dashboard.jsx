@@ -388,6 +388,65 @@ const Dashboard = ({ activeTeamId }) => {
         <StatCard label="Workflows Done" value={outcomeMetrics?.workflows_completed_count ?? '—'} tone="gray" />
       </div>
 
+      {(outcomeMetrics?.stuck_items?.stuck_ticket_count > 0 || outcomeMetrics?.stuck_items?.stalled_step_count > 0) && (
+        <Card className="p-5 rounded-xl border-l-4 border-l-amber-500 dark:border-l-amber-600">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">What's stuck</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Idle 24h+ or past a workflow step's due date</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {outcomeMetrics.stuck_items.stuck_tickets.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                  Idle tickets ({outcomeMetrics.stuck_items.stuck_ticket_count})
+                </p>
+                <div className="space-y-1.5">
+                  {outcomeMetrics.stuck_items.stuck_tickets.map((t) => (
+                    <button
+                      key={t.ticket_id}
+                      type="button"
+                      onClick={() => navigate('/tickets', { state: { openTicketId: t.ticket_id } })}
+                      className="w-full flex items-center justify-between gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors text-left group"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm text-gray-800 dark:text-gray-200 group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                        #{t.ticket_id} {t.issue_type || ''}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-500 shrink-0">{t.hours_idle}h idle</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {outcomeMetrics.stuck_items.stalled_steps.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                  Overdue workflow steps ({outcomeMetrics.stuck_items.stalled_step_count})
+                </p>
+                <div className="space-y-1.5">
+                  {outcomeMetrics.stuck_items.stalled_steps.map((s, idx) => (
+                    <button
+                      key={`${s.workflow_id}-${idx}`}
+                      type="button"
+                      onClick={() => s.ticket_id && navigate('/tickets', { state: { openTicketId: s.ticket_id } })}
+                      disabled={!s.ticket_id}
+                      className="w-full flex items-center justify-between gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors text-left group disabled:cursor-default disabled:hover:bg-transparent"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm text-gray-800 dark:text-gray-200 group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                        {s.step_title}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-500 shrink-0">{s.hours_overdue}h overdue</span>
+                      {s.ticket_id && <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
       <Card className="p-5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="min-w-0">
