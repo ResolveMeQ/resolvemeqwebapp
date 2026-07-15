@@ -1360,6 +1360,52 @@ const Tickets = ({ activeTeamId }) => {
                           );
                         })()}
 
+                        {detailTicket?.duplicate_of && (
+                          <div
+                            className="rounded-lg border px-4 py-3 text-sm border-amber-200 bg-amber-50/90 dark:bg-amber-950/30 dark:border-amber-900/50"
+                            role="status"
+                          >
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                              Possible duplicate
+                            </p>
+                            <p className="text-gray-800 dark:text-gray-200 leading-snug">
+                              This looks similar to ticket #{detailTicket.duplicate_of} you already have open.{' '}
+                              <button
+                                type="button"
+                                className="font-medium underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200"
+                                onClick={() => loadTicketDetail(detailTicket.duplicate_of)}
+                              >
+                                View it
+                              </button>
+                            </p>
+                          </div>
+                        )}
+
+                        {Array.isArray(detailTicket?.duplicates) && detailTicket.duplicates.length > 0 && (
+                          <div
+                            className="rounded-lg border px-4 py-3 text-sm border-amber-200 bg-amber-50/90 dark:bg-amber-950/30 dark:border-amber-900/50"
+                            role="status"
+                          >
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                              Possibly the same issue
+                            </p>
+                            <p className="text-gray-800 dark:text-gray-200 leading-snug">
+                              {detailTicket.duplicates.map((id, idx) => (
+                                <span key={id}>
+                                  {idx > 0 && ', '}
+                                  <button
+                                    type="button"
+                                    className="font-medium underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200"
+                                    onClick={() => loadTicketDetail(id)}
+                                  >
+                                    #{id}
+                                  </button>
+                                </span>
+                              ))}
+                            </p>
+                          </div>
+                        )}
+
                         <div className="flex flex-wrap items-center gap-2 border-t border-gray-200 dark:border-gray-800 pt-4">
                           <Button variant="ghost" size="sm" onClick={() => { setEditTicket(detailTicket); setEditForm({ issue_type: detailTicket?.issue_type || '', description: detailTicket?.description || '', category: detailTicket?.category || 'other', status: detailTicket?.status || 'new' }); setDetailEditing(true); }}>
                             Edit
