@@ -636,6 +636,13 @@ export const api = {
       return apiFetch(`/api/workflows/${workflowId}/steps/${stepId}/auto-check/`, { method: 'POST' });
     },
 
+    executeAutoAction: async (workflowId, stepId) => {
+      return apiFetch(`/api/workflows/${workflowId}/steps/${stepId}/auto-action/`, {
+        method: 'POST',
+        body: JSON.stringify({ confirm: true }),
+      });
+    },
+
     stepAssistant: async (workflowId, stepId) => {
       return apiFetch(`/api/workflows/${workflowId}/steps/${stepId}/assistant/`);
     },

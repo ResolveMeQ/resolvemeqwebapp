@@ -8,6 +8,7 @@ import {
   Hand,
   ShieldCheck,
   Bot,
+  ShieldAlert,
   SkipForward,
   Lock,
   BookOpen,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
+import ConfirmModal from './ui/ConfirmModal';
 import { api } from '../services/api';
 import { cn } from '../utils/cn';
 
@@ -22,12 +24,34 @@ const STEP_TYPE_ICON = {
   manual: Hand,
   approval: ShieldCheck,
   auto_check: Bot,
+  auto_action: ShieldAlert,
 };
 
 const STEP_TYPE_BADGE = {
   manual: 'secondary',
   approval: 'warning',
   auto_check: 'primary',
+  auto_action: 'error',
+};
+
+const CONNECTOR_LABEL = {
+  okta: 'Okta',
+  google_workspace: 'Google Workspace',
+  microsoft365: 'Microsoft 365',
+};
+
+const ACTION_LABEL = {
+  deactivate_user: 'Deactivate user',
+  reset_password: 'Reset password',
+  remove_from_group: 'Remove from group',
+  revoke_license: 'Revoke license',
+};
+
+const describeAutoAction = (cfg) => {
+  if (!cfg) return '';
+  const connector = CONNECTOR_LABEL[cfg.connector] || cfg.connector;
+  const action = ACTION_LABEL[cfg.action] || cfg.action;
+  return `${action} in ${connector}`;
 };
 
 const formatDue = (iso) => {
@@ -196,7 +220,7 @@ function StepAssistantPanel({ workflowId, step, disabled, onAccepted }) {
   );
 }
 
-function StepDetailCard({ workflowId, step, busy, onClaim, onComplete, onAutoCheck, onAssistantAccepted }) {
+function StepDetailCard({ workflowId, step, busy, onClaim, onComplete, onAutoCheck, onRequestAutoAction, onAssistantAccepted }) {
   const isDone = step.status === 'done';
   const isSkipped = step.status === 'skipped';
   const isActive = step.status === 'active';
@@ -204,6 +228,7 @@ function StepDetailCard({ workflowId, step, busy, onClaim, onComplete, onAutoChe
   const TypeIcon = STEP_TYPE_ICON[stepType] || Hand;
   const roleLabel = step.assignee_role_label || step.assignee_team;
   const checkResult = step.auto_check_result;
+  const actionResult = step.auto_action_result;
 
   return (
     <div
@@ -245,7 +270,11 @@ function StepDetailCard({ workflowId, step, busy, onClaim, onComplete, onAutoChe
         {stepType !== 'manual' && !isSkipped && !isDone && (
           <Badge variant={STEP_TYPE_BADGE[stepType] || 'secondary'} className="mt-1.5 text-[10px] gap-1">
             <TypeIcon className="w-3 h-3" />
-            {stepType === 'approval' ? 'Approval' : 'Auto check'}
+            {stepType === 'approval'
+              ? 'Approval'
+              : stepType === 'auto_action'
+                ? describeAutoAction(step.auto_action) || 'Directory action'
+                : 'Auto check'}
           </Badge>
         )}
         {step.description && (
@@ -304,6 +333,20 @@ function StepDetailCard({ workflowId, step, busy, onClaim, onComplete, onAutoChe
             {checkResult.message}
           </p>
         )}
+        {actionResult?.message && !isDone && !isSkipped && (
+          <p
+            className={cn(
+              'text-xs mt-1.5',
+              actionResult.status === 'success'
+                ? 'text-green-600 dark:text-green-400'
+                : actionResult.status === 'skipped'
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-red-600 dark:text-red-400'
+            )}
+          >
+            {actionResult.message}
+          </p>
+        )}
         {isActive && workflowId && (stepType === 'manual' || stepType === 'approval') && (
           <StepAssistantPanel
             workflowId={workflowId}
@@ -324,6 +367,15 @@ function StepDetailCard({ workflowId, step, busy, onClaim, onComplete, onAutoChe
             <>
               <Button variant="primary" size="sm" loading={busy} onClick={() => onAutoCheck?.(step)}>
                 Run check
+              </Button>
+              <Button variant="outline" size="sm" loading={busy} onClick={() => onComplete(step)}>
+                Mark done
+              </Button>
+            </>
+          ) : stepType === 'auto_action' ? (
+            <>
+              <Button variant="danger" size="sm" loading={busy} onClick={() => onRequestAutoAction?.(step)}>
+                Execute action
               </Button>
               <Button variant="outline" size="sm" loading={busy} onClick={() => onComplete(step)}>
                 Mark done
@@ -359,6 +411,8 @@ function StepDetailCard({ workflowId, step, busy, onClaim, onComplete, onAutoChe
 const WorkflowChecklist = ({ workflow, onUpdate, variant = 'standalone' }) => {
   const [busyStepId, setBusyStepId] = useState(null);
   const [error, setError] = useState(null);
+  const [confirmingStep, setConfirmingStep] = useState(null);
+  const [revealedSecret, setRevealedSecret] = useState(null);
   const embedded = variant === 'embedded';
 
   if (!workflow) return null;
@@ -401,6 +455,25 @@ const WorkflowChecklist = ({ workflow, onUpdate, variant = 'standalone' }) => {
       onUpdate?.();
     } catch (e) {
       setError(e?.message || 'Could not run auto check.');
+    } finally {
+      setBusyStepId(null);
+    }
+  };
+
+  const handleExecuteAutoAction = async (step) => {
+    setBusyStepId(step.id);
+    setError(null);
+    try {
+      const res = await api.workflows.executeAutoAction(workflow.id, step.id);
+      if (!res?.passed) {
+        setError(res?.message || 'Action did not complete.');
+      } else if (res?.generated_password) {
+        setRevealedSecret({ stepId: step.id, title: step.title, password: res.generated_password });
+      }
+      onUpdate?.();
+    } catch (e) {
+      setError(e?.message || 'Could not execute this action.');
+      throw e;
     } finally {
       setBusyStepId(null);
     }
@@ -449,6 +522,25 @@ const WorkflowChecklist = ({ workflow, onUpdate, variant = 'standalone' }) => {
         <p className="text-xs text-red-600 dark:text-red-400 mb-2">{error}</p>
       )}
 
+      {revealedSecret && (
+        <div className="mb-3 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/90 dark:bg-amber-950/30 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200 mb-1">
+            One-time temporary password
+          </p>
+          <p className="text-xs text-gray-700 dark:text-gray-300 mb-1.5">
+            For "{revealedSecret.title}" — shown once, not stored. Share it with the user securely.
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="text-sm font-mono bg-white dark:bg-gray-900 border border-amber-300 dark:border-amber-800 rounded px-2 py-1">
+              {revealedSecret.password}
+            </code>
+            <Button variant="ghost" size="sm" onClick={() => setRevealedSecret(null)}>
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2">
         {workflow.steps.map((step) => (
           <StepDetailCard
@@ -459,6 +551,7 @@ const WorkflowChecklist = ({ workflow, onUpdate, variant = 'standalone' }) => {
             onClaim={handleClaim}
             onComplete={handleComplete}
             onAutoCheck={handleAutoCheck}
+            onRequestAutoAction={setConfirmingStep}
             onAssistantAccepted={onUpdate}
           />
         ))}
@@ -470,6 +563,20 @@ const WorkflowChecklist = ({ workflow, onUpdate, variant = 'standalone' }) => {
           All steps complete
         </p>
       )}
+
+      <ConfirmModal
+        open={Boolean(confirmingStep)}
+        onClose={() => setConfirmingStep(null)}
+        title="Execute directory action?"
+        description={
+          confirmingStep
+            ? `This will ${describeAutoAction(confirmingStep.auto_action).toLowerCase() || 'run this action'} for "${confirmingStep.title}" right now. This cannot be undone automatically.`
+            : ''
+        }
+        confirmLabel="Execute"
+        variant="danger"
+        onConfirm={() => handleExecuteAutoAction(confirmingStep)}
+      />
     </div>
   );
 };
