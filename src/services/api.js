@@ -1207,6 +1207,15 @@ export const api = {
         body: JSON.stringify({ team_id: teamId }),
       });
     },
+    slackUpdateSettings: async (teamId, payload) => {
+      if (!teamId) {
+        throw new Error('team_id is required to update Slack settings');
+      }
+      return apiFetch('/api/integrations/slack/settings/', {
+        method: 'PATCH',
+        body: JSON.stringify({ team_id: teamId, ...payload }),
+      });
+    },
     teamsStatus: async (teamId) => {
       const q = teamId ? `?team_id=${encodeURIComponent(teamId)}` : '';
       return apiFetch(`/api/integrations/teams/status/${q}`);

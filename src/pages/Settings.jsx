@@ -123,6 +123,8 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
   const [slackConnecting, setSlackConnecting] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
   const [slackDisconnecting, setSlackDisconnecting] = useState(false);
+  const [slackForm, setSlackForm] = useState({ escalation_channel_id: '' });
+  const [slackSaving, setSlackSaving] = useState(false);
   const [teamsStatus, setTeamsStatus] = useState(null);
   const [teamsStatusLoading, setTeamsStatusLoading] = useState(false);
   const [teamsLinking, setTeamsLinking] = useState(false);
@@ -223,6 +225,7 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
       setSlackStatusLoading(true);
       const s = await api.integrations.slackStatus(teamId);
       setSlackStatus(s);
+      setSlackForm({ escalation_channel_id: s?.escalation_channel_id || '' });
     } catch (e) {
       console.error('Slack status:', e);
       setSlackStatus({ connected: false, error: true });
@@ -897,6 +900,26 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
     }
   };
 
+  const handleSaveSlack = async () => {
+    const teamId = preferences?.active_team;
+    if (!teamId) {
+      showToast('Choose an active workspace first.', 'error');
+      return;
+    }
+    try {
+      setSlackSaving(true);
+      await api.integrations.slackUpdateSettings(teamId, {
+        escalation_channel_id: slackForm.escalation_channel_id.trim(),
+      });
+      showToast('Slack settings updated.');
+      await loadSlackStatus();
+    } catch (e) {
+      showToast(e?.message || 'Could not save Slack settings.', 'error');
+    } finally {
+      setSlackSaving(false);
+    }
+  };
+
   const confirmDisconnectJira = () => {
     const teamId = preferences?.active_team;
     if (!teamId) return;
@@ -1302,6 +1325,33 @@ const Settings = ({ initialTab = 'general', onThemeChange, theme }) => {
                 </div>
               </div>
             </div>
+
+            {connected && (
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="flex-1 min-w-[220px]">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Escalation channel ID
+                  </label>
+                  <input
+                    type="text"
+                    className={inputClass}
+                    placeholder="e.g. C01234ABCD (leave blank to use the account default)"
+                    value={slackForm.escalation_channel_id}
+                    onChange={(e) => setSlackForm((p) => ({ ...p, escalation_channel_id: e.target.value }))}
+                  />
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="button"
+                  loading={slackSaving}
+                  disabled={!canManageIntegrations}
+                  onClick={handleSaveSlack}
+                >
+                  Save
+                </Button>
+              </div>
+            )}
 
             <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/40 p-4 space-y-2">
               <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 uppercase tracking-wide">
