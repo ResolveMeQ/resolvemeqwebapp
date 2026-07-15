@@ -1493,6 +1493,32 @@ const Tickets = ({ activeTeamId }) => {
                           </div>
                         )}
 
+                        {Array.isArray(detailTicket?.incident_tickets) && detailTicket.incident_tickets.length > 0 && (
+                          <div
+                            className="rounded-lg border px-4 py-3 text-sm border-red-200 bg-red-50/90 dark:bg-red-950/30 dark:border-red-900/50"
+                            role="status"
+                          >
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                              Possible ongoing incident
+                            </p>
+                            <p className="text-gray-800 dark:text-gray-200 leading-snug">
+                              {detailTicket.incident_tickets.length + 1} people (including this report) have filed similar tickets recently:{' '}
+                              {detailTicket.incident_tickets.map((id, idx) => (
+                                <span key={id}>
+                                  {idx > 0 && ', '}
+                                  <button
+                                    type="button"
+                                    className="font-medium underline underline-offset-2 hover:text-red-900 dark:hover:text-red-200"
+                                    onClick={() => loadTicketDetail(id)}
+                                  >
+                                    #{id}
+                                  </button>
+                                </span>
+                              ))}
+                            </p>
+                          </div>
+                        )}
+
                         <div className="flex flex-wrap items-center gap-2 border-t border-gray-200 dark:border-gray-800 pt-4">
                           <Button variant="ghost" size="sm" onClick={() => { setEditTicket(detailTicket); setEditForm({ issue_type: detailTicket?.issue_type || '', description: detailTicket?.description || '', category: detailTicket?.category || 'other', status: detailTicket?.status || 'new' }); setDetailEditing(true); }}>
                             Edit
