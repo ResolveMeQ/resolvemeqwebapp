@@ -109,6 +109,9 @@ const Tickets = ({ activeTeamId }) => {
   const [screenshotLightboxUrl, setScreenshotLightboxUrl] = useState(null);
   const [ticketCategories, setTicketCategories] = useState(TICKET_CATEGORY_FALLBACK);
   const [toast, setToast] = useState(null);
+  const [selectedTicketIds, setSelectedTicketIds] = useState(new Set());
+  const [bulkStatus, setBulkStatus] = useState('resolved');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
   const toastSeq = useRef(0);
   const pendingScrollToCommentsRef = useRef(null);
   const screenshotInputRef = useRef(null);
@@ -349,6 +352,36 @@ const Tickets = ({ activeTeamId }) => {
       showToast(err?.message || 'Could not update ticket status.', 'error');
     } finally {
       setUpdatingStatus(null);
+    }
+  };
+
+  const toggleTicketSelected = (ticketId) => {
+    setSelectedTicketIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(ticketId)) next.delete(ticketId);
+      else next.add(ticketId);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedTicketIds(new Set());
+
+  const handleBulkStatusUpdate = async () => {
+    const ticketIds = Array.from(selectedTicketIds);
+    if (!ticketIds.length) return;
+    setBulkUpdating(true);
+    try {
+      const res = await api.tickets.bulkUpdate(ticketIds, bulkStatus);
+      setActiveTickets((prev) =>
+        prev.map((t) => (ticketIds.includes(t.ticket_id ?? t.id) ? { ...t, status: bulkStatus } : t))
+      );
+      showToast(`Updated ${res?.updated ?? ticketIds.length} ticket(s) to ${bulkStatus.replace(/_/g, ' ')}.`, 'success');
+      clearSelection();
+    } catch (err) {
+      console.error('Error bulk-updating tickets:', err);
+      showToast(err?.message || 'Could not bulk-update tickets.', 'error');
+    } finally {
+      setBulkUpdating(false);
     }
   };
 
@@ -921,6 +954,29 @@ const Tickets = ({ activeTeamId }) => {
           </div>
         </div>
 
+        {selectedTicketIds.size > 0 && (
+          <div className="px-4 sm:px-6 py-3 border-b border-gray-200 dark:border-gray-800 bg-primary-50/60 dark:bg-primary-950/20 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+              {selectedTicketIds.size} selected
+            </span>
+            <select
+              value={bulkStatus}
+              onChange={(e) => setBulkStatus(e.target.value)}
+              className="input-enterprise !py-1.5 !w-auto text-sm"
+            >
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <Button variant="primary" size="sm" loading={bulkUpdating} onClick={handleBulkStatusUpdate}>
+              Apply
+            </Button>
+            <Button variant="ghost" size="sm" disabled={bulkUpdating} onClick={clearSelection}>
+              Clear
+            </Button>
+          </div>
+        )}
+
         {(communityLoading || communityHints.length > 0) && (
           <div className="px-4 sm:px-6 py-3 border-b border-amber-100 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-950/20">
             <div className="flex items-center gap-2 text-xs font-semibold text-amber-900 dark:text-amber-200 uppercase tracking-wide">
@@ -1022,10 +1078,18 @@ const Tickets = ({ activeTeamId }) => {
                   <div
                     key={id}
                     className={cn(
-                      'p-4 hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors',
+                      'p-4 hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors flex items-start gap-3',
                       isSelected && 'bg-primary-50 dark:bg-primary-900/10'
                     )}
                   >
+                    <input
+                      type="checkbox"
+                      className="mt-1.5 shrink-0"
+                      checked={selectedTicketIds.has(id)}
+                      onChange={() => toggleTicketSelected(id)}
+                      aria-label={`Select ticket #${id}`}
+                    />
+                    <div className="min-w-0 flex-1">
                     <button
                       type="button"
                       onClick={() => handleViewDetail(ticket)}
@@ -1065,6 +1129,7 @@ const Tickets = ({ activeTeamId }) => {
                         Delete
                       </button>
                     </div>
+                    </div>
                   </div>
                 );
               })}
@@ -1074,6 +1139,20 @@ const Tickets = ({ activeTeamId }) => {
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
                   <tr>
+                    <th className="w-10 px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={filteredTickets.length > 0 && filteredTickets.every((t) => selectedTicketIds.has(t.ticket_id ?? t.id))}
+                        onChange={() => {
+                          setSelectedTicketIds((prev) => {
+                            const allSelected = filteredTickets.every((t) => prev.has(t.ticket_id ?? t.id));
+                            if (allSelected) return new Set();
+                            return new Set(filteredTickets.map((t) => t.ticket_id ?? t.id));
+                          });
+                        }}
+                        aria-label="Select all tickets"
+                      />
+                    </th>
                     <th className="text-left px-6 py-3 text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">ID</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Issue</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Category</th>
@@ -1095,6 +1174,14 @@ const Tickets = ({ activeTeamId }) => {
                           isSelected && 'bg-primary-50 dark:bg-primary-900/10'
                         )}
                       >
+                        <td className="px-4 py-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedTicketIds.has(id)}
+                            onChange={() => toggleTicketSelected(id)}
+                            aria-label={`Select ticket #${id}`}
+                          />
+                        </td>
                         <td className="px-6 py-4 font-mono text-xs text-gray-500 dark:text-gray-500">#{id}</td>
                         <td className="px-6 py-4">
                           <button

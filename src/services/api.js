@@ -516,6 +516,13 @@ export const api = {
       });
     },
 
+    bulkUpdate: async (ticketIds, status) => {
+      return apiFetch('/api/tickets/bulk-update/', {
+        method: 'POST',
+        body: JSON.stringify({ ticket_ids: ticketIds, status }),
+      });
+    },
+
     history: async (ticketId) => {
       return apiFetch(`/api/tickets/${ticketId}/history/`);
     },
