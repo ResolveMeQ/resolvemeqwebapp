@@ -24,6 +24,7 @@ import {
 import { cn } from '../../utils/cn';
 import { NAVIGATION_ITEMS, THEME_MODES } from '../../constants';
 import WorkspaceSwitcher from '../WorkspaceSwitcher';
+import BrandLogo from '../brand/BrandLogo';
 
 /**
  * Sidebar component with responsive design and glassmorphism effects
@@ -132,10 +133,9 @@ const Sidebar = ({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex items-center space-x-2.5"
+                className="flex items-center min-w-0"
               >
-                <img src="/logo.png" alt="ResolveMeQ" className="h-7 w-auto object-contain" />
-                <span className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">ResolveMeQ</span>
+                <BrandLogo adaptive variant="lockup" markClassName="h-7 w-7" wordmarkClassName="text-lg" />
               </motion.div>
             ) : (
               <motion.div
@@ -145,7 +145,7 @@ const Sidebar = ({
                 exit={{ opacity: 0 }}
                 className="flex items-center justify-center w-full"
               >
-                <img src="/logo.png" alt="ResolveMeQ" className="h-7 w-7 object-contain" />
+                <BrandLogo variant="mark" className="h-7 w-7" />
               </motion.div>
             )}
           </AnimatePresence>
@@ -310,9 +310,8 @@ const Sidebar = ({
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
             <div className="flex-shrink-0 flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-800">
-              <div className="flex items-center space-x-2.5 min-w-0">
-                <img src="/logo.png" alt="ResolveMeQ" className="h-7 w-auto object-contain shrink-0" />
-                <span className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight truncate">ResolveMeQ</span>
+              <div className="min-w-0">
+                <BrandLogo adaptive variant="lockup" markClassName="h-7 w-7" wordmarkClassName="text-lg" />
               </div>
               <button
                 onClick={() => setIsMobileOpen(false)}

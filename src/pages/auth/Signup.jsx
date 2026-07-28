@@ -13,6 +13,7 @@ import {
 import Button from '../../components/ui/Button';
 import GoogleSignInButton from '../../components/auth/GoogleSignInButton';
 import AuthThemeToggle from '../../components/auth/AuthThemeToggle';
+import BrandLogo from '../../components/brand/BrandLogo';
 import { isGoogleAuthEnabled } from '../../utils/googleAuth';
 import { api } from '../../services/api';
 
@@ -141,10 +142,10 @@ const Signup = ({ onSignup, onNavigateToLogin, onGoogleSignedIn }) => {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+      <div className="min-h-screen brand-auth-shell flex items-center justify-center p-4">
         <AuthThemeToggle />
         <div className="w-full max-w-md">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8 text-center">
+          <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl shadow-sm border border-blue-900/5 dark:border-blue-400/10 p-8 text-center">
             <div className="w-16 h-16 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
             </div>
@@ -154,8 +155,8 @@ const Signup = ({ onSignup, onNavigateToLogin, onGoogleSignedIn }) => {
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
               Registration successful! We've sent a 6-digit verification code to <strong className="text-gray-900 dark:text-white">{formData.email}</strong>. Check your email and enter the code at the verify page, or click the link in the email.
             </p>
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-              <p className="text-xs text-blue-800 dark:text-blue-200">
+            <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-4 mb-6">
+              <p className="text-xs text-primary-800 dark:text-primary-200">
                 <strong>Note:</strong> The verification link will expire in 10 minutes. If you don't see the email, check your spam folder.
               </p>
             </div>
@@ -183,21 +184,18 @@ const Signup = ({ onSignup, onNavigateToLogin, onGoogleSignedIn }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+    <div className="min-h-screen brand-auth-shell flex items-center justify-center p-4">
       <AuthThemeToggle />
       <div className="w-full max-w-lg">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-6">
-            <img src="/logo.png" alt="ResolveMeQ" className="h-10 w-auto object-contain" />
-            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-              ResolveMeQ
-            </h1>
+          <div className="inline-flex justify-center mb-6">
+            <BrandLogo adaptive variant="lockup" className="h-10" markClassName="h-10 w-10" wordmarkClassName="text-2xl" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Create your account</h2>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Create your account</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">Get started with enterprise IT support</p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
+        <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl shadow-sm border border-blue-900/5 dark:border-blue-400/10 p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>

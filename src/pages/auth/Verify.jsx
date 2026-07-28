@@ -4,6 +4,7 @@ import { CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import CodeEntrySection from '../../components/auth/CodeEntrySection';
 import AuthThemeToggle from '../../components/auth/AuthThemeToggle';
+import BrandLogo from '../../components/brand/BrandLogo';
 import { api } from '../../services/api';
 
 /**
@@ -65,10 +66,10 @@ const Verify = ({ onVerified, onNavigateToLogin }) => {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+      <div className="min-h-screen brand-auth-shell flex items-center justify-center p-4">
         <AuthThemeToggle />
         <div className="w-full max-w-md">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8 text-center">
+          <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl shadow-sm border border-blue-900/5 dark:border-blue-400/10 p-8 text-center">
             <div className="w-16 h-16 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
             </div>
@@ -87,19 +88,18 @@ const Verify = ({ onVerified, onNavigateToLogin }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+    <div className="min-h-screen brand-auth-shell flex items-center justify-center p-4">
       <AuthThemeToggle />
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-6">
-            <img src="/logo.png" alt="ResolveMeQ" className="h-10 w-auto object-contain" />
-            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">ResolveMeQ</h1>
+          <div className="inline-flex justify-center mb-6">
+            <BrandLogo adaptive variant="lockup" className="h-10" markClassName="h-10 w-10" wordmarkClassName="text-2xl" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Verify your email</h2>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Verify your email</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">Enter the verification code from your email</p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
+        <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl shadow-sm border border-blue-900/5 dark:border-blue-400/10 p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             <CodeEntrySection
               email={email}

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 248 64" fill="none" role="img" aria-label="ResolveMeQ">
+  <defs>
+    <clipPath id="split">
+      <rect width="64" height="27"/>
+      <rect y="37" width="64" height="27"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#split)" fill="#2563EB">
+    <rect x="27" y="3" width="10" height="58" rx="2.5"/>
+    <rect x="27" y="3" width="10" height="58" rx="2.5" transform="rotate(45 32 32)"/>
+    <rect x="27" y="3" width="10" height="58" rx="2.5" transform="rotate(90 32 32)"/>
+    <rect x="27" y="3" width="10" height="58" rx="2.5" transform="rotate(135 32 32)"/>
+    <circle cx="32" cy="32" r="18"/>
+  </g>
+  <circle cx="32" cy="32" r="9.5" fill="#0B1220"/>
+  <circle cx="32" cy="32" r="4.5" fill="#60A5FA"/>
+  <rect x="6" y="28.5" width="52" height="2" rx="1" fill="#60A5FA"/>
+  <rect x="6" y="33.5" width="52" height="2" rx="1" fill="#60A5FA"/>
+  <text x="76" y="40"
+    fill="#0F172A"
+    font-family="DejaVu Sans, Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif"
+    font-size="26"
+    font-weight="700"
+    letter-spacing="-0.035em">ResolveMeQ</text>
+</svg>

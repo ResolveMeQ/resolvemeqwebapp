@@ -10,6 +10,7 @@ import {
 import Button from '../../components/ui/Button';
 import GoogleSignInButton from '../../components/auth/GoogleSignInButton';
 import AuthThemeToggle from '../../components/auth/AuthThemeToggle';
+import BrandLogo from '../../components/brand/BrandLogo';
 import { isGoogleAuthEnabled } from '../../utils/googleAuth';
 import { api, TokenService } from '../../services/api';
 
@@ -120,21 +121,18 @@ const Login = ({ onLogin, onNavigateToSignup, onNavigateToForgotPassword }) => {
   const showResendOption = errors.general && isUnverifiedError(errors.general);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+    <div className="min-h-screen brand-auth-shell flex items-center justify-center p-4">
       <AuthThemeToggle />
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-6">
-            <img src="/logo.png" alt="ResolveMeQ" className="h-10 w-auto object-contain" />
-            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-              ResolveMeQ
-            </h1>
+          <div className="inline-flex justify-center mb-6">
+            <BrandLogo adaptive variant="lockup" className="h-10" markClassName="h-10 w-10" wordmarkClassName="text-2xl" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Welcome back</h2>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Welcome back</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">Sign in to your account</p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
+        <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl shadow-sm border border-blue-900/5 dark:border-blue-400/10 p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="email" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">

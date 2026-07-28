@@ -32,6 +32,7 @@ import { cn } from '../utils/cn';
 import { KnowledgeBaseArticlesSkeleton } from '../components/ui/Skeleton';
 import { renderMarkdown } from '../utils/markdown';
 import { formatFileSize, resolveMediaUrl } from '../utils/media';
+import { KnowledgeBaseSeo } from '../seo/KnowledgeBaseSeo';
 
 const MENTION_RE = /(?<![\\w@])@([A-Za-z0-9_.+-]{2,150})/g;
 
@@ -1958,6 +1959,12 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
   }
 
   return (
+    <>
+      <KnowledgeBaseSeo
+        selectedArticle={selectedArticle}
+        selectedQuestion={selectedQuestion}
+        viewMode={viewMode}
+      />
     <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-8rem)] lg:min-h-[500px]">
       {/* Left: list and filters */}
       <div className="flex-1 min-w-0 flex flex-col space-y-6 overflow-y-auto scrollbar-hide">
@@ -2368,6 +2375,7 @@ const KnowledgeBase = ({ isAuthenticated = true, activeTeamId = null }) => {
         </div>
       )}
     </div>
+    </>
   );
 };
 

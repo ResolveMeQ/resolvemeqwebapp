@@ -2,5 +2,18 @@ User-agent: *
 Allow: /knowledge-base
 Allow: /community/
 Disallow: /api/
+Disallow: /login
+Disallow: /signup
+Disallow: /verify
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /tickets
+Disallow: /workflows
+Disallow: /settings
+Disallow: /billing
+Disallow: /analytics
+Disallow: /teams
+Disallow: /users
+Disallow: /escalation-queue
 
-Sitemap: https://app.resolvemeq.net/sitemap.xml
+Sitemap: https://resolvemeq.net/sitemap.xml

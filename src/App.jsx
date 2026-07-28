@@ -26,6 +26,7 @@ import './index.css';
 import { THEME_MODES, DEFAULT_THEME } from './constants';
 import { TokenService, api, userCanAccessEscalationQueue } from './services/api';
 import { applyThemeToDocument, getLocalTheme, hasLocalTheme, normalizeTheme, setLocalTheme } from './utils/theme';
+import { AppRouteSeo } from './seo/KnowledgeBaseSeo';
 
 function safeNextPath(next) {
   const raw = String(next || '').trim();
@@ -473,9 +474,11 @@ function App() {
   }
 
   const hasTeamSwitcher = true;
+  const isKnowledgeBaseRoute = location.pathname.startsWith('/knowledge-base');
 
   return (
     <>
+      {!isKnowledgeBaseRoute && <AppRouteSeo />}
       {isAuthenticated && (
         <AppTour
           key={tourNonce}

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import AuthThemeToggle from '../../components/auth/AuthThemeToggle';
+import BrandLogo from '../../components/brand/BrandLogo';
 import { api } from '../../services/api';
 
 /**
@@ -49,10 +50,10 @@ const ForgotPassword = ({ onNavigateToLogin }) => {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+      <div className="min-h-screen brand-auth-shell flex items-center justify-center p-4">
         <AuthThemeToggle />
         <div className="w-full max-w-md">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8 text-center">
+          <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl shadow-sm border border-blue-900/5 dark:border-blue-400/10 p-8 text-center">
             <div className="w-16 h-16 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
             </div>
@@ -65,8 +66,8 @@ const ForgotPassword = ({ onNavigateToLogin }) => {
               We've sent a 6-digit code and reset link to <strong className="text-gray-900 dark:text-white">{email}</strong>. Check your email and either click the link or enter the code on the reset page.
             </p>
             
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-              <p className="text-xs text-blue-800 dark:text-blue-200">
+            <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-4 mb-6">
+              <p className="text-xs text-primary-800 dark:text-primary-200">
                 <strong>Note:</strong> The code will expire in 1 hour. If the link doesn't work, go to the reset page and enter the code manually.
               </p>
             </div>
@@ -95,21 +96,18 @@ const ForgotPassword = ({ onNavigateToLogin }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+    <div className="min-h-screen brand-auth-shell flex items-center justify-center p-4">
       <AuthThemeToggle />
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-6">
-            <img src="/logo.png" alt="ResolveMeQ" className="h-10 w-auto object-contain" />
-            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-              ResolveMeQ
-            </h1>
+          <div className="inline-flex justify-center mb-6">
+            <BrandLogo adaptive variant="lockup" className="h-10" markClassName="h-10 w-10" wordmarkClassName="text-2xl" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Forgot password?</h2>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Forgot password?</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">No worries, we'll send you reset instructions</p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-8">
+        <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl shadow-sm border border-blue-900/5 dark:border-blue-400/10 p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="email" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">
